@@ -813,7 +813,9 @@ static RISCV_CSR_READFN(mcycleR) {
 //
 static RISCV_CSR_WRITEFN(mcycleW) {
 
-    if(RISCV_XLEN_IS_32(riscv)) {
+    if(!hpmAccessValid(attrs, riscv)) {
+        // no action
+    } else if(RISCV_XLEN_IS_32(riscv)) {
         cycleW(riscv, setLower(newValue, cycleR(riscv)));
     } else {
         cycleW(riscv, newValue);
@@ -841,7 +843,9 @@ static RISCV_CSR_READFN(mcyclehR) {
 //
 static RISCV_CSR_WRITEFN(mcyclehW) {
 
-    cycleW(riscv, setUpper(newValue, cycleR(riscv)));
+    if(hpmAccessValid(attrs, riscv)) {
+        cycleW(riscv, setUpper(newValue, cycleR(riscv)));
+    }
 
     return newValue;
 }
@@ -915,7 +919,9 @@ static RISCV_CSR_READFN(minstretR) {
 //
 static RISCV_CSR_WRITEFN(minstretW) {
 
-    if(RISCV_XLEN_IS_32(riscv)) {
+    if(!hpmAccessValid(attrs, riscv)) {
+        // no action
+    } else if(RISCV_XLEN_IS_32(riscv)) {
         instretW(riscv, setLower(newValue, instretR(riscv)));
     } else {
         instretW(riscv, newValue);
@@ -943,9 +949,35 @@ static RISCV_CSR_READFN(minstrethR) {
 //
 static RISCV_CSR_WRITEFN(minstrethW) {
 
-    instretW(riscv, setUpper(newValue, instretR(riscv)));
+    if(hpmAccessValid(attrs, riscv)) {
+        instretW(riscv, setUpper(newValue, instretR(riscv)));
+    }
 
     return newValue;
+}
+
+//
+// Read unimplemented performance monitor register
+//
+static RISCV_CSR_READFN(mhpmR) {
+
+    if(hpmAccessValid(attrs, riscv)) {
+        // no action
+    }
+
+    return 0;
+}
+
+//
+// Write unimplemented performance monitor register
+//
+static RISCV_CSR_WRITEFN(mhpmW) {
+
+    if(hpmAccessValid(attrs, riscv)) {
+        // no action
+    }
+
+    return 0;
 }
 
 
@@ -1057,64 +1089,6 @@ static RISCV_CSR_WRITEFN(pmpaddrW) {
     noTraceChange : _NOTR,                          \
     TVMT          : _TVMT,                          \
 }
-
-
-////////////////////////////////////////////////////////////////////////////////
-// MACROS FOR HARDWIRED-TO-ZERO CSRS
-////////////////////////////////////////////////////////////////////////////////
-
-//
-// Hardwired-to-zero
-//
-#define CSR_ATTR_HWZ( \
-    _ID, _NUM, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC \
-) [CSR_ID(_ID)] = {                                 \
-    name          : #_ID,                           \
-    desc          : _DESC" (hardwired to zero)",    \
-    csrNum        : _NUM,                           \
-    arch          : _ARCH,                          \
-    wEndBlock     : _ENDB,                          \
-    wEndRM        : _ENDRM,                         \
-    noTraceChange : _NOTR,                          \
-    TVMT          : _TVMT,                          \
-}
-
-//
-// Hardwired-to-zero, append number
-//
-#define CSR_ATTR_HWZ_NUM(_ID, _NUM, _I, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC) \
-    CSR_ATTR_HWZ(_ID##_I, _NUM+_I, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC#_I)
-
-//
-// Hardwired-to-zero, numbers 0..9
-//
-#define CSR_ATTR_HWZ_0_9(_ID, _NUM, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC) \
-    CSR_ATTR_HWZ_NUM(_ID, _NUM, 0, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC), \
-    CSR_ATTR_HWZ_NUM(_ID, _NUM, 1, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC), \
-    CSR_ATTR_HWZ_NUM(_ID, _NUM, 2, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC), \
-    CSR_ATTR_HWZ_NUM(_ID, _NUM, 3, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC), \
-    CSR_ATTR_HWZ_NUM(_ID, _NUM, 4, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC), \
-    CSR_ATTR_HWZ_NUM(_ID, _NUM, 5, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC), \
-    CSR_ATTR_HWZ_NUM(_ID, _NUM, 6, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC), \
-    CSR_ATTR_HWZ_NUM(_ID, _NUM, 7, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC), \
-    CSR_ATTR_HWZ_NUM(_ID, _NUM, 8, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC), \
-    CSR_ATTR_HWZ_NUM(_ID, _NUM, 9, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC)
-
-//
-// Hardwired-to-zero, numbers 3..31
-//
-#define CSR_ATTR_HWZ_3_31(_ID, _NUM, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC) \
-    CSR_ATTR_HWZ_NUM(_ID,    _NUM,     3, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC),    \
-    CSR_ATTR_HWZ_NUM(_ID,    _NUM,     4, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC),    \
-    CSR_ATTR_HWZ_NUM(_ID,    _NUM,     5, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC),    \
-    CSR_ATTR_HWZ_NUM(_ID,    _NUM,     6, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC),    \
-    CSR_ATTR_HWZ_NUM(_ID,    _NUM,     7, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC),    \
-    CSR_ATTR_HWZ_NUM(_ID,    _NUM,     8, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC),    \
-    CSR_ATTR_HWZ_NUM(_ID,    _NUM,     9, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC),    \
-    CSR_ATTR_HWZ_0_9(_ID##1, _NUM+10,     _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC"1"), \
-    CSR_ATTR_HWZ_0_9(_ID##2, _NUM+20,     _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC"2"), \
-    CSR_ATTR_HWZ_NUM(_ID,    _NUM,    30, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC),    \
-    CSR_ATTR_HWZ_NUM(_ID,    _NUM,    31, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC)
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1239,6 +1213,42 @@ static RISCV_CSR_WRITEFN(pmpaddrW) {
     CSR_ATTR_P__NUM(_ID, _NUM, 15, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC, _RCB, _RWCB, _WCB)
 
 //
+// Implemented using callbacks only, numbers 0..9
+//
+#define CSR_ATTR_P__0_9( \
+    _ID, _NUM, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC, _RCB, _RWCB, _WCB \
+) \
+    CSR_ATTR_P__NUM(_ID, _NUM, 0, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC, _RCB, _RWCB, _WCB), \
+    CSR_ATTR_P__NUM(_ID, _NUM, 1, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC, _RCB, _RWCB, _WCB), \
+    CSR_ATTR_P__NUM(_ID, _NUM, 2, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC, _RCB, _RWCB, _WCB), \
+    CSR_ATTR_P__NUM(_ID, _NUM, 3, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC, _RCB, _RWCB, _WCB), \
+    CSR_ATTR_P__NUM(_ID, _NUM, 4, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC, _RCB, _RWCB, _WCB), \
+    CSR_ATTR_P__NUM(_ID, _NUM, 5, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC, _RCB, _RWCB, _WCB), \
+    CSR_ATTR_P__NUM(_ID, _NUM, 6, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC, _RCB, _RWCB, _WCB), \
+    CSR_ATTR_P__NUM(_ID, _NUM, 7, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC, _RCB, _RWCB, _WCB), \
+    CSR_ATTR_P__NUM(_ID, _NUM, 8, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC, _RCB, _RWCB, _WCB), \
+    CSR_ATTR_P__NUM(_ID, _NUM, 9, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC, _RCB, _RWCB, _WCB)
+
+//
+// Implemented using callbacks only, numbers 3..31
+//
+#define CSR_ATTR_P__3_31( \
+    _ID, _NUM, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC, _RCB, _RWCB, _WCB \
+) \
+    CSR_ATTR_P__NUM(_ID,    _NUM, 3, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC,    _RCB, _RWCB, _WCB), \
+    CSR_ATTR_P__NUM(_ID,    _NUM, 4, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC,    _RCB, _RWCB, _WCB), \
+    CSR_ATTR_P__NUM(_ID,    _NUM, 5, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC,    _RCB, _RWCB, _WCB), \
+    CSR_ATTR_P__NUM(_ID,    _NUM, 6, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC,    _RCB, _RWCB, _WCB), \
+    CSR_ATTR_P__NUM(_ID,    _NUM, 7, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC,    _RCB, _RWCB, _WCB), \
+    CSR_ATTR_P__NUM(_ID,    _NUM, 8, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC,    _RCB, _RWCB, _WCB), \
+    CSR_ATTR_P__NUM(_ID,    _NUM, 9, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC,    _RCB, _RWCB, _WCB), \
+    CSR_ATTR_P__0_9(_ID##1, _NUM+10, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC"1", _RCB, _RWCB, _WCB), \
+    CSR_ATTR_P__0_9(_ID##2, _NUM+20, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC"2", _RCB, _RWCB, _WCB), \
+    CSR_ATTR_P__NUM(_ID,    _NUM,30, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC,    _RCB, _RWCB, _WCB), \
+    CSR_ATTR_P__NUM(_ID,    _NUM,31, _ARCH, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC,    _RCB, _RWCB, _WCB)
+
+
+//
 // CSR table
 //
 static const riscvCSRAttrs csrs[CSR_ID(LAST)] = {
@@ -1258,16 +1268,16 @@ static const riscvCSRAttrs csrs[CSR_ID(LAST)] = {
     CSR_ATTR_P__     (cycle,        0xC00, 0,           0,0,1,0,  "Cycle Counter",                                 mcycleR,    0,     0         ),
     CSR_ATTR_P__     (time,         0xC01, 0,           0,0,1,0,  "Timer",                                         mtimeR,     0,     0         ),
     CSR_ATTR_P__     (instret,      0xC02, 0,           0,0,1,0,  "Instructions Retired",                          minstretR,  0,     0         ),
-    CSR_ATTR_HWZ_3_31(hpmcounter,   0xC00, 0,           0,0,0,0,  "Performance Monitor Counter "                                                ),
+    CSR_ATTR_P__3_31 (hpmcounter,   0xC00, 0,           0,0,0,0,  "Performance Monitor Counter ",                  mhpmR,      0,     mhpmW     ),
     CSR_ATTR_P__     (cycleh,       0xC80, ISA_XLEN_32, 0,0,1,0,  "Cycle Counter High",                            mcyclehR,   0,     0         ),
     CSR_ATTR_P__     (timeh,        0xC81, ISA_XLEN_32, 0,0,1,0,  "Timer High",                                    mtimehR,    0,     0         ),
     CSR_ATTR_P__     (instreth,     0xC82, ISA_XLEN_32, 0,0,1,0,  "Instructions Retired High",                     minstrethR, 0,     0         ),
-    CSR_ATTR_HWZ_3_31(hpmcounterh,  0xC80, ISA_XLEN_32, 0,0,0,0,  "Performance Monitor High "                                                   ),
+    CSR_ATTR_P__3_31 (hpmcounterh,  0xC80, ISA_XLEN_32, 0,0,0,0,  "Performance Monitor High ",                     mhpmR,      0,     mhpmW     ),
 
     //                name          num    arch         attrs     description                                      rCB         rwCB   wCB
     CSR_ATTR_P__     (sstatus,      0x100, ISA_S,       0,0,0,0,  "Supervisor Status",                             sstatusR,   0,     sstatusW  ),
-    CSR_ATTR_TV_     (sedeleg,      0x102, ISA_N,       0,0,0,0,  "Supervisor Exception Delegation",               0,          0,     0         ),
-    CSR_ATTR_T__     (sideleg,      0x103, ISA_N,       1,0,0,0,  "Supervisor Interrupt Delegation",               0,          0,     sidelegW  ),
+    CSR_ATTR_TV_     (sedeleg,      0x102, ISA_SandN,   0,0,0,0,  "Supervisor Exception Delegation",               0,          0,     0         ),
+    CSR_ATTR_T__     (sideleg,      0x103, ISA_SandN,   1,0,0,0,  "Supervisor Interrupt Delegation",               0,          0,     sidelegW  ),
     CSR_ATTR_P__     (sie,          0x104, ISA_S,       1,0,0,0,  "Supervisor Interrupt Enable",                   sieR,       0,     sieW      ),
     CSR_ATTR_T__     (stvec,        0x105, ISA_S,       0,0,0,0,  "Supervisor Trap-Vector Base-Address",           0,          0,     stvecW    ),
     CSR_ATTR_TV_     (scounteren,   0x106, ISA_S,       0,0,0,0,  "Supervisor Counter Enable",                     0,          0,     0         ),
@@ -1285,11 +1295,11 @@ static const riscvCSRAttrs csrs[CSR_ID(LAST)] = {
     CSR_ATTR_T__     (mhartid,      0xF14, 0,           0,0,0,0,  "Hardware Thread ID",                            0,          0,     0         ),
     CSR_ATTR_TV_     (mstatus,      0x300, 0,           0,0,0,0,  "Machine Status",                                mstatusR,   0,     mstatusW  ),
     CSR_ATTR_T__     (misa,         0x301, 0,           1,0,0,0,  "ISA and Extensions",                            0,          0,     misaW     ),
-    CSR_ATTR_TV_     (medeleg,      0x302, ISA_S|ISA_N, 0,0,0,0,  "Machine Exception Delegation",                  0,          0,     0         ),
-    CSR_ATTR_T__     (mideleg,      0x303, ISA_S|ISA_N, 1,0,0,0,  "Machine Interrupt Delegation",                  0,          0,     midelegW  ),
+    CSR_ATTR_TV_     (medeleg,      0x302, ISA_SorN,    0,0,0,0,  "Machine Exception Delegation",                  0,          0,     0         ),
+    CSR_ATTR_T__     (mideleg,      0x303, ISA_SorN,    1,0,0,0,  "Machine Interrupt Delegation",                  0,          0,     midelegW  ),
     CSR_ATTR_T__     (mie,          0x304, 0,           1,0,0,0,  "Machine Interrupt Enable",                      0,          0,     mieW      ),
     CSR_ATTR_T__     (mtvec,        0x305, 0,           0,0,0,0,  "Machine Trap-Vector Base-Address",              0,          0,     mtvecW    ),
-    CSR_ATTR_TV_     (mcounteren,   0x306, ISA_S|ISA_U, 0,0,0,0,  "Machine Counter Enable",                        0,          0,     0         ),
+    CSR_ATTR_TV_     (mcounteren,   0x306, ISA_SorU,    0,0,0,0,  "Machine Counter Enable",                        0,          0,     0         ),
     CSR_ATTR_T__     (mscratch,     0x340, 0,           0,0,0,0,  "Machine Scratch",                               0,          0,     0         ),
     CSR_ATTR_TV_     (mepc,         0x341, 0,           0,0,0,0,  "Machine Exception Program Counter",             0,          0,     0         ),
     CSR_ATTR_TV_     (mcause,       0x342, 0,           0,0,0,0,  "Machine Cause",                                 0,          0,     0         ),
@@ -1306,11 +1316,11 @@ static const riscvCSRAttrs csrs[CSR_ID(LAST)] = {
     //                name          num    arch         attrs     description                                      rCB         rwCB   wCB
     CSR_ATTR_P__     (mcycle,       0xB00, 0,           0,0,1,0,  "Machine Cycle Counter",                         mcycleR,    0,     mcycleW   ),
     CSR_ATTR_P__     (minstret,     0xB02, 0,           0,0,1,0,  "Machine Instructions Retired",                  minstretR,  0,     minstretW ),
-    CSR_ATTR_HWZ_3_31(mhpmcounter,  0xB00, 0,           0,0,0,0,  "Machine Performance Monitor Counter "                                        ),
+    CSR_ATTR_P__3_31 (mhpmcounter,  0xB00, 0,           0,0,0,0,  "Machine Performance Monitor Counter ",          mhpmR,      0,     mhpmW     ),
     CSR_ATTR_P__     (mcycleh,      0xB80, ISA_XLEN_32, 0,0,1,0,  "Machine Cycle Counter High",                    mcyclehR,   0,     mcyclehW  ),
     CSR_ATTR_P__     (minstreth,    0xB82, ISA_XLEN_32, 0,0,1,0,  "Machine Instructions Retired High",             minstrethR, 0,     minstrethW),
-    CSR_ATTR_HWZ_3_31(mhpmcounterh, 0xB80, ISA_XLEN_32, 0,0,0,0,  "Machine Performance Monitor Counter High "                                   ),
-    CSR_ATTR_HWZ_3_31(mhpmevent,    0x320, 0,           0,0,0,0,  "Machine Performance Monitor Event Select "                                   ),
+    CSR_ATTR_P__3_31 (mhpmcounterh, 0xB80, ISA_XLEN_32, 0,0,0,0,  "Machine Performance Monitor Counter High ",     mhpmR,      0,     mhpmW     ),
+    CSR_ATTR_P__3_31 (mhpmevent,    0x320, 0,           0,0,0,0,  "Machine Performance Monitor Event Select ",     mhpmR,      0,     mhpmW     ),
 
     //                name          num    arch         attrs     description                                      rCB         rwCB   wCB
     CSR_ATTR_NIP     (tselect,      0x7A0, 0,           0,0,0,0,  "Debug/Trace Trigger Register Select"                                         ),
@@ -1373,12 +1383,31 @@ inline static vmiRegAccess getAccess(riscvCSRAttrsCP attrs) {
 // the purposes of a gdb access (if normal is False)? If not, return missing
 // but required architectural features
 //
-inline static riscvArchitecture getMissingCSRFeatures(
+static riscvArchitecture getMissingCSRFeatures(
     riscvCSRAttrsCP   attrs,
-    riscvArchitecture arch,
+    riscvArchitecture actual,
     Bool              normal
 ) {
-    return (normal && !(arch & attrs->arch)) ? attrs->arch : 0;
+    if(!normal) {
+
+        // gdb access always supported
+        return 0;
+
+    } else {
+
+        riscvArchitecture required = attrs->arch & ~ISA_and;
+
+        if(attrs->arch & ISA_and) {
+
+            // all specified features are required
+            return required & ~actual;
+
+        } else {
+
+            // one or more of the specified features is required
+            return !(actual & required) ? required : 0;
+        }
+    }
 }
 
 //
@@ -2099,6 +2128,15 @@ void riscvCSRInit(riscvP riscv, Uns32 index) {
     SET_CSR_MASK_V(riscv, sideleg, uInterrupts);
 
     //--------------------------------------------------------------------------
+    // sedeleg, sideleg initial values (N extension and no Supervisor mode)
+    //--------------------------------------------------------------------------
+
+    if((arch&ISA_SorN) == ISA_N) {
+        WR_CSR(riscv, sedeleg, -1);
+        WR_CSR(riscv, sideleg, -1);
+    }
+
+     //--------------------------------------------------------------------------
     // mtvec, stvec, utvec masks and initial value
     //--------------------------------------------------------------------------
 
@@ -2289,13 +2327,33 @@ Bool riscvWriteCSR(riscvCSRAttrsCP attrs, riscvP riscv, const void *buffer) {
         // get any write callback function
         riscvCSRWriteFn writeCB = getCSRWriteCB(attrs, riscv, bits);
 
-        // this function should only be used when there is a write callback
-        VMI_ASSERT(writeCB, "require write callback");
+        if(writeCB) {
 
-        // write value, indicating an artifact access
-        riscv->artifactAccess = True;
-        writeCB(attrs, riscv, newValue);
-        riscv->artifactAccess = False;
+            // write value using callback, indicating an artifact access
+            riscv->artifactAccess = True;
+            writeCB(attrs, riscv, newValue);
+            riscv->artifactAccess = False;
+
+        } else if(rawValue) {
+
+            // write value directly
+            Uns64 writeMask = getCSRWriteMask(attrs, riscv);
+            Uns64 oldValue;
+
+            if(is64Bit) {
+                oldValue = *(Uns64*)rawValue;
+            } else {
+                oldValue = *(Uns32*)rawValue;
+            }
+
+            newValue = (newValue & writeMask) | (oldValue & ~writeMask);
+
+            if(is64Bit) {
+                *(Uns64*)rawValue = newValue;
+            } else {
+                *(Uns32*)rawValue = newValue;
+            }
+        }
 
         // update raw value if register is implemented externally
         if(!rawValue) {
@@ -2542,6 +2600,9 @@ Bool riscvGetCSRDetails(riscvP riscv, riscvCSRDetailsP details, Bool normal) {
                 !getWriteMaskCArch(attrs, arch) &&
                 VMI_ISNOREG(getWriteMaskVArch(attrs, arch))
             );
+
+            // indicate whether this is an extension library register
+            details->extension = attrs->object;
 
             return True;
         }

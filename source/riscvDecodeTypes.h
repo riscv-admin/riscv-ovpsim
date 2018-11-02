@@ -126,6 +126,7 @@ typedef enum riscvITypeE {
     RV_IT_SC_R,
 
     // F-extension and D-extension R-type instructions
+    RV_IT_FMV_R,
     RV_IT_FABS_R,
     RV_IT_FADD_R,
     RV_IT_FCLASS_R,
@@ -149,6 +150,9 @@ typedef enum riscvITypeE {
     RV_IT_FMSUB_R4,
     RV_IT_FNMADD_R4,
     RV_IT_FNMSUB_R4,
+
+    // X-extension instructions
+    RV_IT_CUSTOM,
 
     // KEEP LAST
     RV_IT_LAST

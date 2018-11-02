@@ -39,22 +39,47 @@
 //
 // Fetch two bytes from the given address
 //
-inline static Uns32 fetch2(riscvP riscv, riscvAddr thisPC) {
+inline static Uns16 fetch2(riscvP riscv, riscvAddr thisPC) {
     return vmicxtFetch2Byte((vmiProcessorP)riscv, thisPC);
 }
 
 //
-// Is the instruction a 4-byte instruction
+// Fetch four bytes from the given address
+//
+inline static Uns32 fetch4(riscvP riscv, riscvAddr thisPC) {
+    return vmicxtFetch4Byte((vmiProcessorP)riscv, thisPC);
+}
+
+//
+// Is the instruction a 4-byte instruction?
 //
 inline static Bool is4ByteInstruction(Uns32 instruction) {
     return ((instruction & 3) == 3);
 }
 
 //
+// Are compressed instructions present?
+//
+inline static Bool compressedPresent(riscvP riscv) {
+    return riscv->configInfo.arch & ISA_C;
+}
+
+//
 // Return size of the instruction at address thisPC
 //
 static Uns32 getInstructionSize(riscvP riscv, riscvAddr thisPC) {
-    return is4ByteInstruction(fetch2(riscv, thisPC)) ? 4 : 2;
+
+    Uns32 result;
+
+    if(!compressedPresent(riscv)) {
+        result = 4;
+    } else if(is4ByteInstruction(fetch2(riscv, thisPC))) {
+        result = 4;
+    } else {
+        result = 2;
+    }
+
+    return result;
 }
 
 //
@@ -304,7 +329,7 @@ typedef struct opAttrsS {
     rmSpec            rm       :  4;    // rounding mode specification
     Uns32             priDelta :  4;    // decode priority delta
     Bool              csrInOp  :  1;    // whether to emit CSR as part of opcode
-    Bool              xQuiet   :  1;    // are X register type-quiet?
+    Bool              xQuiet   :  1;    // are X registers type-quiet?
 } opAttrs;
 
 typedef const struct opAttrsS *opAttrsCP;
@@ -490,6 +515,12 @@ typedef enum riscvIType32E {
     IT32_FSFLAGS_I,
     IT32_FSRM_I,
 
+    // Custom instructions
+    IT32_CUSTOM1,
+    IT32_CUSTOM2,
+    IT32_CUSTOM3,
+    IT32_CUSTOM4,
+
     // KEEP LAST
     IT32_LAST
 
@@ -671,6 +702,12 @@ const static opAttrs attrsArray32[] = {
     ATTR32_FSSR      (  FSFLAGS_I,      CSRR_I, RVANY,  "fsflags",    "|000000000001|.....|001|.....|1110011|"),
     ATTR32_FSSR      (     FSRM_I,      CSRR_I, RVANY,  "fsrm",       "|000000000010|.....|001|.....|1110011|"),
 
+    // X-extension Type, custom instructions
+    ATTR32_CUSTOM    (    CUSTOM1,      CUSTOM, RVANY,  "custom1",    "|............|.....|...|.....|0001011|"),
+    ATTR32_CUSTOM    (    CUSTOM2,      CUSTOM, RVANY,  "custom2",    "|............|.....|...|.....|0101011|"),
+    ATTR32_CUSTOM    (    CUSTOM3,      CUSTOM, RVANY,  "custom3",    "|............|.....|...|.....|1011011|"),
+    ATTR32_CUSTOM    (    CUSTOM4,      CUSTOM, RVANY,  "custom4",    "|............|.....|...|.....|1111011|"),
+
     // dummy entry for undecoded instruction
     ATTR32_LAST      (       LAST,      LAST,           "undef")
 };
@@ -781,8 +818,14 @@ typedef enum riscvIType16E {
     IT16_FSW_I,
     IT16_FSWSP_I,
 
-    // explicitly undefined instructions
+    // explicitly undefined and reserved instructions
     IT16_UD1,
+    IT16_RES1,  // c.addi4spn/c.addi16sp when nzuimm=0
+    IT16_RES2,  // c.lui when nzimm=0
+    IT16_RES3,  // c.jr when rs=0
+    IT16_RES4,  // c.addiw when rd=0
+    IT16_RES5,  // c.lwsp when rd=0
+    IT16_RES6,  // c.ldsp when rd=0
 
     // KEEP LAST
     IT16_LAST
@@ -795,63 +838,69 @@ typedef enum riscvIType16E {
 const static opAttrs attrsArray16[] = {
 
     // base R-type instructions
-    ATTR16_ADD      (      ADD_R,     ADD_R, RVANYC,  "add",     "|100|1|.....|.....|10|"),
-    ATTR16_ADDW     (     ADDW_R,     ADD_R, RV64C,   "add",     "|100111|...|01|...|01|"),
-    ATTR16_AND      (      AND_R,     AND_R, RVANYC,  "and",     "|100011|...|11|...|01|"),
-    ATTR16_MV       (       MV_R,      MV_R, RVANYC,  "mv",      "|100|0|.....|.....|10|"),
-    ATTR16_AND      (       OR_R,      OR_R, RVANYC,  "or",      "|100011|...|10|...|01|"),
-    ATTR16_AND      (      SUB_R,     SUB_R, RVANYC,  "sub",     "|100011|...|00|...|01|"),
-    ATTR16_ADDW     (     SUBW_R,     SUB_R, RV64C,   "sub",     "|100111|...|00|...|01|"),
-    ATTR16_AND      (      XOR_R,     XOR_R, RVANYC,  "xor",     "|100011|...|01|...|01|"),
+    ATTR16_ADD      (      ADD_R,    ADD_R, RVANYC,  "add",     "|100|1|.....|.....|10|"),
+    ATTR16_ADDW     (     ADDW_R,    ADD_R, RV64C,   "add",     "|100111|...|01|...|01|"),
+    ATTR16_AND      (      AND_R,    AND_R, RVANYC,  "and",     "|100011|...|11|...|01|"),
+    ATTR16_MV       (       MV_R,     MV_R, RVANYC,  "mv",      "|100|0|.....|.....|10|"),
+    ATTR16_AND      (       OR_R,     OR_R, RVANYC,  "or",      "|100011|...|10|...|01|"),
+    ATTR16_AND      (      SUB_R,    SUB_R, RVANYC,  "sub",     "|100011|...|00|...|01|"),
+    ATTR16_ADDW     (     SUBW_R,    SUB_R, RV64C,   "sub",     "|100111|...|00|...|01|"),
+    ATTR16_AND      (      XOR_R,    XOR_R, RVANYC,  "xor",     "|100011|...|01|...|01|"),
 
     // base I-type instructions
-    ATTR16_ADDI     (      ADDI_I,   ADDI_I, RVANYC,  "addi",    "|000|.|.....|.....|01|"),
-    ATTR16_ADDI16SP (  ADDI16SP_I,   ADDI_I, RVANYC,  "addi",    "|011|.|00010|.....|01|"),
-    ATTR16_ADDI4SPN (  ADDI4SPN_I,   ADDI_I, RVANYC,  "addi",    "|000|........|...|00|"),
-    ATTR16_ADDIW    (     ADDIW_I,   ADDI_I, RV64C,   "addi",    "|001|........|...|01|"),
-    ATTR16_ANDI     (      ANDI_I,   ANDI_I, RVANYC,  "andi",    "|100|.|10...|.....|01|"),
-    ATTR16_SLLI     (      SLLI_I,   SLLI_I, RVANYC,  "slli",    "|000|.|.....|.....|10|"),
-    ATTR16_SRAI     (      SRAI_I,   SRAI_I, RVANYC,  "srai",    "|100|.|01...|.....|01|"),
-    ATTR16_SRAI     (      SRLI_I,   SRLI_I, RVANYC,  "srli",    "|100|.|00...|.....|01|"),
-    ATTR16_LI       (        LI_I,   ADDI_I, RVANYC,  "li",      "|010|.|.....|.....|01|"),
-    ATTR16_LUI      (       LUI_I,   ADDI_I, RVANYC,  "lui",     "|011|.|.....|.....|01|"),
-    ATTR16_JR       (        JR_I,   JALR_I, RVANYC,  "jr",      "|100|0|.....|00000|10|"),
-    ATTR16_JALR     (      JALR_I,   JALR_I, RVANYC,  "jalr",    "|100|1|.....|00000|10|"),
-    ATTR16_LD       (        LD_I,      L_I, RV64C,   "l",       "|011|...|...|..|...|00|"),
-    ATTR16_LDSP     (      LDSP_I,      L_I, RV64C,   "l",       "|011|.|.....|.....|10|"),
-    ATTR16_LW       (        LW_I,      L_I, RVANYC,  "l",       "|010|...|...|..|...|00|"),
-    ATTR16_LWSP     (      LWSP_I,      L_I, RVANYC,  "l",       "|010|.|.....|.....|10|"),
-    ATTR16_LD       (        SD_I,      S_I, RV64C,   "s",       "|111|...|...|..|...|00|"),
-    ATTR16_SDSP     (      SDSP_I,      S_I, RV64C,   "s",       "|111|.|.....|.....|10|"),
-    ATTR16_LW       (        SW_I,      S_I, RVANYC,  "s",       "|110|...|...|..|...|00|"),
-    ATTR16_SWSP     (      SWSP_I,      S_I, RVANYC,  "s",       "|110|.|.....|.....|10|"),
+    ATTR16_ADDI     (     ADDI_I,   ADDI_I, RVANYC,  "addi",    "|000|.|.....|.....|01|"),
+    ATTR16_ADDI16SP ( ADDI16SP_I,   ADDI_I, RVANYC,  "addi",    "|011|.|00010|.....|01|"),
+    ATTR16_ADDI4SPN ( ADDI4SPN_I,   ADDI_I, RVANYC,  "addi",    "|000|........|...|00|"),
+    ATTR16_ADDIW    (    ADDIW_I,   ADDI_I, RV64C,   "addi",    "|001|.|.....|.....|01|"),
+    ATTR16_ANDI     (     ANDI_I,   ANDI_I, RVANYC,  "andi",    "|100|.|10...|.....|01|"),
+    ATTR16_SLLI     (     SLLI_I,   SLLI_I, RVANYC,  "slli",    "|000|.|.....|.....|10|"),
+    ATTR16_SRAI     (     SRAI_I,   SRAI_I, RVANYC,  "srai",    "|100|.|01...|.....|01|"),
+    ATTR16_SRAI     (     SRLI_I,   SRLI_I, RVANYC,  "srli",    "|100|.|00...|.....|01|"),
+    ATTR16_LI       (       LI_I,   ADDI_I, RVANYC,  "li",      "|010|.|.....|.....|01|"),
+    ATTR16_LUI      (      LUI_I,   ADDI_I, RVANYC,  "lui",     "|011|.|.....|.....|01|"),
+    ATTR16_JR       (       JR_I,   JALR_I, RVANYC,  "jr",      "|100|0|.....|00000|10|"),
+    ATTR16_JALR     (     JALR_I,   JALR_I, RVANYC,  "jalr",    "|100|1|.....|00000|10|"),
+    ATTR16_LD       (       LD_I,      L_I, RV64C,   "l",       "|011|...|...|..|...|00|"),
+    ATTR16_LDSP     (     LDSP_I,      L_I, RV64C,   "l",       "|011|.|.....|.....|10|"),
+    ATTR16_LW       (       LW_I,      L_I, RVANYC,  "l",       "|010|...|...|..|...|00|"),
+    ATTR16_LWSP     (     LWSP_I,      L_I, RVANYC,  "l",       "|010|.|.....|.....|10|"),
+    ATTR16_LD       (       SD_I,      S_I, RV64C,   "s",       "|111|...|...|..|...|00|"),
+    ATTR16_SDSP     (     SDSP_I,      S_I, RV64C,   "s",       "|111|.|.....|.....|10|"),
+    ATTR16_LW       (       SW_I,      S_I, RVANYC,  "s",       "|110|...|...|..|...|00|"),
+    ATTR16_SWSP     (     SWSP_I,      S_I, RVANYC,  "s",       "|110|.|.....|.....|10|"),
 
     // miscellaneous system instructions
-    ATTR16_NOP       (   EBREAK_I, EBREAK_I, RVANYC,  "ebreak",  "|100|1|00000|00000|10|"),
+    ATTR16_NOP      (   EBREAK_I, EBREAK_I, RVANYC,  "ebreak",  "|100|1|00000|00000|10|"),
 
     // base B-type instructions
-    ATTR16_BEQZ     (      BEQZ_B,    BEQ_B, RVANYC,  "beqz",    "|110|...|...|.....|01|"),
-    ATTR16_BEQZ     (      BNEZ_B,    BNE_B, RVANYC,  "bnez",    "|111|...|...|.....|01|"),
+    ATTR16_BEQZ     (     BEQZ_B,    BEQ_B, RVANYC,  "beqz",    "|110|...|...|.....|01|"),
+    ATTR16_BEQZ     (     BNEZ_B,    BNE_B, RVANYC,  "bnez",    "|111|...|...|.....|01|"),
 
     // base J-type instructions
-    ATTR16_J        (         J_J,    JAL_J, RVANYC,  "j",       "|101|...........|01|"),
-    ATTR16_JAL      (       JAL_J,    JAL_J, RV32C,   "jal",     "|001|...........|01|"),
+    ATTR16_J        (        J_J,    JAL_J, RVANYC,  "j",       "|101|...........|01|"),
+    ATTR16_JAL      (      JAL_J,    JAL_J, RV32C,   "jal",     "|001|...........|01|"),
 
     // F-extension and D-extension I-type instructions
-    ATTR16_FLD      (       FLD_I,      L_I, RVANYCD, "fl",      "|001|...|...|..|...|00|"),
-    ATTR16_FLDSP    (     FLDSP_I,      L_I, RVANYCD, "fl",      "|001|.|.....|.....|10|"),
-    ATTR16_FLW      (       FLW_I,      L_I, RV32CF,  "fl",      "|011|...|...|..|...|00|"),
-    ATTR16_FLWSP    (     FLWSP_I,      L_I, RV32CF,  "fl",      "|011|.|.....|.....|10|"),
-    ATTR16_FLD      (       FSD_I,      S_I, RVANYCD, "fs",      "|101|...|...|..|...|00|"),
-    ATTR16_FSDSP    (     FSDSP_I,      S_I, RVANYCD, "fs",      "|101|......|.....|10|"),
-    ATTR16_FLW      (       FSW_I,      S_I, RV32CF,  "fs",      "|111|...|...|..|...|00|"),
-    ATTR16_FSWSP    (     FSWSP_I,      S_I, RV32CF,  "fs",      "|111|......|.....|10|"),
+    ATTR16_FLD      (      FLD_I,      L_I, RVANYCD, "fl",      "|001|...|...|..|...|00|"),
+    ATTR16_FLDSP    (    FLDSP_I,      L_I, RVANYCD, "fl",      "|001|.|.....|.....|10|"),
+    ATTR16_FLW      (      FLW_I,      L_I, RV32CF,  "fl",      "|011|...|...|..|...|00|"),
+    ATTR16_FLWSP    (    FLWSP_I,      L_I, RV32CF,  "fl",      "|011|.|.....|.....|10|"),
+    ATTR16_FLD      (      FSD_I,      S_I, RVANYCD, "fs",      "|101|...|...|..|...|00|"),
+    ATTR16_FSDSP    (    FSDSP_I,      S_I, RVANYCD, "fs",      "|101|......|.....|10|"),
+    ATTR16_FLW      (      FSW_I,      S_I, RV32CF,  "fs",      "|111|...|...|..|...|00|"),
+    ATTR16_FSWSP    (    FSWSP_I,      S_I, RV32CF,  "fs",      "|111|......|.....|10|"),
 
-    // explicitly undefined instructions
-    ATTR16_NOP      (         UD1,     LAST, RVANYC,  "illegal", "|000|0|00000|00000|00|"),
+    // explicitly undefined and reserved instructions
+    ATTR16_NOP      (        UD1,     LAST, RVANYC,  "illegal", "|000|0|00000|00000|00|"),
+    ATTR16_NOP      (       RES1,     LAST, RVANYC,  "res",     "|000|00000000|...|00|"),
+    ATTR16_NOP      (       RES2,     LAST, RVANYC,  "res",     "|011|0|.....|00000|01|"),
+    ATTR16_NOP      (       RES3,     LAST, RVANYC,  "res",     "|100|0|00000|00000|10|"),
+    ATTR16_NOP      (       RES4,     LAST, RV64C,   "res",     "|001|.|00000|.....|01|"),
+    ATTR16_NOP      (       RES5,     LAST, RVANYC,  "res",     "|010|.|00000|.....|10|"),
+    ATTR16_NOP      (       RES6,     LAST, RV64C,   "res",     "|011|.|00000|.....|10|"),
 
     // dummy entry for undecoded instruction
-    ATTR16_LAST     (        LAST,     LAST,          "undef")
+    ATTR16_LAST     (       LAST,     LAST,          "undef")
 };
 
 //
@@ -1040,10 +1089,30 @@ static riscvCSRUDesc getCSRUpdate(
 }
 
 //
+// Force result to be undefined if shift amount >= XLEN or register size
+//
+static void validateShift(
+    riscvP          riscv,
+    riscvInstrInfoP info,
+    Uns32           shift,
+    riscvRegDesc    wX
+) {
+    if(shift>=getXLenBits(riscv)) {
+        info->arch &= ~getXLenArch(riscv);
+    } else if(shift>=getRBits(wX)) {
+        info->type = RV_IT_LAST;
+    }
+}
+
+//
 // Return a constant encoded within the instruction
 //
-static Uns64 getConstant(riscvP riscv, riscvInstrInfoP info, constSpec c) {
-
+static Uns64 getConstant(
+    riscvP          riscv,
+    riscvInstrInfoP info,
+    constSpec       c,
+    riscvRegDesc    wX
+) {
     Uns64 result = 0;
     Uns32 instr  = info->instruction;
 
@@ -1062,10 +1131,7 @@ static Uns64 getConstant(riscvP riscv, riscvInstrInfoP info, constSpec c) {
             break;
         case CS_SHAMT_25_20:
             result = U_25_20(instr);
-            // undefined if shift amount >= XLEN
-            if(result>=getXLenBits(riscv)) {
-                info->arch &= ~getXLenArch(riscv);
-            }
+            validateShift(riscv, info, result, wX);
             break;
         case CS_AUIPC:
             result = S_31_12(instr) << 12;
@@ -1091,6 +1157,7 @@ static Uns64 getConstant(riscvP riscv, riscvInstrInfoP info, constSpec c) {
         case CS_C_SLLI:
             result  = U_12(instr) << 5;
             result += U_6_2(instr);
+            validateShift(riscv, info, result, wX);
             break;
         case CS_C_ADDI16SP:
             result  = S_12(instr)  << 9;
@@ -1414,7 +1481,7 @@ static void fixFPPseudoInstructions(riscvInstrInfoP info) {
 
         case RV_IT_FSGNJ_R:
             if(info->r[1]==info->r[2]) {
-                info->type   = RV_IT_MV_R;
+                info->type   = RV_IT_FMV_R;
                 info->opcode = "fmv";
                 info->format = FMT_R1_R2;
             }
@@ -1465,7 +1532,7 @@ static void interpretInstruction(
     info->unsExt    = getUnsExt(info, attrs->unsExt);
     info->csr       = getCSR(riscv, info, attrs->csr);
     info->csrUpdate = getCSRUpdate(riscv, info, attrs->csrUpdate);
-    info->c         = getConstant(riscv, info, attrs->cs);
+    info->c         = getConstant(riscv, info, attrs->cs, wX);
     info->r[0]      = getRegister(riscv, info, attrs->r1, wX, wF, attrs->xQuiet);
     info->r[1]      = getRegister(riscv, info, attrs->r2, wX, wF, attrs->xQuiet);
     info->r[2]      = getRegister(riscv, info, attrs->r3, wX, wF, attrs->xQuiet);
@@ -1514,7 +1581,7 @@ void riscvDecode(
     info->type        = RV_IT_LAST;
     info->thisPC      = thisPC;
     info->instruction = riscvGetInstruction(riscv, info->thisPC);
-    info->bytes       = is4ByteInstruction(fetch2(riscv, thisPC)) ? 4 : 2;
+    info->bytes       = is4ByteInstruction(info->instruction) ? 4 : 2;
 
     // decode based on instruction size
     if(info->bytes==4) {
@@ -1529,10 +1596,18 @@ void riscvDecode(
 //
 Uns32 riscvGetInstruction(riscvP riscv, riscvAddr thisPC) {
 
-    Uns32 result = fetch2(riscv, thisPC);
+    Uns32 result;
 
-    if(is4ByteInstruction(result)) {
+    if(!compressedPresent(riscv)) {
 
+        // compressed instructions absent: all instructions are 4 bytes, fetched
+        // in a single 4-byte operation
+        result = fetch4(riscv, thisPC);
+
+    } else if(is4ByteInstruction(result=fetch2(riscv, thisPC))) {
+
+        // compressed instructions present: instructions are 2 or 4 bytes,
+        // fetched in 2-byte parts
         riscvAddr highPC = thisPC + 2;
 
         // allow for highPC wrapping if XLEN is 32

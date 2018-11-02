@@ -4,13 +4,13 @@ A Complete, Fully Functional, Configurable RISC-V Simulator
 ===
 
 Author: Imperas Software, Ltd., using OVP Open Standard APIs  
-Date   : 12 Jun 2018 
-Version: 20180612.0  
+Date   : 01 Nov 2018 
+Version: 20181101.0  
 License: Model source included under Apache 2.0 open source license  
 License: Simulator riscvOVPsim licensed under Open Virtual Platforms (OVP) Fixed Platform Kits license  
 RISC-V Specifications currently supported:
-- RISCV.org User 2.2, 2.3a (draft)  
-- RISCV.org Privilege 1.10, 1.11a (draft)[not hypervisors as currently in flux]
+- RISCV.org User 2.2, 2.3a (April 2018 draft)  
+- RISCV.org Privilege 1.10, 1.11a (April 2018 draft)[not hypervisors as currently in flux]
 
 About riscvOVPsim
 ---
@@ -22,7 +22,7 @@ The simulator is developed, licensed and maintained by [Imperas Software](http:/
 
 As a member of the RISC-V Foundation community of software and hardware innovators collaboratively driving RISC-V adoption, Imperas has developed the riscvOVPsim simulator to assist RISC-V adopters to become compliant to the RISC-V specifications. The latest RISC-V compliance test suite and framework can be downloaded from https://www.github.com/riscv/riscv-compliance . 
 
-riscvOVPsim includes an industrial quality model and simulator of RISC-V processors for use for compliance and test development. It has been developed for personal, academic, or commercial use, and the model is provided as open source.
+riscvOVPsim includes an industrial quality model and simulator of RISC-V processors for use for compliance and test development. It has been developed for personal, academic, or commercial use, and the model is provided as open source under the Apache 2.0 license. The simulator is provided under the under Open Virtual Platforms (OVP) Fixed Platform Kits license that enables download and usage. riscvOVPsim and Imperas RISC-V support is actively maintained and enhanced. To ensure you make use of the current version of riscvOVPsim this initial release will expire. Please download the latest version.
 
 Runtime configurable settings for all RISC-V specification options makes it very easy to compare run time results with any RTL implementations.
 
@@ -33,7 +33,7 @@ Model Source: [source](source)
 Examples: [examples](examples)  
 
 ![](riscvOVPsim.jpg)  
-riscvOVPsim is a fixed function simulation of one configurable processor model in a fixed platform. Full extendable platform simulations of reference designs booting etc FreeRTOS, Linux, SMP Linux etc. are available as open source and are available from [www.IMPERAS.com](http://www.imperas.com), [www.OVPworld.org](http://www.OVPworld.org).  
+riscvOVPsim is a fixed function simulation of one configurable processor model in a fixed platform. Full extendable platform simulations of reference designs booting FreeRTOS, Linux, SMP Linux etc. are available as open source and are available from [www.IMPERAS.com](http://www.imperas.com), [www.OVPworld.org](http://www.OVPworld.org).  
 
 
 Debugging using GDB / Eclipse
@@ -102,7 +102,7 @@ For example on Linux:
   
 Extending riscvOVPsim and building your own models and platforms
 ---
-riscvOVPsim is a fixed function simulation of one configurable processor model in a fixed platform. Full extendable platform simulations of reference designs booting etc FreeRTOS, Linux, SMP Linux etc. are available as open source and are available from [www.IMPERAS.com](http://www.imperas.com), [www.OVPworld.org](http://www.OVPworld.org).  
+riscvOVPsim is a fixed function simulation of one configurable processor model in a fixed platform. Full extendable platform simulations of reference designs booting FreeRTOS, Linux, SMP Linux etc. are available as open source and are available from [www.IMPERAS.com](http://www.imperas.com), [www.OVPworld.org](http://www.OVPworld.org).  
 
 
 About Open Virtual Platforms (OVP) and Imperas Software
