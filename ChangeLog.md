@@ -3,8 +3,6 @@ riscvOVPsim Fixed Platform Kit Change Log
 
 # Changes since last release
 
-This is the riscvOVPsim/Changelog.md  
-
 RISCV Processor Model
 -------------------------------------------------------------------------------
 - The model now supports save and restore.
