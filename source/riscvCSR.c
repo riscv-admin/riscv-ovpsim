@@ -1479,14 +1479,14 @@ inline static vmiReg getRawArch(riscvCSRAttrsCP attrs, riscvArchitecture arch) {
 //
 // Return constant write mask for the register
 //
-inline Uns64 getWriteMaskCArch(riscvCSRAttrsCP attrs, riscvArchitecture arch) {
+inline static Uns64 getWriteMaskCArch(riscvCSRAttrsCP attrs, riscvArchitecture arch) {
     return (arch&ISA_XLEN_64) ? attrs->writeMaskC64 : attrs->writeMaskC32;
 }
 
 //
 // Return configurable write mask for the register
 //
-inline vmiReg getWriteMaskVArch(riscvCSRAttrsCP attrs, riscvArchitecture arch) {
+inline static vmiReg getWriteMaskVArch(riscvCSRAttrsCP attrs, riscvArchitecture arch) {
     return (arch&ISA_XLEN_64) ? attrs->writeMaskV64 : attrs->writeMaskV32;
 }
 
