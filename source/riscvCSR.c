@@ -2058,9 +2058,17 @@ void riscvCSRInit(riscvP riscv, Uns32 index) {
         }
     }
 
-    // initialize mstatus write mask (User mode)
     if(arch&ISA_U) {
+
+        // initialize mstatus write mask (User mode)
         SET_CSR_FIELD_MASK_1(riscv, mstatus, MPRV);
+
+        // from version 1.11, mstatus.TW is writable if any lower-level
+        // privilege mode is implemented (previously, it was just if Supervisor
+        // mode was implemented)
+        if(RISCV_PRIV_VERSION(riscv) >= RVPV_1_11) {
+            SET_CSR_FIELD_MASK_1(riscv, mstatus, TW);
+        }
     }
 
     // initialize N-extension write masks

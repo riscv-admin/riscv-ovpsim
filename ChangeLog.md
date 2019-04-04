@@ -4,6 +4,21 @@
 # This CHANGELOG contains information specific to the RISCV processor model   #
 ###############################################################################
 
+- The SFENCE.VMA instruction is now only supported if Supervisor mode is
+  implemented.
+- When Privileged Level version 1.11 is enabled (see the priv_version parameter)
+  mstatus.TW is now writable if any Privilege Level other than Machine mode is
+  implemented. When Privileged Level version 1.10 is enabled, this field is
+  writable only if Supervisor mode is implemented.
+- A bug has been fixed which caused PMP privileges to be incorrectly set in some
+  cases (where a high priority unlocked region was disabled and covered the same
+  address range as a lower priority locked region).
+
+###############################################################################
+## Date 2019-March-06                                                        ##
+## Release 20190306.0                                                        ##
+###############################################################################
+
 - Relaxed the fence instruction for finer grain as per specification of values
   for imm[11:0], rs1 and rd fields
 - The model now supports save and restore.
