@@ -3,6 +3,8 @@
 #      Copyright (c) 2005-2019 Imperas Software Ltd., www.imperas.com         #
 # This CHANGELOG contains information specific to the RISCV processor model   #
 ###############################################################################
+- Fixed bug that caused the Model Specific Documentation for the SiFive 
+  U54MC model to be missing the sections under Overview.
 - The vector extension is now implemented and enabled if the V bit is set in
   the misa register. Variants RV32GCV and RV64GCV have been added which enable
   this extension as standard. See the processor documentation for these variants
