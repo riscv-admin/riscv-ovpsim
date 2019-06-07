@@ -92,10 +92,11 @@ static void fillSvModes(char *result, Uns32 Sv_modes) {
 //
 // Create processor documentation
 //
-void riscvDoc(riscvP riscv) {
+void riscvDoc(riscvP rootProcessor) {
 
     vmiDocNodeP   Root     = vmidocAddSection(0, "Root");
-    riscvP        child    = getChild(riscv);
+    riscvP        riscv    = rootProcessor;
+    riscvP        child    = getChild(rootProcessor);
     riscvConfigCP cfg      = &riscv->configInfo;
     Uns32         numHarts = cfg->numHarts;
     Bool          isSMP    = numHarts && child && !cfg->members;
@@ -959,6 +960,6 @@ void riscvDoc(riscvP riscv) {
         }
     }
 
-    vmidocProcessor((vmiProcessorP)riscv, Root);
+    vmidocProcessor((vmiProcessorP)rootProcessor, Root);
 }
 
