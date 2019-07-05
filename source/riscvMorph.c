@@ -879,91 +879,6 @@ static RISCV_MORPH_FN(emitMulopHRRR) {
 }
 
 //
-// Do arithmetic negation of rH:rL and return the upper half of the result
-//
-static Uns64 doNEG128H(Uns64 rL, Uns64 rH) {
-
-    // bitwise negate value
-    rH = ~rH;
-    rL = ~rL;
-
-    // increment bitwise-negated value
-    rL += 1;
-    if(!rL) {rH++;}
-
-    // return result upper half
-    return rH;
-}
-
-//
-// Emit code to negate the given register
-//
-static void emitNegate(Uns32 bits, vmiReg rL, vmiReg rH) {
-
-    if(bits<=64) {
-
-        // implement using VMI primitive
-        vmimtUnopRR(bits, vmi_NEG, rL, rL, 0);
-
-    } else if(bits==128) {
-
-        // implement using embedded call (updating only
-        vmimtArgReg(64, rL);
-        vmimtArgReg(64, rH);
-        vmimtCallResultAttrs((vmiCallFn)doNEG128H, 64, rH, VMCA_PURE);
-
-    } else {
-
-        // report unimplemented bits
-        VMI_ABORT("Bad bits %u", bits); // LCOV_EXCL_LINE
-    }
-}
-
-//
-// Implement MULHSU instruction  (three registers, selecting result upper half)
-//
-static RISCV_MORPH_FN(emitMULHSU) {
-
-    riscvP       riscv    = state->riscv;
-    riscvRegDesc rdA      = getRVReg(state, 0);
-    riscvRegDesc rs1A     = getRVReg(state, 1);
-    riscvRegDesc rs2A     = getRVReg(state, 2);
-    vmiReg       rd       = getVMIReg(riscv, rdA);
-    vmiReg       rs1      = getVMIReg(riscv, rs1A);
-    vmiReg       rs2      = getVMIReg(riscv, rs2A);
-    Uns32        bits     = getRBits(rdA);
-    vmiReg       flag     = getTmp(0);
-    vmiReg       temprs1  = getTmp(1);
-    vmiReg       resultHL = getTmp(1);
-    vmiReg       resultL  = resultHL;
-    vmiReg       resultH  = VMI_REG_DELTA(resultHL, bits/8);
-    vmiLabelP    pos1     = vmimtNewLabel();
-    vmiLabelP    pos2     = vmimtNewLabel();
-
-    // determine if rs1 is negative
-    vmimtCompareRC(bits, vmi_COND_L, rs1, 0, flag);
-
-    // negate rs1 if it is negative
-    vmimtMoveRR(bits, temprs1, rs1);
-    vmimtCondJumpLabel(flag, False, pos1);
-    vmimtUnopRR(bits, vmi_NEG, temprs1, temprs1, 0);
-    vmimtInsertLabel(pos1);
-
-    // unsigned multiply (rs1 * rs2)
-    vmimtMulopRRR(bits, vmi_MUL, resultH, resultL, temprs1, rs2, 0);
-
-    // negate rd if rs1 was negative
-    vmimtCondJumpLabel(flag, False, pos2);
-    emitNegate(bits*2, resultL, resultH);
-    vmimtInsertLabel(pos2);
-
-    // save result
-    vmimtMoveRR(bits, rd, resultH);
-
-    writeReg(riscv, rdA);
-}
-
-//
 // Implement generic Cmpop (three registers)
 //
 static RISCV_MORPH_FN(emitCmpopRRR) {
@@ -5291,14 +5206,14 @@ static void seedXd(riscvMorphStateP state, iterDescP id, Int32 c) {
 //
 // Initialization callback for VMPOPC
 //
-static RISCV_MORPHV_FN(initVMPopcCB) {
+static RISCV_MORPHV_FN(initVMPOPCCB) {
     seedXd(state, id, 0);
 }
 
 //
 // Per-element callback for VMPOPC
 //
-static RISCV_MORPHV_FN(emitVMPopcCB) {
+static RISCV_MORPHV_FN(emitVMPOPCCB) {
 
     riscvP       riscv = state->riscv;
     riscvRegDesc rdA   = getRVReg(state, 0);
@@ -5322,14 +5237,14 @@ static RISCV_MORPHV_FN(emitVMPopcCB) {
 //
 // Initialization callback for VMFIRST
 //
-static RISCV_MORPHV_FN(initVMFirstCB) {
+static RISCV_MORPHV_FN(initVMFIRSTCB) {
     seedXd(state, id, -1);
 }
 
 //
 // Per-element callback for VMFIRST
 //
-static RISCV_MORPHV_FN(emitVMFirstCB) {
+static RISCV_MORPHV_FN(emitVMFIRSTCB) {
 
     riscvP       riscv = state->riscv;
     riscvRegDesc rdA   = getRVReg(state, 0);
@@ -5582,7 +5497,7 @@ static void endCompare(iterDescP id, cmpCxtP cxt) {
 //
 // Per-element callback for merge (if unmasked or mask=1), register arg2
 //
-static RISCV_MORPHV_FN(emitVRMergeTCB) {
+static RISCV_MORPHV_FN(emitVRMERGETCB) {
 
     vmimtMoveRR(id->SEW, id->r[0], id->r[2]);
 }
@@ -5590,7 +5505,7 @@ static RISCV_MORPHV_FN(emitVRMergeTCB) {
 //
 // Per-element callback for merge (if unmasked or mask=1), constant arg2
 //
-static RISCV_MORPHV_FN(emitVIMergeTCB) {
+static RISCV_MORPHV_FN(emitVIMERGETCB) {
 
     vmimtMoveRC(id->SEW, id->r[0], state->info.c);
 }
@@ -5598,7 +5513,7 @@ static RISCV_MORPHV_FN(emitVIMergeTCB) {
 //
 // Per-element callback for merge (if masked and mask=0)
 //
-static RISCV_MORPHV_FN(emitVRMergeFCB) {
+static RISCV_MORPHV_FN(emitVRMERGEFCB) {
 
     vmimtMoveRR(id->SEW, id->r[0], id->r[1]);
 }
@@ -5734,50 +5649,6 @@ static void emitVRMulHIntInt(
 }
 
 //
-// Common per-element callback for integer MULSUH instructions
-//
-static void emitVRMulHSUIntInt(
-    riscvMorphStateP state,
-    iterDescP        id,
-    vmiReg           rdl,
-    vmiReg           rdh
-) {
-    vmiReg    arg1 = id->r[1];
-    vmiReg    arg2 = id->r[2];
-    vmiReg    t0   = getTmp(0);
-    vmiReg    t1   = getTmp(1);
-    vmiLabelP done = vmimtNewLabel();
-
-    // determine whether first argument is negative
-    vmimtTestRR(id->SEW, vmi_COND_S, arg1, arg1, t0);
-
-    // create scale (1 if positive, -1 if negative)
-    vmimtCondMoveRCC(id->SEW, t0, True, t0, -1, 1);
-
-    // apply scale to first argument (convert to positive if required)
-    vmimtBinopRRR(id->SEW, vmi_IMUL, t1, arg1, t0, 0);
-
-    // do double-width multiply, preserving top half
-    vmimtMulopRRR(id->SEW, state->attrs->binop, rdh, rdl, t1, arg2, 0);
-
-    // skip final negation unless argument 1 was negative
-    vmimtCompareRCJumpLabel(8, vmi_COND_EQ, t0, 1, done);
-
-    // bitwise-negate result parts
-    vmimtUnopR(id->SEW, vmi_NOT, rdl, 0);
-    vmimtUnopR(id->SEW, vmi_NOT, rdh, 0);
-
-    // add 1 to complete negation
-    vmiFlags fl = {f:{[vmi_CF]=t0}};
-    vmiFlags fh = {cin:t0};
-    vmimtBinopRC(id->SEW, vmi_ADD, rdl, 1, &fl);
-    vmimtBinopRC(id->SEW, vmi_ADC, rdh, 0, &fh);
-
-    // here if final negation is skipped
-    vmimtInsertLabel(done);
-}
-
-//
 // Per-element callback for single-width integer MULH instructions
 //
 static RISCV_MORPHV_FN(emitVRMulHIntCB) {
@@ -5789,17 +5660,6 @@ static RISCV_MORPHV_FN(emitVRMulHIntCB) {
 }
 
 //
-// Per-element callback for single-width integer MULSUH instructions
-//
-static RISCV_MORPHV_FN(emitVRMulHSUIntCB) {
-
-    vmiReg rdl = getTmp(2);
-    vmiReg rdh = id->r[0];
-
-    emitVRMulHSUIntInt(state, id, rdl, rdh);
-}
-
-//
 // Per-element callback for widening integer MULH instructions
 //
 static RISCV_MORPHV_FN(emitVRWMulHIntCB) {
@@ -5808,17 +5668,6 @@ static RISCV_MORPHV_FN(emitVRWMulHIntCB) {
     vmiReg rdh = VMI_REG_DELTA(rdl, id->SEW/8);
 
     emitVRMulHIntInt(state, id, rdl, rdh);
-}
-
-//
-// Per-element callback for widening integer MULSUH instructions
-//
-static RISCV_MORPHV_FN(emitVRWMulHSUIntCB) {
-
-    vmiReg rdl = id->r[0];
-    vmiReg rdh = VMI_REG_DELTA(rdl, id->SEW/8);
-
-    emitVRMulHSUIntInt(state, id, rdl, rdh);
 }
 
 //
@@ -6821,7 +6670,7 @@ static RISCV_MORPHV_FN(emitVIRGATHERCB) {
 //
 // Initialization callback for VCOMPRESS.VM
 //
-static RISCV_MORPHV_FN(initVCompressCB) {
+static RISCV_MORPHV_FN(initVCOMPRESSCB) {
 
     riscvP       riscv      = state->riscv;
     Uns32        offsetBits = IMPERAS_POINTER_BITS;
@@ -6838,7 +6687,7 @@ static RISCV_MORPHV_FN(initVCompressCB) {
 //
 // Per-element callback for VCOMPRESS.VM
 //
-static RISCV_MORPHV_FN(emitVCompressCB) {
+static RISCV_MORPHV_FN(emitVCOMPRESSCB) {
 
     Uns32 offsetBits = IMPERAS_POINTER_BITS;
 
@@ -6914,7 +6763,7 @@ const static riscvMorphAttr dispatchTable[] = {
     [RV_IT_DIVU_R]           = {morph:emitBinopRRR,  binop:vmi_DIV,    iClass:OCL_IC_INTEGER},
     [RV_IT_MUL_R]            = {morph:emitBinopRRR,  binop:vmi_MUL,    iClass:OCL_IC_INTEGER},
     [RV_IT_MULH_R]           = {morph:emitMulopHRRR, binop:vmi_IMUL,   iClass:OCL_IC_INTEGER},
-    [RV_IT_MULHSU_R]         = {morph:emitMULHSU                   ,   iClass:OCL_IC_INTEGER},
+    [RV_IT_MULHSU_R]         = {morph:emitMulopHRRR, binop:vmi_IMULSU, iClass:OCL_IC_INTEGER},
     [RV_IT_MULHU_R]          = {morph:emitMulopHRRR, binop:vmi_MUL,    iClass:OCL_IC_INTEGER},
     [RV_IT_REM_R]            = {morph:emitBinopRRR,  binop:vmi_IREM,   iClass:OCL_IC_INTEGER},
     [RV_IT_REMU_R]           = {morph:emitBinopRRR,  binop:vmi_REM,    iClass:OCL_IC_INTEGER},
@@ -7038,7 +6887,7 @@ const static riscvMorphAttr dispatchTable[] = {
     [RV_IT_VAMOXOR_R]        = {morph:emitVectorOp, opTCB:emitVAMOBinopRRR, checkCB:emitVAMOCheckCB, binop:vmi_XOR },
 
     // V-extension IVV/IVX-type common instructions
-    [RV_IT_VMERGE_VR]        = {morph:emitVectorOp, opTCB:emitVRMergeTCB, opFCB:emitVRMergeFCB},
+    [RV_IT_VMERGE_VR]        = {morph:emitVectorOp, opTCB:emitVRMERGETCB, opFCB:emitVRMERGEFCB},
     [RV_IT_VADD_VR]          = {morph:emitVectorOp, opTCB:emitVRBinaryIntCB, binop:vmi_ADD },
     [RV_IT_VSUB_VR]          = {morph:emitVectorOp, opTCB:emitVRBinaryIntCB, binop:vmi_SUB },
     [RV_IT_VRSUB_VR]         = {morph:emitVectorOp, opTCB:emitVRBinaryIntCB, binop:vmi_RSUB},
@@ -7092,27 +6941,27 @@ const static riscvMorphAttr dispatchTable[] = {
     [RV_IT_VREM_VR]          = {morph:emitVectorOp, opTCB:emitVRBinaryIntCB, binop:vmi_IREM},
     [RV_IT_VMUL_VR]          = {morph:emitVectorOp, opTCB:emitVRBinaryIntCB, binop:vmi_IMUL},
     [RV_IT_VMULHU_VR]        = {morph:emitVectorOp, opTCB:emitVRMulHIntCB,   binop:vmi_MUL },
-    [RV_IT_VMULHSU_VR]       = {morph:emitVectorOp, opTCB:emitVRMulHSUIntCB, binop:vmi_MUL },
+    [RV_IT_VMULHSU_VR]       = {morph:emitVectorOp, opTCB:emitVRMulHIntCB,   binop:vmi_IMULSU},
     [RV_IT_VMULH_VR]         = {morph:emitVectorOp, opTCB:emitVRMulHIntCB,   binop:vmi_IMUL},
-    [RV_IT_VWMULU_VR]        = {morph:emitVectorOp, opTCB:emitVRWMulHIntCB,  binop:vmi_MUL,  vShape:RVVW_211_IIQ, argType:RVVX_UU},
-    [RV_IT_VWMULSU_VR]       = {morph:emitVectorOp, opTCB:emitVRWMulHSUIntCB,binop:vmi_MUL,  vShape:RVVW_211_IIQ, argType:RVVX_SU},
-    [RV_IT_VWMUL_VR]         = {morph:emitVectorOp, opTCB:emitVRWMulHIntCB,  binop:vmi_IMUL, vShape:RVVW_211_IIQ, argType:RVVX_SS},
-    [RV_IT_VWADDU_VR]        = {morph:emitVectorOp, opTCB:emitVRBinaryIntCB, binop:vmi_ADD,  vShape:RVVW_211_II,  argType:RVVX_UU},
-    [RV_IT_VWADD_VR]         = {morph:emitVectorOp, opTCB:emitVRBinaryIntCB, binop:vmi_ADD,  vShape:RVVW_211_II,  argType:RVVX_SS},
-    [RV_IT_VWSUBU_VR]        = {morph:emitVectorOp, opTCB:emitVRBinaryIntCB, binop:vmi_SUB,  vShape:RVVW_211_II,  argType:RVVX_UU},
-    [RV_IT_VWSUB_VR]         = {morph:emitVectorOp, opTCB:emitVRBinaryIntCB, binop:vmi_SUB,  vShape:RVVW_211_II,  argType:RVVX_SS},
-    [RV_IT_VWADDU_WR]        = {morph:emitVectorOp, opTCB:emitVRBinaryIntCB, binop:vmi_ADD,  vShape:RVVW_221_II,  argType:RVVX_UU},
-    [RV_IT_VWADD_WR]         = {morph:emitVectorOp, opTCB:emitVRBinaryIntCB, binop:vmi_ADD,  vShape:RVVW_221_II,  argType:RVVX_SS},
-    [RV_IT_VWSUBU_WR]        = {morph:emitVectorOp, opTCB:emitVRBinaryIntCB, binop:vmi_SUB,  vShape:RVVW_221_II,  argType:RVVX_UU},
-    [RV_IT_VWSUB_WR]         = {morph:emitVectorOp, opTCB:emitVRBinaryIntCB, binop:vmi_SUB,  vShape:RVVW_221_II,  argType:RVVX_SS},
-    [RV_IT_VMADD_VR]         = {morph:emitVectorOp, opTCB:emitVRMAddIntCB,   binop:vmi_ADD,                                      },
-    [RV_IT_VNMSUB_VR]        = {morph:emitVectorOp, opTCB:emitVRMAddIntCB,   binop:vmi_SUB,                                      },
-    [RV_IT_VMACC_VR]         = {morph:emitVectorOp, opTCB:emitVRMAccIntCB,   binop:vmi_ADD,                                      },
-    [RV_IT_VNMSAC_VR]        = {morph:emitVectorOp, opTCB:emitVRMAccIntCB,   binop:vmi_SUB,                                      },
-    [RV_IT_VWMACCU_VR]       = {morph:emitVectorOp, opTCB:emitVRMAccIntCB,   binop:vmi_ADD,  vShape:RVVW_211_II,  argType:RVVX_UU},
-    [RV_IT_VWMACC_VR]        = {morph:emitVectorOp, opTCB:emitVRMAccIntCB,   binop:vmi_ADD,  vShape:RVVW_211_II,  argType:RVVX_SS},
-    [RV_IT_VWMACCSU_VR]      = {morph:emitVectorOp, opTCB:emitVRMAccIntCB,   binop:vmi_ADD,  vShape:RVVW_211_II,  argType:RVVX_SU},
-    [RV_IT_VWMACCUS_VR]      = {morph:emitVectorOp, opTCB:emitVRMAccIntCB,   binop:vmi_ADD,  vShape:RVVW_211_II,  argType:RVVX_US},
+    [RV_IT_VWMULU_VR]        = {morph:emitVectorOp, opTCB:emitVRWMulHIntCB,  binop:vmi_MUL,      vShape:RVVW_211_IIQ, argType:RVVX_UU},
+    [RV_IT_VWMULSU_VR]       = {morph:emitVectorOp, opTCB:emitVRWMulHIntCB,  binop:vmi_IMULSU,   vShape:RVVW_211_IIQ, argType:RVVX_SU},
+    [RV_IT_VWMUL_VR]         = {morph:emitVectorOp, opTCB:emitVRWMulHIntCB,  binop:vmi_IMUL,     vShape:RVVW_211_IIQ, argType:RVVX_SS},
+    [RV_IT_VWADDU_VR]        = {morph:emitVectorOp, opTCB:emitVRBinaryIntCB, binop:vmi_ADD,      vShape:RVVW_211_II,  argType:RVVX_UU},
+    [RV_IT_VWADD_VR]         = {morph:emitVectorOp, opTCB:emitVRBinaryIntCB, binop:vmi_ADD,      vShape:RVVW_211_II,  argType:RVVX_SS},
+    [RV_IT_VWSUBU_VR]        = {morph:emitVectorOp, opTCB:emitVRBinaryIntCB, binop:vmi_SUB,      vShape:RVVW_211_II,  argType:RVVX_UU},
+    [RV_IT_VWSUB_VR]         = {morph:emitVectorOp, opTCB:emitVRBinaryIntCB, binop:vmi_SUB,      vShape:RVVW_211_II,  argType:RVVX_SS},
+    [RV_IT_VWADDU_WR]        = {morph:emitVectorOp, opTCB:emitVRBinaryIntCB, binop:vmi_ADD,      vShape:RVVW_221_II,  argType:RVVX_UU},
+    [RV_IT_VWADD_WR]         = {morph:emitVectorOp, opTCB:emitVRBinaryIntCB, binop:vmi_ADD,      vShape:RVVW_221_II,  argType:RVVX_SS},
+    [RV_IT_VWSUBU_WR]        = {morph:emitVectorOp, opTCB:emitVRBinaryIntCB, binop:vmi_SUB,      vShape:RVVW_221_II,  argType:RVVX_UU},
+    [RV_IT_VWSUB_WR]         = {morph:emitVectorOp, opTCB:emitVRBinaryIntCB, binop:vmi_SUB,      vShape:RVVW_221_II,  argType:RVVX_SS},
+    [RV_IT_VMADD_VR]         = {morph:emitVectorOp, opTCB:emitVRMAddIntCB,   binop:vmi_ADD,                                          },
+    [RV_IT_VNMSUB_VR]        = {morph:emitVectorOp, opTCB:emitVRMAddIntCB,   binop:vmi_SUB,                                          },
+    [RV_IT_VMACC_VR]         = {morph:emitVectorOp, opTCB:emitVRMAccIntCB,   binop:vmi_ADD,                                          },
+    [RV_IT_VNMSAC_VR]        = {morph:emitVectorOp, opTCB:emitVRMAccIntCB,   binop:vmi_SUB,                                          },
+    [RV_IT_VWMACCU_VR]       = {morph:emitVectorOp, opTCB:emitVRMAccIntCB,   binop:vmi_ADD,      vShape:RVVW_211_II,  argType:RVVX_UU},
+    [RV_IT_VWMACC_VR]        = {morph:emitVectorOp, opTCB:emitVRMAccIntCB,   binop:vmi_ADD,      vShape:RVVW_211_II,  argType:RVVX_SS},
+    [RV_IT_VWMACCSU_VR]      = {morph:emitVectorOp, opTCB:emitVRMAccIntCB,   binop:vmi_ADD,      vShape:RVVW_211_II,  argType:RVVX_SU},
+    [RV_IT_VWMACCUS_VR]      = {morph:emitVectorOp, opTCB:emitVRMAccIntCB,   binop:vmi_ADD,      vShape:RVVW_211_II,  argType:RVVX_US},
 
     // V-extension IVV-type instructions
     [RV_IT_VWREDSUMU_VS]     = {morph:emitVectorOp, opTCB:emitVRedBinaryIntCB, initCB:initVRedCB, endCB:endVRedCB, binop:vmi_ADD, vShape:RVVW_212_SI, argType:RVVX_UU, vstart0:1},
@@ -7193,14 +7042,14 @@ const static riscvMorphAttr dispatchTable[] = {
     [RV_IT_VREDMAXU_VS]      = {morph:emitVectorOp, opTCB:emitVRedBinaryIntCB, initCB:initVRedCB, endCB:endVRedCB, binop:vmi_MAX,  vShape:RVVW_111_SI,  vstart0:1},
     [RV_IT_VREDMAX_VS]       = {morph:emitVectorOp, opTCB:emitVRedBinaryIntCB, initCB:initVRedCB, endCB:endVRedCB, binop:vmi_IMAX, vShape:RVVW_111_SI,  vstart0:1},
     [RV_IT_VEXT_X_V]         = {morph:emitScalarOp, opTCB:emitVEXTXV,                                                              vShape:RVVW_EXT_II,  vstart0:0},
-    [RV_IT_VMPOPC_M]         = {morph:emitVectorOp, opTCB:emitVMPopcCB,                    initCB:initVMPopcCB,                    vShape:RVVW_111_PP,  vstart0:1},
-    [RV_IT_VMFIRST_M]        = {morph:emitVectorOp, opTCB:emitVMFirstCB,                   initCB:initVMFirstCB,                   vShape:RVVW_111_PP,  vstart0:1},
-    [RV_IT_VMSBF_M]          = {morph:emitVectorOp, opTCB:emitVMSBFCB,                     initCB:initVMSFCB,                      vShape:RVVW_111_PP,  vstart0:0},
-    [RV_IT_VMSOF_M]          = {morph:emitVectorOp, opTCB:emitVMSOFCB,                     initCB:initVMSFCB,                      vShape:RVVW_111_PP,  vstart0:0},
-    [RV_IT_VMSIF_M]          = {morph:emitVectorOp, opTCB:emitVMSIFCB,                     initCB:initVMSFCB,                      vShape:RVVW_111_PP,  vstart0:0},
+    [RV_IT_VMPOPC_M]         = {morph:emitVectorOp, opTCB:emitVMPOPCCB,                    initCB:initVMPOPCCB,                    vShape:RVVW_111_PP,  vstart0:1},
+    [RV_IT_VMFIRST_M]        = {morph:emitVectorOp, opTCB:emitVMFIRSTCB,                   initCB:initVMFIRSTCB,                   vShape:RVVW_111_PP,  vstart0:1},
+    [RV_IT_VMSBF_M]          = {morph:emitVectorOp, opTCB:emitVMSBFCB,                     initCB:initVMSFCB,                      vShape:RVVW_111_PP,  vstart0:1},
+    [RV_IT_VMSOF_M]          = {morph:emitVectorOp, opTCB:emitVMSOFCB,                     initCB:initVMSFCB,                      vShape:RVVW_111_PP,  vstart0:1},
+    [RV_IT_VMSIF_M]          = {morph:emitVectorOp, opTCB:emitVMSIFCB,                     initCB:initVMSFCB,                      vShape:RVVW_111_PP,  vstart0:1},
     [RV_IT_VIOTA_M]          = {morph:emitVectorOp, opTCB:emitVIOTACB,                     initCB:initVIOTACB,                     vShape:RVVW_111_IP,  vstart0:1},
     [RV_IT_VID_V]            = {morph:emitVectorOp, opTCB:emitVIDTCB,    opFCB:emitVIDFCB, initCB:initVIOTACB,                     vShape:RVVW_111_IP,  vstart0:0},
-    [RV_IT_VCOMPRESS_VM]     = {morph:emitVectorOp, opTCB:emitVCompressCB,                 initCB:initVCompressCB,                 vShape:RVVW_111_CMP, vstart0:1, implicitTZ:1},
+    [RV_IT_VCOMPRESS_VM]     = {morph:emitVectorOp, opTCB:emitVCOMPRESSCB,                 initCB:initVCOMPRESSCB,                 vShape:RVVW_111_CMP, vstart0:1, implicitTZ:1},
     [RV_IT_VMAND_MM]         = {morph:emitVectorOp, opTCB:emitMBinaryCB, binop:vmi_AND,  vShape:RVVW_111_PP},
     [RV_IT_VMANDNOT_MM]      = {morph:emitVectorOp, opTCB:emitMBinaryCB, binop:vmi_ANDN, vShape:RVVW_111_PP},
     [RV_IT_VMOR_MM]          = {morph:emitVectorOp, opTCB:emitMBinaryCB, binop:vmi_OR,   vShape:RVVW_111_PP},
@@ -7211,7 +7060,7 @@ const static riscvMorphAttr dispatchTable[] = {
     [RV_IT_VMXNOR_MM]        = {morph:emitVectorOp, opTCB:emitMBinaryCB, binop:vmi_XNOR, vShape:RVVW_111_PP},
 
     // V-extension IVI-type instructions
-    [RV_IT_VMERGE_VI]        = {morph:emitVectorOp, opTCB:emitVIMergeTCB, opFCB:emitVRMergeFCB},
+    [RV_IT_VMERGE_VI]        = {morph:emitVectorOp, opTCB:emitVIMERGETCB, opFCB:emitVRMERGEFCB},
     [RV_IT_VADD_VI]          = {morph:emitVectorOp, opTCB:emitVIBinaryIntCB, binop:vmi_ADD},
     [RV_IT_VRSUB_VI]         = {morph:emitVectorOp, opTCB:emitVIBinaryIntCB, binop:vmi_RSUB},
     [RV_IT_VAND_VI]          = {morph:emitVectorOp, opTCB:emitVIBinaryIntCB, binop:vmi_AND},
