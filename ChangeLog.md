@@ -4,6 +4,9 @@
 # This CHANGELOG contains information specific to the RISCV processor model   #
 ###############################################################################
 
+- A bug has been fixed that could cause incorrect behavior when PMP region
+  mappings change on the RISC-V model.
+  
 ###############################################################################
 ## Date 2019-June-28                                                         ##
 ## Release 20190628.0                                                        ##
