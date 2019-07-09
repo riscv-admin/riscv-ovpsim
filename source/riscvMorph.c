@@ -227,8 +227,15 @@ inline static Bool disableMorph(riscvMorphStateP state) {
 //
 // Get the currently-enabled architectural features
 //
-static riscvArchitecture getCurrentArch(riscvP riscv) {
+inline static riscvArchitecture getCurrentArch(riscvP riscv) {
     return riscv->currentArch;
+}
+
+//
+// Validate current polymorphic block key
+//
+inline static void emitCheckPolymorphic(void) {
+    vmimtPolymorphicBlock(16, RISCV_PM_KEY);
 }
 
 
@@ -735,8 +742,211 @@ inline static void writeReg(riscvP riscv, riscvRegDesc r) {
 
 
 ////////////////////////////////////////////////////////////////////////////////
+// TRANSACTIONAL LOAD/STORE UTILITIES
+////////////////////////////////////////////////////////////////////////////////
+
+//
+// Return a Boolean indicating if transaction mode is enabled
+//
+inline static Bool inTransactionMode(riscvMorphStateP state) {
+
+    riscvP riscv = state->riscv;
+
+    // validate transaction mode state if required
+    if(riscv->useTMode) {
+        emitCheckPolymorphic();
+    }
+
+    // is transaction mode enabled?
+    return (riscv->pmKey & PMK_TRANSACTION);
+}
+
+//
+// Do transaction load of up to 8 bytes
+//
+static Uns64 doLoadTMode(riscvP riscv, Uns64 VA, Uns32 bytes) {
+
+    Uns64 result;
+
+    riscv->cb.tLoad(riscv, &result, VA, bytes);
+
+    return result;
+}
+
+//
+// Do transaction store of up to 8 bytes
+//
+static void doStoreTMode(riscvP riscv, Uns64 VA, Uns64 value, Uns32 bytes) {
+
+    riscv->cb.tStore(riscv, &value, VA, bytes);
+}
+
+//
+// Create address for transaction load or store
+//
+static vmiReg emitTransactionVA(
+    riscvMorphStateP state,
+    vmiReg           ra,
+    Addr             offset
+) {
+    vmiReg raTmp   = getTmp(0);
+    Uns32 raBits   = riscvGetXlenMode(state->riscv);
+    Uns32 addrBits = 64;
+
+    // include offset
+    vmimtBinopRRC(raBits, vmi_ADD, raTmp, ra, offset, 0);
+
+    // extend address to 64 bits if required
+    if(raBits<addrBits) {
+        vmimtMoveExtendRR(addrBits, raTmp, raBits, raTmp, False);
+    }
+
+    return raTmp;
+}
+
+//
+// Transaction load value from memory for explicit memBits and offset
+//
+static void emitLoadTModeMBO(
+    riscvMorphStateP state,
+    Uns32            rdBits,
+    Uns32            memBits,
+    Addr             offset,
+    vmiReg           rd,
+    vmiReg           ra,
+    memConstraint    constraint
+) {
+    Bool      sExtend = !state->info.unsExt;
+    memEndian endian  = getDataEndian(state->riscv);
+    vmiCallFn cb      = (vmiCallFn)doLoadTMode;
+
+    // extend address to 64 bits if required
+    ra = emitTransactionVA(state, ra, offset);
+
+    // emit code to perform transaction load
+    vmimtArgProcessor();
+    vmimtArgReg(64, ra);
+    vmimtArgUns32(memBits/8);
+    vmimtCallResultAttrs(cb, memBits, rd, VMCA_FP_RESTORE);
+
+    // byte swap result if required (here for completeness, but not expected
+    // to be executed)
+    if(endian==MEM_ENDIAN_BIG) {                        // LCOV_EXCL_LINE
+        vmimtUnopR(memBits, vmi_SWP, rd, 0);            // LCOV_EXCL_LINE
+    }                                                   // LCOV_EXCL_LINE
+
+    // extend result if required
+    vmimtMoveExtendRR(rdBits, rd, memBits, rd, sExtend);
+}
+
+//
+// Transaction store value to memory for explicit memBits and offset
+//
+static void emitStoreTModeMBO(
+    riscvMorphStateP state,
+    Uns32            memBits,
+    Addr             offset,
+    vmiReg           ra,
+    vmiReg           rs,
+    memConstraint    constraint
+) {
+    memEndian endian = getDataEndian(state->riscv);
+    vmiCallFn cb     = (vmiCallFn)doStoreTMode;
+
+    // extend address to 64 bits if required
+    ra = emitTransactionVA(state, ra, offset);
+
+    // byte swap source if required (here for completeness, but not expected
+    // to be executed)
+    if(endian==MEM_ENDIAN_BIG) {                        // LCOV_EXCL_LINE
+        vmiReg rsTmp = getTmp(1);                       // LCOV_EXCL_LINE
+        vmimtUnopRR(memBits, vmi_SWP, rsTmp, rs, 0);    // LCOV_EXCL_LINE
+        rs = rsTmp;                                     // LCOV_EXCL_LINE
+    }                                                   // LCOV_EXCL_LINE
+
+    // emit code to perform transaction store
+    vmimtArgProcessor();
+    vmimtArgReg(64, ra);
+    vmimtArgReg(64, rs);
+    vmimtArgUns32(memBits/8);
+    vmimtCallAttrs(cb, VMCA_FP_RESTORE);
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
 // LOAD/STORE UTILITIES
 ////////////////////////////////////////////////////////////////////////////////
+
+//
+// Normal load value from memory for explicit memBits and offset
+//
+static void emitLoadNormalMBO(
+    riscvMorphStateP state,
+    Uns32            rdBits,
+    Uns32            memBits,
+    Addr             offset,
+    vmiReg           rd,
+    vmiReg           ra,
+    memConstraint    constraint
+) {
+    Bool      sExtend = !state->info.unsExt;
+    memEndian endian  = getDataEndian(state->riscv);
+
+    vmimtLoadRRO(rdBits, memBits, offset, rd, ra, endian, sExtend, constraint);
+}
+
+//
+// Normal store value to memory for explicit memBits and offset
+//
+static void emitStoreNormalMBO(
+    riscvMorphStateP state,
+    Uns32            memBits,
+    Addr             offset,
+    vmiReg           ra,
+    vmiReg           rs,
+    memConstraint    constraint
+) {
+    memEndian endian = getDataEndian(state->riscv);
+
+    vmimtStoreRRO(memBits, offset, ra, rs, endian, constraint);
+}
+
+//
+// Load value from memory for explicit memBits and offset
+//
+static void emitLoadCommonMBO(
+    riscvMorphStateP state,
+    vmiReg           rd,
+    Uns32            rdBits,
+    vmiReg           ra,
+    Uns32            memBits,
+    Uns64            offset,
+    memConstraint    constraint
+) {
+    if(inTransactionMode(state)) {
+        emitLoadTModeMBO(state, rdBits, memBits, offset, rd, ra, constraint);
+    } else {
+        emitLoadNormalMBO(state, rdBits, memBits, offset, rd, ra, constraint);
+    }
+}
+
+//
+// Store value to memory for explicit memBits and offset
+//
+static void emitStoreCommonMBO(
+    riscvMorphStateP state,
+    vmiReg           rs,
+    vmiReg           ra,
+    Uns32            memBits,
+    Uns64            offset,
+    memConstraint    constraint
+) {
+    if(inTransactionMode(state)) {
+        emitStoreTModeMBO(state, memBits, offset, ra, rs, constraint);
+    } else {
+        emitStoreNormalMBO(state, memBits, offset, ra, rs, constraint);
+    }
+}
 
 //
 // Load value from memory
@@ -748,12 +958,10 @@ static void emitLoadCommon(
     vmiReg           ra,
     memConstraint    constraint
 ) {
-    Uns32     memBits = state->info.memBits;
-    Uns64     offset  = state->info.c;
-    Bool      sExtend = !state->info.unsExt;
-    memEndian endian  = getDataEndian(state->riscv);
+    Uns32 memBits = state->info.memBits;
+    Uns64 offset  = state->info.c;
 
-    vmimtLoadRRO(rdBits, memBits, offset, rd, ra, endian, sExtend, constraint);
+    emitLoadCommonMBO(state, rd, rdBits, ra, memBits, offset, constraint);
 }
 
 //
@@ -765,11 +973,10 @@ static void emitStoreCommon(
     vmiReg           ra,
     memConstraint    constraint
 ) {
-    Uns32     memBits = state->info.memBits;
-    Uns64     offset  = state->info.c;
-    memEndian endian  = getDataEndian(state->riscv);
+    Uns32 memBits = state->info.memBits;
+    Uns64 offset  = state->info.c;
 
-    vmimtStoreRRO(memBits, offset, ra, rs, endian, constraint);
+    emitStoreCommonMBO(state, rs, ra, memBits, offset, constraint);
 }
 
 
@@ -2320,11 +2527,15 @@ static Bool emitCheckLegalRM(riscvP riscv, riscvRMDesc rm) {
         // static check for illegal mode
         validRM = False;
 
-    } else if(rm==RV_RM_CURRENT) {
+    } else if(rm == RV_RM_CURRENT) {
 
-        // dynamic check of current mode required
-        vmimtPolymorphicBlock(RISCV_PM_KEY);
-        validRM = (riscv->pmKey & RM_VALID_MASK);
+        // insert dynamic rounding mode check if required
+        if(riscv->rmCheckValid) {
+            vmimtValidateBlockMask(ISA_RM_INVALID);
+        }
+
+        // dynamic check for illegal mode
+        validRM = !(riscv->currentArch & ISA_RM_INVALID);
     }
 
     // illegal instruction if invalid rounding mode
@@ -3141,7 +3352,7 @@ static riscvVLMULMt getVLMULMt(riscvP riscv) {
 
     if(VLMUL==VLMULMT_UNKNOWN) {
 
-        vmimtPolymorphicBlock(RISCV_PM_KEY);
+        emitCheckPolymorphic();
 
         blockState->VLMULMt = VLMUL = vlmulToVLMUL(RD_CSR_FIELD(riscv, vtype, vlmul));
     }
@@ -3159,7 +3370,7 @@ static riscvSEWMt getSEWMt(riscvP riscv) {
 
     if(SEW==SEWMT_UNKNOWN) {
 
-        vmimtPolymorphicBlock(RISCV_PM_KEY);
+        emitCheckPolymorphic();
 
         blockState->SEWMt = SEW = vsewToSEW(RD_CSR_FIELD(riscv, vtype, vsew));
     }
@@ -3183,7 +3394,7 @@ static riscvVLClassMt getVLClassMt(riscvMorphStateP state) {
         riscvVLMULMt VLMUL = getVLMULMt(riscv);
         Uns32        vlMax = riscv->configInfo.VLEN*VLMUL/SEW;
 
-        vmimtPolymorphicBlock(RISCV_PM_KEY);
+        emitCheckPolymorphic();
 
         if(!vl) {
             vlClass = VLCLASSMT_ZERO;
@@ -4427,6 +4638,9 @@ static Bool emitCheckVILL(riscvMorphStateP state) {
 
     Bool vill = RD_CSR_FIELD(state->riscv, vtype, vill);
 
+    // indicate this is a vector instruction
+    vmimtInstructionClassAdd(OCL_IC_VECTOR);
+
     if(vill) {
         ILLEGAL_INSTRUCTION_MESSAGE(state->riscv, "VILL", "vtype.vill=1");
     }
@@ -4594,7 +4808,7 @@ static Uns32 setVLSEWLMULInt(riscvP riscv, Uns32 vl, Uns32 vsew, Uns32 vlmul) {
     riscvSetVL(riscv, vl);
 
     // set matching polymorphic key and clamped vl
-    riscvRefreshPMKey(riscv);
+    riscvRefreshVectorPMKey(riscv);
 
     return RD_CSR(riscv, vl);
 }
@@ -4925,14 +5139,13 @@ static void emitVLdInt(riscvMorphStateP state, iterDescP id, vmiReg ra) {
         vmiReg vdTmp = skip ? getTmp(0) : vd;
 
         // do load (either directly to result location or to temporary)
-        vmimtLoadRRO(
+        emitLoadCommonMBO(
+            state,
+            vdTmp,
             id->SEW,
+            ra,
             memBits,
             memBytes*i,
-            vdTmp,
-            ra,
-            getDataEndian(state->riscv),
-            !state->info.unsExt,
             MEM_CONSTRAINT_ALIGNED
         );
 
@@ -4966,12 +5179,12 @@ static void emitVStInt(riscvMorphStateP state, iterDescP id, vmiReg ra) {
         vmiReg vs = getSegmentRegisterV0(state, id->r[0], i);
 
         // do store
-        vmimtStoreRRO(
+        emitStoreCommonMBO(
+            state,
+            vs,
+            ra,
             memBits,
             memBytes*i,
-            ra,
-            vs,
-            getDataEndian(state->riscv),
             MEM_CONSTRAINT_ALIGNED
         );
     }
@@ -5204,16 +5417,16 @@ static void seedXd(riscvMorphStateP state, iterDescP id, Int32 c) {
 }
 
 //
-// Initialization callback for VMPOPC
+// Initialization callback for VPOPC
 //
-static RISCV_MORPHV_FN(initVMPOPCCB) {
+static RISCV_MORPHV_FN(initVPOPCCB) {
     seedXd(state, id, 0);
 }
 
 //
-// Per-element callback for VMPOPC
+// Per-element callback for VPOPC
 //
-static RISCV_MORPHV_FN(emitVMPOPCCB) {
+static RISCV_MORPHV_FN(emitVPOPCCB) {
 
     riscvP       riscv = state->riscv;
     riscvRegDesc rdA   = getRVReg(state, 0);
@@ -5235,16 +5448,16 @@ static RISCV_MORPHV_FN(emitVMPOPCCB) {
 }
 
 //
-// Initialization callback for VMFIRST
+// Initialization callback for VFIRST
 //
-static RISCV_MORPHV_FN(initVMFIRSTCB) {
+static RISCV_MORPHV_FN(initVFIRSTCB) {
     seedXd(state, id, -1);
 }
 
 //
-// Per-element callback for VMFIRST
+// Per-element callback for VFIRST
 //
-static RISCV_MORPHV_FN(emitVMFIRSTCB) {
+static RISCV_MORPHV_FN(emitVFIRSTCB) {
 
     riscvP       riscv = state->riscv;
     riscvRegDesc rdA   = getRVReg(state, 0);
@@ -7042,8 +7255,8 @@ const static riscvMorphAttr dispatchTable[] = {
     [RV_IT_VREDMAXU_VS]      = {morph:emitVectorOp, opTCB:emitVRedBinaryIntCB, initCB:initVRedCB, endCB:endVRedCB, binop:vmi_MAX,  vShape:RVVW_111_SI,  vstart0:1},
     [RV_IT_VREDMAX_VS]       = {morph:emitVectorOp, opTCB:emitVRedBinaryIntCB, initCB:initVRedCB, endCB:endVRedCB, binop:vmi_IMAX, vShape:RVVW_111_SI,  vstart0:1},
     [RV_IT_VEXT_X_V]         = {morph:emitScalarOp, opTCB:emitVEXTXV,                                                              vShape:RVVW_EXT_II,  vstart0:0},
-    [RV_IT_VMPOPC_M]         = {morph:emitVectorOp, opTCB:emitVMPOPCCB,                    initCB:initVMPOPCCB,                    vShape:RVVW_111_PP,  vstart0:1},
-    [RV_IT_VMFIRST_M]        = {morph:emitVectorOp, opTCB:emitVMFIRSTCB,                   initCB:initVMFIRSTCB,                   vShape:RVVW_111_PP,  vstart0:1},
+    [RV_IT_VPOPC_M]          = {morph:emitVectorOp, opTCB:emitVPOPCCB,                     initCB:initVPOPCCB,                     vShape:RVVW_111_PP,  vstart0:1},
+    [RV_IT_VFIRST_M]         = {morph:emitVectorOp, opTCB:emitVFIRSTCB,                    initCB:initVFIRSTCB,                    vShape:RVVW_111_PP,  vstart0:1},
     [RV_IT_VMSBF_M]          = {morph:emitVectorOp, opTCB:emitVMSBFCB,                     initCB:initVMSFCB,                      vShape:RVVW_111_PP,  vstart0:1},
     [RV_IT_VMSOF_M]          = {morph:emitVectorOp, opTCB:emitVMSOFCB,                     initCB:initVMSFCB,                      vShape:RVVW_111_PP,  vstart0:1},
     [RV_IT_VMSIF_M]          = {morph:emitVectorOp, opTCB:emitVMSIFCB,                     initCB:initVMSFCB,                      vShape:RVVW_111_PP,  vstart0:1},
