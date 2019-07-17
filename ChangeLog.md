@@ -4,6 +4,15 @@
 # This CHANGELOG contains information specific to the RISCV processor model   #
 ###############################################################################
 
+- Corrected memory sizing in the riscvOVPsim fixed platform to use address 
+  range specified by argument addressbits.
+- Fixed bug when using new vmi_IMULSU operation.
+- Bug fixed which could cause incorrect results for floating point round or 
+  convert to unsigned operations when non-vmi_FPR_CURRENT rounding modes are
+  used in general arithmetic operations, as per RISC-V.
+- A bug was fixed that could cause incorrect behavior when PMP region mappings
+  change.
+  
 ###############################################################################
 ## Date 2019-June-28                                                         ##
 ## Release 20190628.0                                                        ##
