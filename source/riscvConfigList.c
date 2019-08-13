@@ -38,11 +38,18 @@
     .ASID_bits     = ((_ARCH)&RV64) ? 16 : 9    \
 }
 
+#define RISC_VARIANT_BASE(_NAME, _ARCH) {       \
+    .name          = _NAME,                     \
+    .arch          = _ARCH,                     \
+    .user_version  = RVUV_DEFAULT,              \
+    .priv_version  = RVPV_DEFAULT,              \
+    .tval_ii_code  = True                       \
+}
+
 //
 // Defined configurations
 //
 static const riscvConfig configList[] = {
-
     // RV32 variants
     RISC_VARIANT("RV32I",    ISA_U|ISA_S|RV32I   ),
     RISC_VARIANT("RV32IM",   ISA_U|ISA_S|RV32IM  ),
@@ -64,6 +71,11 @@ static const riscvConfig configList[] = {
     RISC_VARIANT("RV64GC",   ISA_U|ISA_S|RV64GC  ),
     RISC_VARIANT("RV64GCN",  ISA_U|ISA_S|RV64GCN ),
     RISC_VARIANT("RV64GCV",  ISA_U|ISA_S|RV64GCV ),
+
+    // RV BASE variants
+    RISC_VARIANT_BASE("RVB32I", RV32I),
+    RISC_VARIANT_BASE("RVB32E", RV32E),
+    RISC_VARIANT_BASE("RVB64I", RV64I),
 
     {0} // null terminator
 };
