@@ -1,9 +1,16 @@
 ###############################################################################
-#                       CHANGELOG.MODEL.RISCV.txt                             #
+#                       CHANGELOG.RISCVOVPSIM.txt                             #
 #      Copyright (c) 2005-2019 Imperas Software Ltd., www.imperas.com         #
-# This CHANGELOG contains information specific to the RISCV processor model   #
+# This CHANGELOG contains information for the riscvOVPsim fixed platform      #
+# which includes information of the OVP Simulator and RISCV processor model   #
 ###############################################################################
 
+- A fix has been made to the cmix instruction so it no longer writes the t0 
+  register. Note this is not in the base model, but in the extB prototype bit 
+  manipulation extension library.
+- New functions to support modeling Transactional Memory features in an 
+  extension library have been added to the enhanced model support call backs in 
+  the base model. 
 - Corrected memory sizing in the riscvOVPsim fixed platform to use address 
   range specified by argument addressbits.
 - Fixed bug when using new vmi_IMULSU operation.
@@ -19,6 +26,14 @@
   - The constraint on legal LMUL for segmented load/store operations has been
     changed from requiring LMUL=1 to requiring LMUL*NFIELDS<=8. This corresponds
     to a specification change made on 2019-June-06.
+  - decodes for instructions which only exist in unmasked form have been
+    changed so that the vm field in the instruction must be 1 (previously, this
+    bit was treated as a don't-care).
+  - instruction disassembly has been improved for 'move' instructions (this
+    change does not affect model behavior).
+  - A bug has been fixed which caused an error when an attempt was made to
+    execute floating point instructions with a scalar argument and with SLEN
+    less than 32.
 - The model has a new parameter vector_version which can be used to select
   either the stable 0.71 Vector Extension (the default) or the unstable master
   branch. The master branch currently has the following changes compared to the

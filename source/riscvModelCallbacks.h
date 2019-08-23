@@ -27,6 +27,7 @@
 
 // model header files
 #include "riscvDerivedMorph.h"
+#include "riscvExceptionTypes.h"
 #include "riscvMode.h"
 #include "riscvRegisterTypes.h"
 #include "riscvTypeRefs.h"
@@ -48,6 +49,14 @@ typedef RISCV_GET_XLEN_FN((*riscvGetXlenFn));
 //
 #define RISCV_GET_REG_NAME_FN(_NAME) const char *_NAME(Uns32 index)
 typedef RISCV_GET_REG_NAME_FN((*riscvGetRegNameFn));
+
+//
+// Return true if in transaction mode
+// Use at morph time only - assumes instruction checking this could
+// abort a transaction so emits end block if in TM
+//
+#define RISCV_GET_TMODE_FN(_NAME) Bool _NAME(riscvP riscv)
+typedef RISCV_GET_TMODE_FN((*riscvGetTModeFn));
 
 //
 // Enable or disable transaction mode
@@ -193,6 +202,7 @@ typedef struct riscvModelCBS {
     riscvGetRegNameFn         getXRegName;
     riscvGetRegNameFn         getFRegName;
     riscvSetTModeFn           setTMode;
+    riscvGetTModeFn           getTMode;
 
     // from riscvExceptions.h
     riscvIllegalInstructionFn illegalInstruction;

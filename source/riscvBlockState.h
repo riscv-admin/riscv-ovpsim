@@ -83,7 +83,7 @@ typedef enum riscvPMKE {
 typedef struct riscvBlockStateS {
 
     riscvBlockStateP prevState;     // previous block state
-    Uns32            fpNaNBoxMask;  // mask of known single-precision FP registers
+    Uns32            fpNaNBoxMask[2];// mask of known NaN-boxed registers
     Bool             fpInstDone;    // floating-point instruction already seen?
     riscvSEWMt       SEWMt;         // known active vector SEW
     riscvVLMULMt     VLMULMt;       // known active vector VLMUL
