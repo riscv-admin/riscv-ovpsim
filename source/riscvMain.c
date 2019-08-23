@@ -54,6 +54,7 @@ static void initModelCBs(riscvP riscv) {
     riscv->cb.getXlenArch        = riscvGetXlenArch;
     riscv->cb.getXRegName        = riscvGetXRegName;
     riscv->cb.getFRegName        = riscvGetFRegName;
+    riscv->cb.getTMode           = riscvGetTMode;
     riscv->cb.setTMode           = riscvSetTMode;
 
     // from riscvExceptions.h

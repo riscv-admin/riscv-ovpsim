@@ -611,7 +611,7 @@ VMI_IASSWITCH_FN(riscvContextSwitchCB) {
 //
 // Enable or disable transaction mode
 //
-void riscvSetTMode(riscvP riscv, Bool enable) {
+RISCV_SET_TMODE_FN(riscvSetTMode) {
 
     // flush dictionaries the first time transaction mode is enabled
     if(enable && !riscv->useTMode) {
@@ -630,5 +630,12 @@ void riscvSetTMode(riscvP riscv, Bool enable) {
     } else {
         riscv->pmKey &= ~PMK_TRANSACTION;
     }
+}
+
+//
+// Return true if in transaction mode
+//
+RISCV_GET_TMODE_FN(riscvGetTMode) {
+    return (riscv->pmKey & PMK_TRANSACTION) != 0;
 }
 

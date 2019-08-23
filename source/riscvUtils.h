@@ -24,6 +24,7 @@
 
 // model header files
 #include "riscvMode.h"
+#include "riscvModelCallbacks.h"
 #include "riscvTypes.h"
 #include "riscvTypeRefs.h"
 #include "riscvVariant.h"
@@ -121,5 +122,10 @@ void riscvUpdateExclusiveAccessCallback(riscvP riscv, Bool install);
 //
 // Enable or disable transaction mode
 //
-void riscvSetTMode(riscvP riscv, Bool enable);
+RISCV_SET_TMODE_FN(riscvSetTMode);
+
+//
+// Return true if in transaction mode
+//
+RISCV_GET_TMODE_FN(riscvGetTMode);
 

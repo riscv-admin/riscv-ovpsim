@@ -683,6 +683,36 @@ inline static vmiReg getVMIReg(riscvP riscv, riscvRegDesc r) {
 }
 
 //
+// Does the floating point register require NaN boxing?
+//
+static Bool requireNaNBox(
+    riscvP       riscv,
+    riscvRegDesc r,
+    Uns32        archBits,
+    Uns32        srcBits
+) {
+    riscvBlockStateP blockState = riscv->blockState;
+    Bool             doNaNBox   = False;
+
+    if(archBits>srcBits) {
+
+        Uns32 fpNaNBoxMask;
+
+        if(srcBits==16) {
+            fpNaNBoxMask = blockState->fpNaNBoxMask[0];
+        } else if(srcBits==32) {
+            fpNaNBoxMask = blockState->fpNaNBoxMask[1];
+        } else {
+            fpNaNBoxMask = -1;
+        }
+
+        doNaNBox = !(fpNaNBoxMask & getRegMask(r));
+    }
+
+    return doNaNBox;
+}
+
+//
 // Do actions when a register is written (sign extending or NaN boxing, if
 // required)
 //
@@ -705,13 +735,21 @@ void riscvWriteRegSize(riscvP riscv, riscvRegDesc r, Uns32 srcBits) {
         riscvBlockStateP blockState = riscv->blockState;
         Uns32            dstBits    = riscvGetFlenArch(riscv);
         Uns32            fprMask    = getRegMask(r);
+        Uns32            i;
 
-        // NaN-box result
-        if(dstBits>srcBits) {
+        // NaN-box result if required
+        if(requireNaNBox(riscv, r, dstBits, srcBits)) {
             vmimtMoveRC(dstBits-srcBits, VMI_REG_DELTA(dst,srcBits/8), -1);
-            blockState->fpNaNBoxMask |= fprMask;
-        } else {
-            blockState->fpNaNBoxMask &= ~fprMask;
+        }
+
+        // floating point views narrower than srcBits are now not NaN-boxed
+        for(i=0; (16<<i)<srcBits; i++) {
+            blockState->fpNaNBoxMask[i] &= ~fprMask;
+        }
+
+        // floating point views srcBits or wider are now NaN-boxed
+        for(; i<2; i++) {
+            blockState->fpNaNBoxMask[i] |= fprMask;
         }
 
         // set mstatus.FS
@@ -1971,6 +2009,11 @@ static RISCV_MORPH_FN(emitCSRRI) {
 #define UNS64_MAX           0xffffffffffffffffULL
 
 //
+// Flt16 macros
+//
+#define FP16_DEFAULT_QNAN   0x7e00
+
+//
 // Flt32 macros
 //
 #define FP32_EXP_ONES       0xff
@@ -2129,22 +2172,22 @@ vmiReg riscvGetVMIRegFS(riscvP riscv, riscvRegDesc r, vmiReg tmp) {
 
         Uns32 bits     = getRBits(r);
         Uns32 archBits = riscvGetFlenArch(riscv);
-        Uns32 fprMask  = getRegMask(r);
 
         // handle possible switch to QNaN-valued temporary if the source
         // register is smaller than the architectural register size and not
         // known to be NaN-boxed
-        if((archBits>bits) && !(riscv->blockState->fpNaNBoxMask&fprMask)) {
+        if(requireNaNBox(riscv, r, archBits, bits)) {
 
-            // use temporary corresponding to the input argument
-            vmiReg upper = VMI_REG_DELTA(result,bits/8);
+            // select default QNaN value
+            Uns32 QNaN  = (bits==16) ? FP16_DEFAULT_QNAN : FP32_DEFAULT_QNAN;
+            Uns64 upper = -1ULL << bits;
 
             // is the upper half all ones?
-            vmimtCompareRC(bits, vmi_COND_EQ, upper, -1, tmp);
+            vmimtCompareRC(archBits, vmi_COND_NB, result, upper, tmp);
 
             // seed the apparent value, depending on whether the source is
             // correctly NaN-boxed
-            vmimtCondMoveRRC(bits, tmp, True, tmp, result, FP32_DEFAULT_QNAN);
+            vmimtCondMoveRRC(bits, tmp, True, tmp, result, QNaN);
 
             // use the temporary as a source
             result = tmp;
@@ -6263,7 +6306,8 @@ static RISCV_MORPHV_FN(emitVIRShiftIntCB) {
 }
 
 //
-// Per-element callback for averaging instructions with two register operands
+// Per-element callback for single-width fractional multiply with rounding and
+// saturation
 //
 static RISCV_MORPHV_FN(emitVRSMULCB) {
 
@@ -7262,6 +7306,7 @@ const static riscvMorphAttr dispatchTable[] = {
     [RV_IT_VDOT_VV]          = {morph:emitVectorOp, checkCB:emitEDIVCheckCB},
 
     // V-extension FVV/FVF-type common instructions
+    [RV_IT_VFMERGE_VR]       = {fpConfig:RVFP_NORMAL, morph:emitVectorOp, opTCB:emitVRMERGETCB, opFCB:emitVRMERGEFCB,    vShape:RVVW_111_FF},
     [RV_IT_VFADD_VR]         = {fpConfig:RVFP_NORMAL, morph:emitVectorOp, opTCB:emitVRBinaryFltCB,  fpBinop: vmi_FADD,   vShape:RVVW_111_FF},
     [RV_IT_VFSUB_VR]         = {fpConfig:RVFP_NORMAL, morph:emitVectorOp, opTCB:emitVRBinaryFltCB,  fpBinop: vmi_FSUB,   vShape:RVVW_111_FF},
     [RV_IT_VFRSUB_VR]        = {fpConfig:RVFP_NORMAL, morph:emitVectorOp, opTCB:emitVRBinaryFltRCB, fpBinop: vmi_FSUB,   vShape:RVVW_111_FF},
@@ -7407,8 +7452,9 @@ VMI_START_END_BLOCK_FN(riscvStartBlock) {
     thisState->prevState = prevState;
     riscv->blockState    = thisState;
 
-    // no single-precision registers are known to be NaN-boxed initially
-    thisState->fpNaNBoxMask = 0;
+    // no floating point registers are known to be NaN-boxed initially
+    thisState->fpNaNBoxMask[0] = 0;
+    thisState->fpNaNBoxMask[1] = 0;
 
     // no floating-point instructions have been seen initially if management
     // of floating point state using mstatus.FS is required
