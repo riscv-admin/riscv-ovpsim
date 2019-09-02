@@ -587,6 +587,16 @@ static void updateFS(riscvP riscv) {
 }
 
 //
+// Reset JIT code generator state after possible write of mstatus.FS
+//
+static void resetFS(riscvP riscv) {
+
+    riscvBlockStateP blockState = riscv->blockState;
+
+    blockState->fpInstDone = False;
+}
+
+//
 // Return VMI register for a temporary
 //
 static vmiReg getTmp(Uns32 i) {
@@ -2212,6 +2222,13 @@ void riscvWFS(riscvMorphStateP state, Bool useRS1) {
     updateFS(state->riscv);
 }
 
+//
+// Reset JIT code generator state after possible write of mstatus.FS
+//
+void riscvRstFS(riscvMorphStateP state, Bool useRS1) {
+    resetFS(state->riscv);
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // GENERAL QNAN/INDETERMINATE HANDLERS
@@ -2577,6 +2594,18 @@ inline static vmiFPRC mapRMDescToRC(riscvRMDesc rm) {
 ////////////////////////////////////////////////////////////////////////////////
 
 //
+// Return VMI register for floating point status flags when written (NOTE:
+// mstatus.FS must be updated)
+//
+static vmiReg getFPFlagsMT(riscvMorphStateP state) {
+
+    // set mstatus.FS
+    updateFS(state->riscv);
+
+    return RISCV_FP_FLAGS;
+}
+
+//
 // Validate the given rounding mode is legal and emit an Illegal Instruction
 // exception call if not
 //
@@ -2680,12 +2709,13 @@ static RISCV_MORPH_FN(emitFUnop) {
     riscvRegDesc  fs1A  = getRVReg(state, 1);
     vmiReg        fd    = getVMIReg(riscv, fdA);
     vmiReg        fs1   = getVMIRegFS(riscv, fs1A, getTmp(1));
+    vmiReg        flags = getFPFlagsMT(state);
     vmiFType      type  = getRegFType(fdA);
     vmiFUnop      op    = state->attrs->fpUnop;
     vmiFPConfigCP ctrl  = getFPControl(state);
 
     if(emitSetOperationRM(state, state->info.rm)) {
-        vmimtFUnopRR(type, op, fd, fs1, RISCV_FP_FLAGS, ctrl);
+        vmimtFUnopRR(type, op, fd, fs1, flags, ctrl);
         writeReg(riscv, fdA);
     }
 }
@@ -2702,12 +2732,13 @@ static RISCV_MORPH_FN(emitFBinop) {
     vmiReg        fd    = getVMIReg(riscv, fdA);
     vmiReg        fs1   = getVMIRegFS(riscv, fs1A, getTmp(1));
     vmiReg        fs2   = getVMIRegFS(riscv, fs2A, getTmp(2));
+    vmiReg        flags = getFPFlagsMT(state);
     vmiFType      type  = getRegFType(fdA);
     vmiFBinop     op    = state->attrs->fpBinop;
     vmiFPConfigCP ctrl  = getFPControl(state);
 
     if(emitSetOperationRM(state, state->info.rm)) {
-        vmimtFBinopRRR(type, op, fd, fs1, fs2, RISCV_FP_FLAGS, ctrl);
+        vmimtFBinopRRR(type, op, fd, fs1, fs2, flags, ctrl);
         writeReg(riscv, fdA);
     }
 }
@@ -2726,12 +2757,13 @@ static RISCV_MORPH_FN(emitFTernop) {
     vmiReg        fs1   = getVMIRegFS(riscv, fs1A, getTmp(1));
     vmiReg        fs2   = getVMIRegFS(riscv, fs2A, getTmp(2));
     vmiReg        fs3   = getVMIRegFS(riscv, fs3A, getTmp(3));
+    vmiReg        flags = getFPFlagsMT(state);
     vmiFType      type  = getRegFType(fdA);
     vmiFTernop    op    = state->attrs->fpTernop;
     vmiFPConfigCP ctrl  = getFPControl(state);
 
     if(emitSetOperationRM(state, state->info.rm)) {
-        vmimtFTernopRRRR(type, op, fd, fs1, fs2, fs3, RISCV_FP_FLAGS, False, ctrl);
+        vmimtFTernopRRRR(type, op, fd, fs1, fs2, fs3, flags, False, ctrl);
         writeReg(riscv, fdA);
     }
 }
@@ -2746,13 +2778,14 @@ static RISCV_MORPH_FN(emitFConvert) {
     riscvRegDesc  fsA   = getRVReg(state, 1);
     vmiReg        fd    = getVMIReg(riscv, fdA);
     vmiReg        fs    = getVMIRegFS(riscv, fsA, getTmp(1));
+    vmiReg        flags = getFPFlagsMT(state);
     vmiFType      typeD = getRegFType(fdA);
     vmiFType      typeS = getRegFType(fsA);
     vmiFPRC       rc    = mapRMDescToRC(state->info.rm);
     vmiFPConfigCP ctrl  = getFPControl(state);
 
     if(emitCheckLegalRM(riscv, state->info.rm)) {
-        vmimtFConvertRR(typeD, fd, typeS, fs, rc, RISCV_FP_FLAGS, ctrl);
+        vmimtFConvertRR(typeD, fd, typeS, fs, rc, flags, ctrl);
         writeReg(riscv, fdA);
     }
 }
@@ -2770,12 +2803,13 @@ static void emitFCompareInt(
     riscvFPRelation fpRel     = state->attrs->fpRel;
     vmiFPRelation   relation  = fpRel & ~RVFCMP_QNOK;
     Bool            allowQNaN = fpRel &  RVFCMP_QNOK;
-    vmiFlags        flags     = {f:{[vmi_ZF]=rd}, negate:vmi_FN_ZF};
+    vmiReg          flags     = getFPFlagsMT(state);
+    vmiFlags        zf        = {f:{[vmi_ZF]=rd}, negate:vmi_FN_ZF};
     vmiFPConfigCP   ctrl      = getFPControl(state);
 
     // set least-significant byte of 'rd' with the required result
-    vmimtFCompareRR(typeS, rd, fs1, fs2, RISCV_FP_FLAGS, allowQNaN, ctrl);
-    vmimtBinopRC(8, vmi_AND, rd, relation, &flags);
+    vmimtFCompareRR(typeS, rd, fs1, fs2, flags, allowQNaN, ctrl);
+    vmimtBinopRC(8, vmi_AND, rd, relation, &zf);
 }
 
 //
@@ -3933,6 +3967,7 @@ static void widenOperands(riscvMorphStateP state, iterDescP id) {
                 } else {
 
                     // floating point argument
+                    vmiReg        flags = getFPFlagsMT(state);
                     vmiFType      typeD = getSEWFType(dstSEW);
                     vmiFType      typeS = getSEWFType(srcSEW);
                     vmiFPRC       rc    = vmi_FPR_NEAREST;
@@ -3940,7 +3975,7 @@ static void widenOperands(riscvMorphStateP state, iterDescP id) {
 
                     // convert to temporary
                     vmimtFConvertRR(
-                        typeD, tmpA, typeS, id->r[i], rc, RISCV_FP_FLAGS, ctrl
+                        typeD, tmpA, typeS, id->r[i], rc, flags, ctrl
                     );
                 }
 
@@ -6442,14 +6477,15 @@ static RISCV_MORPHV_FN(endVRedCB) {
 //
 static RISCV_MORPHV_FN(emitVRUnaryFltCB) {
 
-    vmiReg        fd   = id->r[0];
-    vmiReg        fs1  = id->r[1];
-    vmiFType      type = getSEWFType(id->SEW);
-    vmiFUnop      op   = state->attrs->fpUnop;
-    vmiFPConfigCP ctrl = getFPControl(state);
+    vmiReg        fd    = id->r[0];
+    vmiReg        fs1   = id->r[1];
+    vmiReg        flags = getFPFlagsMT(state);
+    vmiFType      type  = getSEWFType(id->SEW);
+    vmiFUnop      op    = state->attrs->fpUnop;
+    vmiFPConfigCP ctrl  = getFPControl(state);
 
     if(emitSetOperationRM(state, RV_RM_CURRENT)) {
-        vmimtFUnopRR(type, op, fd, fs1, RISCV_FP_FLAGS, ctrl);
+        vmimtFUnopRR(type, op, fd, fs1, flags, ctrl);
     }
 }
 
@@ -6462,15 +6498,16 @@ static void emitVRBinaryFltInt(
     Uns32            arg1Index,
     Uns32            arg2Index
 ) {
-    vmiReg        fd   = id->r[0];
-    vmiReg        fs1  = id->r[arg1Index];
-    vmiReg        fs2  = id->r[arg2Index];
-    vmiFType      type = getSEWFType(id->SEW);
-    vmiFBinop     op   = state->attrs->fpBinop;
-    vmiFPConfigCP ctrl = getFPControl(state);
+    vmiReg        fd    = id->r[0];
+    vmiReg        fs1   = id->r[arg1Index];
+    vmiReg        fs2   = id->r[arg2Index];
+    vmiReg        flags = getFPFlagsMT(state);
+    vmiFType      type  = getSEWFType(id->SEW);
+    vmiFBinop     op    = state->attrs->fpBinop;
+    vmiFPConfigCP ctrl  = getFPControl(state);
 
     if(emitSetOperationRM(state, RV_RM_CURRENT)) {
-        vmimtFBinopRRR(type, op, fd, fs1, fs2, RISCV_FP_FLAGS, ctrl);
+        vmimtFBinopRRR(type, op, fd, fs1, fs2, flags, ctrl);
     }
 }
 
@@ -6500,16 +6537,17 @@ static void emitVRMAddFltInt(
     Uns32            arg2Index,
     Uns32            arg3Index
 ) {
-    vmiReg        fd   = id->r[0];
-    vmiReg        fs1  = id->r[arg1Index];
-    vmiReg        fs2  = id->r[arg2Index];
-    vmiReg        fs3  = id->r[arg3Index];
-    vmiFType      type = getSEWFType(id->SEW);
-    vmiFTernop    op   = state->attrs->fpTernop;
-    vmiFPConfigCP ctrl = getFPControl(state);
+    vmiReg        fd    = id->r[0];
+    vmiReg        fs1   = id->r[arg1Index];
+    vmiReg        fs2   = id->r[arg2Index];
+    vmiReg        fs3   = id->r[arg3Index];
+    vmiReg        flags = getFPFlagsMT(state);
+    vmiFType      type  = getSEWFType(id->SEW);
+    vmiFTernop    op    = state->attrs->fpTernop;
+    vmiFPConfigCP ctrl  = getFPControl(state);
 
     if(emitSetOperationRM(state, RV_RM_CURRENT)) {
-        vmimtFTernopRRRR(type, op, fd, fs1, fs2, fs3, RISCV_FP_FLAGS, False, ctrl);
+        vmimtFTernopRRRR(type, op, fd, fs1, fs2, fs3, flags, False, ctrl);
     }
 }
 
@@ -6596,13 +6634,14 @@ static RISCV_MORPHV_FN(emitVRConvertFltCB) {
 
     vmiReg        fd    = id->r[0];
     vmiReg        fs    = id->r[1];
+    vmiReg        flags = getFPFlagsMT(state);
     vmiFType      typeD = getVConvertType(state, id, 0);
     vmiFType      typeS = getVConvertType(state, id, 1);
     vmiFPConfigCP ctrl  = getFPControl(state);
     vmiFPRC       rc    = vmi_FPR_CURRENT;
 
     if(emitSetOperationRM(state, RV_RM_CURRENT)) {
-        vmimtFConvertRR(typeD, fd, typeS, fs, rc, RISCV_FP_FLAGS, ctrl);
+        vmimtFConvertRR(typeD, fd, typeS, fs, rc, flags, ctrl);
     }
 }
 
@@ -6616,15 +6655,16 @@ static RISCV_MORPHV_FN(emitVRConvertFltCB) {
 //
 static RISCV_MORPHV_FN(emitVRedBinaryFltCB) {
 
-    vmiReg        fd   = RISCV_VTMP;
-    vmiReg        fs1  = RISCV_VTMP;
-    vmiReg        fs2  = id->r[1];
-    vmiFType      type = getSEWFType(id->SEW);
-    vmiFBinop     op   = state->attrs->fpBinop;
-    vmiFPConfigCP ctrl = getFPControl(state);
+    vmiReg        fd    = RISCV_VTMP;
+    vmiReg        fs1   = RISCV_VTMP;
+    vmiReg        fs2   = id->r[1];
+    vmiReg        flags = getFPFlagsMT(state);
+    vmiFType      type  = getSEWFType(id->SEW);
+    vmiFBinop     op    = state->attrs->fpBinop;
+    vmiFPConfigCP ctrl  = getFPControl(state);
 
     if(emitSetOperationRM(state, RV_RM_CURRENT)) {
-        vmimtFBinopRRR(type, op, fd, fs1, fs2, RISCV_FP_FLAGS, ctrl);
+        vmimtFBinopRRR(type, op, fd, fs1, fs2, flags, ctrl);
     }
 }
 

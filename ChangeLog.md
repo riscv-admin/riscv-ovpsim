@@ -5,6 +5,8 @@
 # which includes information of the OVP Simulator and RISCV processor model   #
 ###############################################################################
 
+- A bug has been fixed which caused some instructions that update the fcsr 
+  register not to also update mstatus.FS.
 - A fix has been made to the cmix instruction so it no longer writes the t0 
   register. Note this is not in the base model, but in the extB prototype bit 
   manipulation extension library.
