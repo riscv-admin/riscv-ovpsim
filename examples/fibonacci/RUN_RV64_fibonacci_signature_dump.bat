@@ -4,7 +4,7 @@
 set BATCHDIR=%~dp0%
 cd /d %BATCHDIR%
 
-..\..\bin\Windows64\riscvOVPsim.exe --program fibonacci.RISCV64.elf -variant RV64IMAC ^
+..\..\bin\Windows64\riscvOVPsim.exe --program fibonacci.RISCV64.elf -variant RV64I -override riscvOVPsim/cpu/add_Extensions=MAC ^
 	--signaturedump ^
 	--override riscvOVPsim/cpu/sigdump/SignatureFile=fib.sig.dat.txt ^
     --override riscvOVPsim/cpu/sigdump/StartSymbol="resultArray" ^

@@ -14,7 +14,8 @@ echo "Selected Example $app"
 # Run Example
 ${bindir}/riscvOVPsim.exe \
             --program ${app} \
-            --variant RV64GCV \
+            --variant RV64I \
+            --override riscvOVPsim/cpu/add_Extensions=MAFDCV \
             --override riscvOVPsim/cpu/VLEN=512 \
             --override riscvOVPsim/cpu/SLEN=64 \
             "$@"

@@ -13,7 +13,8 @@ echo "Selected Example $app"
 
 # Run Example
 ${bindir}/riscvOVPsim.exe \
-    --variant RV64GC \
+    --variant RV64I \
+    --override riscvOVPsim/cpu/add_Extensions=MAFDCB \
     --program ${app} \
     --override riscvOVPsim/cpu/defaultsemihost=F \
     --override riscvOVPsim/cpu/debugflags=6 \
@@ -22,6 +23,5 @@ ${bindir}/riscvOVPsim.exe \
     --override riscvOVPsim/cpu/PMP_registers=0 \
     --override riscvOVPsim/cpu/ASID_bits=0 \
     --override riscvOVPsim/cpu/tval_ii_code=F \
-    --override riscvOVPsim/cpu/add_Extensions=B \
     --customcontrol \
     "$@"

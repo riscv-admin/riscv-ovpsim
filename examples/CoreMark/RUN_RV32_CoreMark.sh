@@ -3,7 +3,7 @@
 cd $(dirname $0)
 bindir=$(dirname $(dirname $(pwd)))/bin/Linux64
 
-${bindir}/riscvOVPsim.exe -program coremark.RISCV32.elf -variant RV32IMAC "$@" -argv 0 0 0x66
+${bindir}/riscvOVPsim.exe -program coremark.RISCV32.elf -variant RV32I -override riscvOVPsim/cpu/add_Extensions=MAC "$@" -argv 0 0 0x66
 
 # validate with args
 # 0 0 0x66
