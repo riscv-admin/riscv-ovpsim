@@ -40,6 +40,9 @@
   either the stable 0.71 Vector Extension (the default) or the unstable master
   branch. The master branch currently has the following changes compared to the
   stable 0.71 branch:
+  - behavior of vsetvl and vsetvli instructions when rs1 = x0 preserves the
+    current vl instead of selecting the maximum possible vl.
+  - tail vector and scalar elements are preserved, not zeroed.
   - vext.s.v and vmford.vv instructions have been removed;
   - vmv.s.x instruction has been added;
   - encodings for vpopc.m, vfirst.m, vmsbf.m, vmsif.m, vmsof.m, viota.m and

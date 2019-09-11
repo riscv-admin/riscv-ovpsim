@@ -4,6 +4,6 @@
 set BATCHDIR=%~dp0%
 cd /d %BATCHDIR%
 
-..\..\bin\Windows64\riscvOVPsim.exe --program fibonacci.RISCV32.elf -variant RV32IMAC %*
+..\..\bin\Windows64\riscvOVPsim.exe --program fibonacci.RISCV32.elf -variant RV32I -override riscvOVPsim/cpu/add_Extensions=MAC %*
 
 if not defined calledscript ( pause )

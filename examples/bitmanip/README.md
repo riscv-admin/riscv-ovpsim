@@ -29,7 +29,7 @@ Running the Example
 ---
 
 A script is provided RUN_RV64GC_BITMANIP_EXAMPLE as both sh for Linux and bat for Windows hosts.
-The script configures the RISC-V processor for the base variant RV64GC and other required parameters for the Bit Manipulation extension.
+The script configures the RISC-V processor for the base variant RV64I, with extensions MAFDC and other required parameters for the Bit Manipulation extension.
 When executed a list of the available ELF files to execute will be provided and a selection should be made.
 By selecting an ELF file it will be loaded into the memory of the virtual platform and executed by the RISC-V processor.
 

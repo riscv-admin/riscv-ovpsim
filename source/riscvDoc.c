@@ -622,7 +622,10 @@ void riscvDoc(riscvP rootProcessor) {
         vmidocAddText(
             Vector,
             "This variant implements the RISC-V base vector extension with "
-            "version specified in the References section of this document."
+            "version specified in the References section of this document. "
+            "Note that parameter \"vector_version\" can be used to select "
+            "the required version, including the unstable \"master\" version "
+            "corresponding to the active specification."
         );
 
         vmiDocNodeP Parameters = vmidocAddSection(

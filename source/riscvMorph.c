@@ -833,7 +833,7 @@ inline static Bool inTransactionMode(riscvMorphStateP state) {
 //
 static Uns64 doLoadTMode(riscvP riscv, Uns64 VA, Uns32 bytes) {
 
-    Uns64 result;
+    Uns64 result = 0;
 
     riscv->cb.tLoad(riscv, &result, VA, bytes);
 
@@ -3258,6 +3258,23 @@ inline static riscvVLMULMt vlmulToVLMUL(Uns32 vlmul) {
 }
 
 //
+// Is zeroing of tail elements required?
+// NOTE: after version 0.71, top parts are preserved, not zeroed
+//
+inline static Bool requireZeroTail(riscvP riscv) {
+    return (riscv->configInfo.vect_version==RVVV_0_71);
+}
+
+//
+// Zero tail elements of vector if required
+//
+static void zeroTail(riscvP riscv, Uns32 bits, vmiReg vd) {
+    if(requireZeroTail(riscv)) {
+        vmimtMoveRC(bits, vd, 0);
+    }
+}
+
+//
 // Get an indexed register specification, removing any previous index
 // information
 //
@@ -4691,6 +4708,8 @@ static void endVectorOp(
     // zero register top parts when vl < vlmax if required
     if(vlClass==VLCLASSMT_MAX) {
         // no top zero state change
+    } else if(!requireZeroTail(state->riscv)) {
+        // after version 0.71, top parts are preserved, not zeroed
     } else if(isScalarN(state->attrs->vShape, 0)) {
         updateScalarTopZero(state, id);
     } else {
@@ -4864,7 +4883,7 @@ static RISCV_MORPH_FN(emitScalarOp) {
                 // do operation on one element
                 doPerElementOp(state, &id);
 
-                // end vector operaton
+                // end vector operation
                 endVectorOp(state, &id, vlClass);
             }
         }
@@ -4962,12 +4981,15 @@ static Uns32 setMaxVLSEWLMUL(riscvP riscv, Uns32 vtypeBits) {
 //
 // Handle the first source argument of VSetVL
 //
-static vmiCallFn handleVSetVLArg1(Uns32 bits, vmiReg rs1) {
+static vmiCallFn handleVSetVLArg1(riscvP riscv, Uns32 bits, vmiReg rs1) {
 
-    if(VMI_ISNOREG(rs1)) {
+    if(!VMI_ISNOREG(rs1)) {
+        vmimtArgReg(bits, rs1);
+        return (vmiCallFn)setVLSEWLMUL;
+    } else if(riscv->configInfo.vect_version==RVVV_0_71) {
         return (vmiCallFn)setMaxVLSEWLMUL;
     } else {
-        vmimtArgReg(bits, rs1);
+        vmimtArgReg(bits, CSR_REG_MT(vl));
         return (vmiCallFn)setVLSEWLMUL;
     }
 }
@@ -4999,7 +5021,7 @@ static RISCV_MORPH_FN(emitVSetVLRRR) {
 
     // call function (may cause exception for invalid SEW)
     vmimtArgProcessor();
-    vmiCallFn cb = handleVSetVLArg1(bits, rs1);
+    vmiCallFn cb = handleVSetVLArg1(riscv, bits, rs1);
     vmimtArgReg(bits, rs2);
     vmimtCallResultAttrs(cb, bits, rd, VMCA_EXCEPTION|VMCA_NO_INVALIDATE);
     writeRegSize(riscv, rdA, bits);
@@ -5049,7 +5071,7 @@ static RISCV_MORPH_FN(emitVSetVLRRC) {
 
         // call update function (SEW is known to be valid)
         vmimtArgProcessor();
-        vmiCallFn cb = handleVSetVLArg1(bits, rs1);
+        vmiCallFn cb = handleVSetVLArg1(riscv, bits, rs1);
         vmimtArgUns32((vsew<<2)+vlmul);
         vmimtCallResultAttrs(cb, bits, rd, VMCA_NO_INVALIDATE);
         writeRegSize(riscv, rdA, bits);
@@ -6460,7 +6482,7 @@ static RISCV_MORPHV_FN(endVRedCB) {
     Uns32       mulE   = getWidthMultiplierN(vShape, 0);
 
     // zero target register
-    vmimtMoveRC(riscv->configInfo.VLEN, id->r[0], 0);
+    zeroTail(riscv, riscv->configInfo.VLEN, id->r[0]);
 
     // set element 0 of target register
     vmimtMoveRR(id->SEW*mulE, id->r[0], RISCV_VTMP);
@@ -6778,7 +6800,7 @@ static RISCV_MORPHV_FN(emitVMVSX) {
     Uns32        sBits = getMinBits(id, getRBits(rs1A));
 
     // zero target register
-    vmimtMoveRC(riscv->configInfo.VLEN, vd, 0);
+    zeroTail(riscv, riscv->configInfo.VLEN, vd);
 
     // assign element 0 of result
     vmimtMoveExtendRR(id->SEW, vd, sBits, rs1, False);
@@ -6814,7 +6836,7 @@ static RISCV_MORPHV_FN(emitVFMVSF) {
     Uns32        sBits = getMinBits(id, getRBits(fs1A));
 
     // zero target register
-    vmimtMoveRC(riscv->configInfo.VLEN, vd, 0);
+    zeroTail(riscv, riscv->configInfo.VLEN, vd);
 
     // assign element 0 of result
     vmimtMoveRR(sBits, vd, fs1);
@@ -7049,7 +7071,7 @@ static RISCV_MORPHV_FN(initVCOMPRESSCB) {
     riscvVLMULMt VLMUL      = getVLMULMtN(riscv, vShape, 0);
 
     // zero target register
-    vmimtMoveRC(riscv->configInfo.VLEN*VLMUL, id->r[0], 0);
+    zeroTail(riscv, riscv->configInfo.VLEN*VLMUL, id->r[0]);
 
     // zero target index
     vmimtMoveRC(offsetBits, RISCV_VTMP, 0);
