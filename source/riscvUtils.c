@@ -114,6 +114,39 @@ Uns32 riscvGetFlenArch(riscvP riscv) {
 }
 
 //
+// Register extension callback block with the base model
+//
+void riscvRegisterExtCB(riscvP riscv, riscvExtCBP extCB) {
+
+    riscvExtCBPP tail = &riscv->extCBs;
+    riscvExtCBP  this;
+
+    while((this=*tail)) {
+        tail = &this->next;
+    }
+
+    *tail = extCB;
+    extCB->next = 0;
+}
+
+//
+// Return extension configuration with the given id
+//
+riscvExtConfigCP riscvGetExtConfig(riscvP riscv, Uns32 id) {
+
+    riscvExtConfigCPP extCfgs = riscv->configInfo.extensionConfigs;
+    riscvExtConfigCP  extCfg  = 0;
+
+    if(extCfgs) {
+        while((extCfg=*extCfgs) && (extCfg->id!=id)) {
+            extCfgs++;
+        }
+    }
+
+    return extCfg;
+}
+
+//
 // Return the current XLEN
 //
 Uns32 riscvGetXlenMode(riscvP riscv) {
@@ -593,13 +626,16 @@ void riscvUpdateExclusiveAccessCallback(riscvP riscv, Bool install) {
 //
 VMI_IASSWITCH_FN(riscvContextSwitchCB) {
 
-    riscvP riscv = (riscvP)processor;
+    riscvP      riscv = (riscvP)processor;
+    riscvExtCBP extCB;
 
     riscvUpdateExclusiveAccessCallback(riscv, state==RS_SUSPEND);
 
     // call derived model context switch function if required
-    if(riscv->cb.switchCB) {
-        riscv->cb.switchCB(riscv, state);
+    for(extCB=riscv->extCBs; extCB; extCB=extCB->next) {
+        if(extCB->switchCB) {
+            extCB->switchCB(riscv, state, extCB->clientData);
+        }
     }
 }
 
@@ -615,9 +651,6 @@ RISCV_SET_TMODE_FN(riscvSetTMode) {
 
     // flush dictionaries the first time transaction mode is enabled
     if(enable && !riscv->useTMode) {
-
-        VMI_ASSERT(riscv->cb.tLoad,  "Require tLoad");
-        VMI_ASSERT(riscv->cb.tStore, "Require tStore");
 
         riscv->useTMode = True;
 

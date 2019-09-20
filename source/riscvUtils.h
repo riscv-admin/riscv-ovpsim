@@ -53,6 +53,16 @@ Uns32 riscvGetFlenArch(riscvP riscv);
 Uns32 riscvGetXlenMode(riscvP riscv);
 
 //
+// Register extension callback block with the base model
+//
+void riscvRegisterExtCB(riscvP riscv, riscvExtCBP extCB);
+
+//
+// Return extension configuration with the given id
+//
+riscvExtConfigCP riscvGetExtConfig(riscvP riscv, Uns32 id);
+
+//
 // Get mode name for the indexed mode
 //
 const char *riscvGetModeName(riscvMode mode);

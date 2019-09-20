@@ -1543,7 +1543,7 @@ const static decodeEntry32 decodeCommon32[] = {
 };
 
 //
-// This specifies decodes for 32-bit opcodes for vector extension version 0.71
+// This specifies decodes for 32-bit opcodes for vector extension version 0.7.1
 //
 const static decodeEntry32 decodeVectorV71[] = {
 
@@ -1577,7 +1577,7 @@ const static decodeEntry32 decodeVectorV71[] = {
 };
 
 //
-// This specifies decodes for 32-bit opcodes for vector extension version 0.72
+// This specifies decodes for 32-bit opcodes for vector extension version 0.7.2
 //
 const static decodeEntry32 decodeVectorV72[] = {
 
@@ -2193,7 +2193,7 @@ static vmidDecodeTableP createDecodeTable32(riscvVectVer vect_version) {
     insertEntries32(table, &decodeCommon32[0]);
 
     // insert vector-extension-dependent 32-bit decode table entries
-    if(vect_version==RVVV_0_71) {
+    if(vect_version==RVVV_0_7_1) {
         insertEntries32(table, &decodeVectorV71[0]);
     } else {
         insertEntries32(table, &decodeVectorV72[0]);
@@ -3014,7 +3014,7 @@ static Uns32 getMemBits(
             result = 32<<U_12(instr);
             break;
         case MBS_12_VAMO:
-            if(vectorVersion(riscv)==RVVV_0_71) {
+            if(vectorVersion(riscv)==RVVV_0_7_1) {
                 result = 32<<U_12(instr);
             } else {
                 result = U_12(instr) ? -1 : 32;

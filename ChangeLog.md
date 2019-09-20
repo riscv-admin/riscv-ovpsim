@@ -36,10 +36,15 @@
   - A bug has been fixed which caused an error when an attempt was made to
     execute floating point instructions with a scalar argument and with SLEN
     less than 32.
+  - A bug has been fixed which caused narrowing floating point/integer type
+    conversion instructions targeting integer types to raise illegal instruction
+    exceptions when the current SEW is smaller than the smallest supported
+    floating point SEW. These instructions should be legal when SEW*2 is the
+    smallest supported floating point SEW and SEW is legal for integer types.
 - The model has a new parameter vector_version which can be used to select
-  either the stable 0.71 Vector Extension (the default) or the unstable master
+  either the stable 0.7.1 Vector Extension (the default) or the unstable master
   branch. The master branch currently has the following changes compared to the
-  stable 0.71 branch:
+  stable 0.7.1 branch:
   - behavior of vsetvl and vsetvli instructions when rs1 = x0 preserves the
     current vl instead of selecting the maximum possible vl.
   - tail vector and scalar elements are preserved, not zeroed.

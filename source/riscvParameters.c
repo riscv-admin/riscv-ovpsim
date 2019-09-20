@@ -62,7 +62,7 @@ typedef enum riscvParamVariantE {
 //
 // Supported Privileged Architecture variants
 //
-static vmiEnumParameter privVariants[RVPV_LAST+1] = {
+static vmiEnumParameter privVariants[] = {
     [RVPV_1_10] = {
         .name        = "1.10",
         .value       = RVPV_1_10,
@@ -85,7 +85,7 @@ static vmiEnumParameter privVariants[RVPV_LAST+1] = {
 //
 // Supported User Architecture variants
 //
-static vmiEnumParameter userVariants[RVUV_LAST+1] = {
+static vmiEnumParameter userVariants[] = {
     [RVUV_2_2] = {
         .name        = "2.2",
         .value       = RVUV_2_2,
@@ -108,16 +108,39 @@ static vmiEnumParameter userVariants[RVUV_LAST+1] = {
 //
 // Supported Vector Architecture variants
 //
-static vmiEnumParameter vectorVariants[RVVV_LAST+1] = {
-    [RVVV_0_71] = {
+static vmiEnumParameter vectorVariants[] = {
+    [RVVV_0_7_1] = {
         .name        = "0.7.1-draft-20190605",
-        .value       = RVVV_0_71,
+        .value       = RVVV_0_7_1,
         .description = "Vector Architecture Version 0.7.1-draft-20190605",
     },
     [RVVV_MASTER] = {
         .name        = "master",
         .value       = RVVV_MASTER,
         .description = "Vector Architecture Master Branch (unstable)",
+    },
+    // KEEP LAST: terminator
+    {0}
+};
+
+//
+// Supported 16-bit floating point variants
+//
+static vmiEnumParameter fp16Variants[] = {
+    [RVFP16_NA] = {
+        .name        = "none",
+        .value       = RVFP16_NA,
+        .description = "No 16-bit floating point implemented",
+    },
+    [RVFP16_IEEE754] = {
+        .name        = "IEEE754",
+        .value       = RVFP16_IEEE754,
+        .description = "IEEE 754 half precision implemented",
+    },
+    [RVFP16_BFLOAT16] = {
+        .name        = "BFLOAT16",
+        .value       = RVFP16_BFLOAT16,
+        .description = "BFLOAT16 implemented",
     },
     // KEEP LAST: terminator
     {0}
@@ -217,6 +240,7 @@ static void setUns64ParamDefault(vmiParameterP param, Uns64 value) {
 static RISCV_ENUM_PDEFAULT_CFG_FN(user_version);
 static RISCV_ENUM_PDEFAULT_CFG_FN(priv_version);
 static RISCV_ENUM_PDEFAULT_CFG_FN(vect_version);
+static RISCV_ENUM_PDEFAULT_CFG_FN(fp16_version);
 
 //
 // Set default value of raw Bool parameters
@@ -368,6 +392,7 @@ static riscvParameter parameters[] = {
     {  RVPV_ALL,     default_user_version,         VMI_ENUM_PARAM_SPEC  (riscvParamValues, user_version,         userVariants,              "Specify required User Architecture version")},
     {  RVPV_ALL,     default_priv_version,         VMI_ENUM_PARAM_SPEC  (riscvParamValues, priv_version,         privVariants,              "Specify required Privileged Architecture version")},
     {  RVPV_V,       default_vect_version,         VMI_ENUM_PARAM_SPEC  (riscvParamValues, vector_version,       vectorVariants,            "Specify required Vector Architecture version")},
+    {  RVPV_FP,      default_fp16_version,         VMI_ENUM_PARAM_SPEC  (riscvParamValues, fp16_version,         fp16Variants,              "Specify required 16-bit floating point format")},
     {  RVPV_ALL,     0,                            VMI_BOOL_PARAM_SPEC  (riscvParamValues, verbose,              True,                      "Specify verbose output messages")},
     {  RVPV_MPCORE,  default_numHarts,             VMI_UNS32_PARAM_SPEC (riscvParamValues, numHarts,             0, 0,          32,         "Specify the number of hart contexts in a multiprocessor")},
     {  RVPV_S,       default_updatePTEA,           VMI_BOOL_PARAM_SPEC  (riscvParamValues, updatePTEA,           False,                     "Specify whether hardware update of PTE A bit is supported")},
@@ -867,5 +892,12 @@ const char *riscvGetUserVersionDesc(riscvP riscv) {
 //
 const char *riscvGetVectorVersionDesc(riscvP riscv) {
     return vectorVariants[RISCV_VECT_VERSION(riscv)].description;
+}
+
+//
+// Return 16-bit floating point description
+//
+const char *riscvGetFP16VersionDesc(riscvP riscv) {
+    return fp16Variants[RISCV_FP16_VERSION(riscv)].description;
 }
 

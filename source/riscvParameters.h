@@ -37,6 +37,7 @@ typedef struct riscvParamValuesS {
     VMI_ENUM_PARAM(user_version);
     VMI_ENUM_PARAM(priv_version);
     VMI_ENUM_PARAM(vector_version);
+    VMI_ENUM_PARAM(fp16_version);
     VMI_BOOL_PARAM(verbose);
     VMI_BOOL_PARAM(updatePTEA);
     VMI_BOOL_PARAM(updatePTED);
@@ -116,3 +117,7 @@ const char *riscvGetUserVersionDesc(riscvP riscv);
 //
 const char *riscvGetVectorVersionDesc(riscvP riscv);
 
+//
+// Return 16-bit floating point description
+//
+const char *riscvGetFP16VersionDesc(riscvP riscv);

@@ -192,18 +192,40 @@ static vmiFPRC updateCurrentRMValid(riscvP riscv) {
 }
 
 //
+// Return effective floating point flags from CSR and JIT flags
+//
+inline static vmiFPFlags getFPFlags(riscvP riscv) {
+
+    vmiFPFlags vmiFlags = {bits:riscv->fpFlagsCSR|riscv->fpFlagsMT};
+
+    return vmiFlags;
+}
+
+//
+// Set floating point CSR flags (and clear JIT flags)
+//
+inline static void setFPFlags(riscvP riscv, vmiFPFlags vmiFlags) {
+
+    riscv->fpFlagsCSR = vmiFlags.bits;
+    riscv->fpFlagsMT  = 0;
+}
+
+//
 // Read fflags
 //
 static RISCV_CSR_READFN(fflagsR) {
 
     CSR_REG_DECL(fflags) = {u32 : {bits:0}};
 
+    // construct effective flags from CSR and JIT flags
+    vmiFPFlags vmiFlags = getFPFlags(riscv);
+
     // compose register value
-    fflags.u32.fields.NX = riscv->fpFlags.f.P;
-    fflags.u32.fields.UF = riscv->fpFlags.f.U;
-    fflags.u32.fields.OF = riscv->fpFlags.f.O;
-    fflags.u32.fields.DZ = riscv->fpFlags.f.Z;
-    fflags.u32.fields.NV = riscv->fpFlags.f.I;
+    fflags.u32.fields.NX = vmiFlags.f.P;
+    fflags.u32.fields.UF = vmiFlags.f.U;
+    fflags.u32.fields.OF = vmiFlags.f.O;
+    fflags.u32.fields.DZ = vmiFlags.f.Z;
+    fflags.u32.fields.NV = vmiFlags.f.I;
 
     // return composed value
     return fflags.u32.bits;
@@ -215,13 +237,17 @@ static RISCV_CSR_READFN(fflagsR) {
 static RISCV_CSR_WRITEFN(fflagsW) {
 
     CSR_REG_DECL(fflags) = {u32 : {bits : newValue & WM32_fflags}};
+    vmiFPFlags vmiFlags  = {bits: 0};
 
     // extract flags
-    riscv->fpFlags.f.P = fflags.u32.fields.NX;
-    riscv->fpFlags.f.U = fflags.u32.fields.UF;
-    riscv->fpFlags.f.O = fflags.u32.fields.OF;
-    riscv->fpFlags.f.Z = fflags.u32.fields.DZ;
-    riscv->fpFlags.f.I = fflags.u32.fields.NV;
+    vmiFlags.f.P = fflags.u32.fields.NX;
+    vmiFlags.f.U = fflags.u32.fields.UF;
+    vmiFlags.f.O = fflags.u32.fields.OF;
+    vmiFlags.f.Z = fflags.u32.fields.DZ;
+    vmiFlags.f.I = fflags.u32.fields.NV;
+
+    // assign CSR flags and clear JIT flags
+    setFPFlags(riscv, vmiFlags);
 
     // return written value
     return fflags.u32.bits;
@@ -291,12 +317,15 @@ static RISCV_CSR_WRITEFN(frmW) {
 //
 static RISCV_CSR_READFN(fcsrR) {
 
+    // construct effective flags from CSR and JIT flags
+    vmiFPFlags vmiFlags = getFPFlags(riscv);
+
     // compose flags in register value
-    WR_CSR_FIELD(riscv, fcsr, NX, riscv->fpFlags.f.P);
-    WR_CSR_FIELD(riscv, fcsr, UF, riscv->fpFlags.f.U);
-    WR_CSR_FIELD(riscv, fcsr, OF, riscv->fpFlags.f.O);
-    WR_CSR_FIELD(riscv, fcsr, DZ, riscv->fpFlags.f.Z);
-    WR_CSR_FIELD(riscv, fcsr, NV, riscv->fpFlags.f.I);
+    WR_CSR_FIELD(riscv, fcsr, NX, vmiFlags.f.P);
+    WR_CSR_FIELD(riscv, fcsr, UF, vmiFlags.f.U);
+    WR_CSR_FIELD(riscv, fcsr, OF, vmiFlags.f.O);
+    WR_CSR_FIELD(riscv, fcsr, DZ, vmiFlags.f.Z);
+    WR_CSR_FIELD(riscv, fcsr, NV, vmiFlags.f.I);
 
     // compose vxsat in register value
     WR_CSR_FIELD(riscv, fcsr, vxsat, RD_CSR(riscv, vxsat));
@@ -310,18 +339,22 @@ static RISCV_CSR_READFN(fcsrR) {
 //
 static RISCV_CSR_WRITEFN(fcsrW) {
 
-    Uns64 mask  = RD_CSR_MASK(riscv, fcsr);
-    Uns8  oldRM = RD_CSR_FIELD(riscv, fcsr, frm);
+    Uns64      mask     = RD_CSR_MASK(riscv, fcsr);
+    Uns8       oldRM    = RD_CSR_FIELD(riscv, fcsr, frm);
+    vmiFPFlags vmiFlags = {bits: 0};
 
     // update the CSR
     WR_CSR(riscv, fcsr, newValue & mask);
 
     // extract flags from register value
-    riscv->fpFlags.f.P = RD_CSR_FIELD(riscv, fcsr, NX);
-    riscv->fpFlags.f.U = RD_CSR_FIELD(riscv, fcsr, UF);
-    riscv->fpFlags.f.O = RD_CSR_FIELD(riscv, fcsr, OF);
-    riscv->fpFlags.f.Z = RD_CSR_FIELD(riscv, fcsr, DZ);
-    riscv->fpFlags.f.I = RD_CSR_FIELD(riscv, fcsr, NV);
+    vmiFlags.f.P = RD_CSR_FIELD(riscv, fcsr, NX);
+    vmiFlags.f.U = RD_CSR_FIELD(riscv, fcsr, UF);
+    vmiFlags.f.O = RD_CSR_FIELD(riscv, fcsr, OF);
+    vmiFlags.f.Z = RD_CSR_FIELD(riscv, fcsr, DZ);
+    vmiFlags.f.I = RD_CSR_FIELD(riscv, fcsr, NV);
+
+    // assign CSR flags and clear JIT flags
+    setFPFlags(riscv, vmiFlags);
 
     // extract vxsat from register value
     WR_CSR(riscv, vxsat, RD_CSR_FIELD(riscv, fcsr, vxsat));
@@ -339,22 +372,52 @@ static RISCV_CSR_WRITEFN(fcsrW) {
 ////////////////////////////////////////////////////////////////////////////////
 
 //
+// This encodes possible extension states
+//
+typedef enum extStatusE {
+    ES_OFF     = 0,
+    ES_INITIAL = 1,
+    ES_CLEAN   = 2,
+    ES_DIRTY   = 3
+} extStatus;
+
+//
+// Consolidate floating point flags on CSR view
+//
+static void consolidateFPFlags(riscvP riscv) {
+
+    if(riscv->fpFlagsMT) {
+
+        // consolidate flags on CSR view
+        riscv->fpFlagsCSR |= riscv->fpFlagsMT;
+        riscv->fpFlagsMT   = 0;
+
+        // indicate floating point extension status is dirty
+        WR_CSR_FIELD(riscv, mstatus, FS, ES_DIRTY);
+    }
+}
+
+//
 // Common routine to read status using mstatus, sstatus or ustatus alias
 //
 static Uns64 statusR(riscvP riscv) {
 
+    // consolidate floating point flags on CSR view
+    consolidateFPFlags(riscv);
+
+    // get FS and XS fields (after consolidation)
     Uns8 FS = RD_CSR_FIELD(riscv, mstatus, FS);
     Uns8 XS = RD_CSR_FIELD(riscv, mstatus, XS);
 
     // if fs_always_dirty is set, force mstatus.FS to be either 0 or 3 (so if
     // it is enabled, it is always seen as dirty)
-    if(FS && (FS!=3) && riscv->configInfo.fs_always_dirty) {
-        FS = 3;
+    if(FS && (FS!=ES_DIRTY) && riscv->configInfo.fs_always_dirty) {
+        FS = ES_DIRTY;
         WR_CSR_FIELD(riscv, mstatus, FS, FS);
     }
 
-    // overall state is dirty if either FS==3 or XS==3
-    Bool SD = ((FS==3) || (XS==3));
+    // overall state is dirty if either FS or XS indicates dirty
+    Bool SD = ((FS==ES_DIRTY) || (XS==ES_DIRTY));
 
     // clear derived SD aliases (inconveniently changes location)
     riscv->csr.mstatus.u32.fields.SD = 0;
@@ -372,6 +435,10 @@ static Uns64 statusR(riscvP riscv) {
 //
 static void statusW(riscvP riscv, Uns64 newValue, Uns64 mask) {
 
+    // consolidate floating point flags on CSR view
+    consolidateFPFlags(riscv);
+
+    // get old value (after consolidation)
     Uns64 oldValue = RD_CSR(riscv, mstatus);
 
     // get new value using writable bit mask
