@@ -152,11 +152,22 @@ typedef enum riscvPrivVerE {
 // Supported Vector Architecture versions
 //
 typedef enum riscvVectVerE {
-    RVVV_0_71,                      // version 0.7.1-draft-20190605
+    RVVV_0_7_1,                     // version 0.7.1-draft-20190605
     RVVV_MASTER,                    // master branch
     RVVV_LAST,                      // for sizing
-    RVVV_DEFAULT = RVVV_0_71,       // default version
+    RVVV_DEFAULT = RVVV_0_7_1,      // default version
 } riscvVectVer;
+
+//
+// Supported 16-bit floating point version
+//
+typedef enum riscvFP16VerE {
+    RVFP16_NA,                      // no 16-bit floating point
+    RVFP16_IEEE754,                 // IEEE 754 half precision
+    RVFP16_BFLOAT16,                // BFLOAT16
+    RVFP16_LAST,                    // for sizing
+    RVFP16_DEFAULT = RVFP16_NA,     // default version
+} riscvFP16Ver;
 
 // macro returning User Architecture version
 #define RISCV_USER_VERSION(_P) ((_P)->configInfo.user_version)
@@ -166,4 +177,7 @@ typedef enum riscvVectVerE {
 
 // macro returning Vector Architecture version
 #define RISCV_VECT_VERSION(_P) ((_P)->configInfo.vect_version)
+
+// macro returning 16-bit floating point version
+#define RISCV_FP16_VERSION(_P) ((_P)->configInfo.fp16_version)
 

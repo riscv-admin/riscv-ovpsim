@@ -24,8 +24,8 @@ echo Selected Example %app%
 
 ; rem run example
 ..\..\bin\Windows64\riscvOVPsim.exe ^
-    --variant RV64I \
-    --override riscvOVPsim/cpu/add_Extensions=MAFDCB ^
+    --variant RVB64I ^
+    --override riscvOVPsim/cpu/add_Extensions=MAFDCBSU ^
     --program %app% ^
     --override riscvOVPsim/cpu/defaultsemihost=F ^
     --override riscvOVPsim/cpu/debugflags=6 ^

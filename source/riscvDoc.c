@@ -90,16 +90,43 @@ static void fillSvModes(char *result, Uns32 Sv_modes) {
 }
 
 //
+// Add documentation using the optional documentation callback
+//
+inline static void addOptDoc(riscvP riscv, vmiDocNodeP node, riscvDocFn docCB) {
+    if(docCB) {
+        docCB(riscv, node);
+    }
+}
+
+//
+// Add documentation using an optional null-terminated string list
+//
+static void addOptDocList(vmiDocNodeP node, const char **specificDocs) {
+
+    if(specificDocs) {
+
+        const char *doc;
+
+        while((doc=*specificDocs++)) {
+            vmidocAddText(node, doc);
+        }
+    }
+}
+
+//
 // Create processor documentation
 //
 void riscvDoc(riscvP rootProcessor) {
 
-    vmiDocNodeP   Root     = vmidocAddSection(0, "Root");
-    riscvP        riscv    = rootProcessor;
-    riscvP        child    = getChild(rootProcessor);
-    riscvConfigCP cfg      = &riscv->configInfo;
-    Uns32         numHarts = cfg->numHarts;
-    Bool          isSMP    = numHarts && child && !cfg->members;
+    vmiDocNodeP      Root     = vmidocAddSection(0, "Root");
+    riscvP           riscv    = rootProcessor;
+    riscvP           child    = getChild(rootProcessor);
+    riscvConfigCP    cfg      = &riscv->configInfo;
+    Uns32            numHarts = cfg->numHarts;
+    Bool             isSMP    = numHarts && child && !cfg->members;
+    Uns32            extIndex;
+    riscvExtConfigCP extCfg;
+
     char          string[1024];
 
     // move to first child if an SMP object
@@ -608,6 +635,15 @@ void riscvDoc(riscvP rootProcessor) {
                     "written."
                 );
             }
+
+            if(cfg->fp16_version) {
+                snprintf(
+                    SNPRINTF_TGT(string),
+                    "16-bit floating point is implemented (%s format).",
+                    riscvGetFP16VersionDesc(riscv)
+                );
+                vmidocAddText(Features, string);
+            }
         }
     }
 
@@ -894,9 +930,16 @@ void riscvDoc(riscvP rootProcessor) {
             );
         }
 
-        // add specific restrictions if required
-        if(cfg->restrictionsCB) {
-            cfg->restrictionsCB(riscv, Limitations);
+        // add custom restrictions if required
+        addOptDoc(riscv, Limitations, cfg->restrictionsCB);
+
+        // add extension-specific restrictions if required
+        for(
+            extIndex = 0;
+            (extCfg = riscvGetIndexedExtConfig(cfg, extIndex));
+            extIndex++
+        ) {
+            addOptDoc(riscv, Limitations, extCfg->restrictionsCB);
         }
     }
 
@@ -954,8 +997,7 @@ void riscvDoc(riscvP rootProcessor) {
     ////////////////////////////////////////////////////////////////////////////
 
     {
-        vmiDocNodeP  References   = vmidocAddSection(Root, "References");
-        const char **specificDocs = cfg->specificDocs;
+        vmiDocNodeP References = vmidocAddSection(Root, "References");
 
         vmidocAddText(
             References,
@@ -987,13 +1029,16 @@ void riscvDoc(riscvP rootProcessor) {
             vmidocAddText(References, string);
         }
 
-        if(specificDocs) {
+        // add custom references if required
+        addOptDocList(References, cfg->specificDocs);
 
-            const char *doc;
-
-            while((doc=*specificDocs++)) {
-                vmidocAddText(References, doc);
-            }
+        // add extension-specific references if required
+        for(
+            extIndex = 0;
+            (extCfg = riscvGetIndexedExtConfig(cfg, extIndex));
+            extIndex++
+        ) {
+            addOptDocList(References, extCfg->specificDocs);
         }
     }
 

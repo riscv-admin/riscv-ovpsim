@@ -45,9 +45,19 @@
 
 
 //
-// Initialize enhanced model support callbacks
+// Initialize enhanced model support callbacks that apply at all levels
 //
-static void initModelCBs(riscvP riscv) {
+static void initAllModelCBs(riscvP riscv) {
+
+    // from riscvUtils.h
+    riscv->cb.registerExtCB = riscvRegisterExtCB;
+    riscv->cb.getExtConfig  = riscvGetExtConfig;
+}
+
+//
+// Initialize enhanced model support callbacks that apply at leaf levels
+//
+static void initLeafModelCBs(riscvP riscv) {
 
     // from riscvUtils.h
     riscv->cb.getXlenMode        = riscvGetXlenMode;
@@ -220,6 +230,7 @@ static void applyParamsSMP(riscvP riscv, riscvParamValuesP params) {
     cfg->user_version      = params->user_version;
     cfg->priv_version      = params->priv_version;
     cfg->vect_version      = params->vector_version;
+    cfg->fp16_version      = params->fp16_version;
     cfg->reset_address     = params->reset_address;
     cfg->nmi_address       = params->nmi_address;
     cfg->ASID_bits         = params->ASID_bits;
@@ -360,6 +371,9 @@ VMI_CONSTRUCTOR_FN(riscvConstructor) {
     riscvP riscv  = (riscvP)processor;
     riscvP parent = getParent(riscv);
 
+    // initialize enhanced model support callbacks that apply at all levels
+    initAllModelCBs(riscv);
+
     // set hierarchical properties
     riscv->parent  = parent;
     riscv->smpRoot = parent ? parent->smpRoot : riscv;
@@ -388,8 +402,8 @@ VMI_CONSTRUCTOR_FN(riscvConstructor) {
 
     } else {
 
-        // initialize enhanced model support callbacks
-        initModelCBs(riscv);
+        // initialize enhanced model support callbacks that apply at leaf levels
+        initLeafModelCBs(riscv);
 
         // set initial mode
         riscvSetMode(riscv, RISCV_MODE_MACHINE);
@@ -465,8 +479,11 @@ VMI_DESTRUCTOR_FN(riscvDestructor) {
     // free bus port specifications
     riscvFreeBusPorts(riscv);
 
-    // initialize CSR state
+    // free CSR state
     riscvCSRFree(riscv);
+
+    // free exception state
+    riscvExceptFree(riscv);
 }
 
 
