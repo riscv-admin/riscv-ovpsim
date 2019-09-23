@@ -231,6 +231,7 @@ static void applyParamsSMP(riscvP riscv, riscvParamValuesP params) {
     cfg->priv_version      = params->priv_version;
     cfg->vect_version      = params->vector_version;
     cfg->fp16_version      = params->fp16_version;
+    cfg->mstatus_fs_mode   = params->mstatus_fs_mode;
     cfg->reset_address     = params->reset_address;
     cfg->nmi_address       = params->nmi_address;
     cfg->ASID_bits         = params->ASID_bits;
@@ -253,7 +254,6 @@ static void applyParamsSMP(riscvP riscv, riscvParamValuesP params) {
     cfg->instret_undefined = params->instret_undefined;
     cfg->enable_CSR_bus    = params->enable_CSR_bus;
     cfg->d_requires_f      = params->d_requires_f;
-    cfg->fs_always_dirty   = params->fs_always_dirty;
     cfg->xret_preserves_lr = params->xret_preserves_lr;
     cfg->ELEN              = powerOfTwo(params->ELEN, "ELEN");
     cfg->SLEN              = powerOfTwo(params->SLEN, "SLEN");

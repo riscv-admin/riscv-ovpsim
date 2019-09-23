@@ -5,8 +5,19 @@
 # which includes information of the OVP Simulator and RISCV processor model   #
 ###############################################################################
 
+###############################################################################
+## Date 2019-Sept-23                                                         ##
+## Release 20190923.0                                                        ##
+###############################################################################
+- Enhancements to the B Extensions to include the instructions as part of the
+  v0.91 specification, also added a parameter for version selection, currently
+  v0.90 and v 0.91. The default will always be the later specification
 - A bug has been fixed which caused some instructions that update the fcsr 
-  register not to also update mstatus.FS.
+  register not to also update mstatus.FS when required.
+- Parameter "fs_always_dirty" has been removed; new parameter "mstatus_fs_mode"
+  has been added to allow the conditions under which mstatus.FS is set to Dirty
+  to be specified more precisely. See processor variant documentation for a
+  detailed description of the available options.
 - A fix has been made to the cmix instruction so it no longer writes the t0 
   register. Note this is not in the base model, but in the extB prototype bit 
   manipulation extension library.

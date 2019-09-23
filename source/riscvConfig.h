@@ -61,6 +61,7 @@ typedef struct riscvConfigS {
     riscvPrivVer      priv_version;     // privileged architecture version
     riscvVectVer      vect_version;     // vector architecture version
     riscvFP16Ver      fp16_version;     // 16-bit floating point version
+    riscvFSMode       mstatus_fs_mode;  // mstatus.FS update mode
     const char      **members;          // cluster member variants
 
     // configuration not visible in CSR state
@@ -90,7 +91,6 @@ typedef struct riscvConfigS {
     Bool              time_undefined;   // whether time CSR is undefined
     Bool              instret_undefined;// whether instret CSR is undefined
     Bool              d_requires_f;     // when misa D requires F to be set
-    Bool              fs_always_dirty;  // if mstatus.FS!=0, force it to 3
     Bool              xret_preserves_lr;// whether xRET preserves current LR
     Bool              enable_CSR_bus;   // enable CSR implementation bus
     Bool              tval_ii_code;     // instruction bits in [sm]tval for
