@@ -388,12 +388,27 @@ static void consolidateFPFlags(riscvP riscv) {
 
     if(riscv->fpFlagsMT) {
 
+        riscvFSMode mode      = riscv->configInfo.mstatus_fs_mode;
+        Uns8        fpFlagsMT = riscv->fpFlagsMT;
+        Bool        setDirty  = False;
+
         // consolidate flags on CSR view
-        riscv->fpFlagsCSR |= riscv->fpFlagsMT;
+        riscv->fpFlagsCSR |= fpFlagsMT;
         riscv->fpFlagsMT   = 0;
 
-        // indicate floating point extension status is dirty
-        WR_CSR_FIELD(riscv, mstatus, FS, ES_DIRTY);
+        // determine whether mstatus.FS should be set to dirty
+        if(mode==RVFS_WRITE_ANY) {
+            // dirty state always set elsewhere
+        } else if(mode==RVFS_ALWAYS_DIRTY) {
+            setDirty = True;
+        } else if(mode==RVFS_WRITE_NZ) {
+            setDirty = fpFlagsMT;
+        }
+
+        // indicate floating point extension status is dirty if required
+        if(setDirty) {
+            WR_CSR_FIELD(riscv, mstatus, FS, ES_DIRTY);
+        }
     }
 }
 
@@ -411,7 +426,7 @@ static Uns64 statusR(riscvP riscv) {
 
     // if fs_always_dirty is set, force mstatus.FS to be either 0 or 3 (so if
     // it is enabled, it is always seen as dirty)
-    if(FS && (FS!=ES_DIRTY) && riscv->configInfo.fs_always_dirty) {
+    if(FS && (riscv->configInfo.mstatus_fs_mode==RVFS_ALWAYS_DIRTY)) {
         FS = ES_DIRTY;
         WR_CSR_FIELD(riscv, mstatus, FS, FS);
     }

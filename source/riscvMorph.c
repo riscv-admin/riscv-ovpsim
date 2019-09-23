@@ -574,16 +574,32 @@ static void emitTrapInstructionMask(
 ////////////////////////////////////////////////////////////////////////////////
 
 //
-// Set mstatus.FS if this is the first floating point instruction in this block
+// Indicate that this instruction may update mstatus (by changing mstatus.FS)
+//
+inline static void mayWriteMStatus(riscvP riscv) {
+
+    if(riscv->configInfo.mstatus_fs_mode!=RVFS_ALWAYS_DIRTY) {
+        vmimtRegReadImpl("mstatus");
+        vmimtRegWriteImpl("mstatus");
+    }
+}
+
+//
+// Set mstatus.FS to Dirty if it is not known to be in that state already
 //
 static void updateFS(riscvP riscv) {
 
-    riscvBlockStateP blockState = riscv->blockState;
+    if(riscv->configInfo.mstatus_fs_mode!=RVFS_ALWAYS_DIRTY) {
 
-    // TODO: only if in write-any mode
-    if(!blockState->FSDirty) {
-        blockState->FSDirty = True;
-        vmimtBinopRC(32, vmi_OR, RISCV_CPU_REG(csr.mstatus), WM_mstatus_FS, 0);
+        riscvBlockStateP blockState = riscv->blockState;
+
+        // indicate that this instruction may update mstatus
+        mayWriteMStatus(riscv);
+
+        if(!blockState->FSDirty) {
+            blockState->FSDirty = True;
+            vmimtBinopRC(32, vmi_OR, RISCV_CPU_REG(csr.mstatus), WM_mstatus_FS, 0);
+        }
     }
 }
 
@@ -2882,12 +2898,17 @@ inline static Bool enableBFLOAT16(riscvP riscv) {
 
 //
 // Return VMI register for floating point status flags when written (NOTE:
-// mstatus.FS must be updated)
+// mstatus.FS might need to be updated as well)
 //
 static vmiReg getFPFlagsMT(riscvMorphStateP state) {
 
-    // set mstatus.FS
-    updateFS(state->riscv);
+    // indicate that this instruction may update mstatus
+    mayWriteMStatus(state->riscv);
+
+    // set mstatus.FS if required
+    if(state->riscv->configInfo.mstatus_fs_mode==RVFS_WRITE_ANY) {
+        updateFS(state->riscv);
+    }
 
     return RISCV_FP_FLAGS;
 }
@@ -7853,9 +7874,8 @@ VMI_START_END_BLOCK_FN(riscvStartBlock) {
     thisState->fpNaNBoxMask[0] = 0;
     thisState->fpNaNBoxMask[1] = 0;
 
-    // no floating-point instructions have been seen initially if management
-    // of floating point state using mstatus.FS is required
-    thisState->FSDirty = riscv->configInfo.fs_always_dirty;
+    // no floating-point instructions have been seen initially
+    thisState->FSDirty = False;
 
     // current vector configuration is not known initially
     thisState->SEWMt                  = SEWMT_UNKNOWN;
