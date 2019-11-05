@@ -492,6 +492,7 @@ typedef struct riscvInstrInfoS {
     Uns8              bytes;            // instruction size in bytes (2 or 4)
     riscvIType        type;             // instruction type
     riscvArchitecture arch;             // architecture requirements
+    riscvVIType       VIType;           // vector instruction type
     Bool              explicitType;     // whether types are explicit in opcode
     Bool              explicitW;        // whether 'w' explicit in opcode
     Bool              unsExt;           // whether to extend unsigned
@@ -506,7 +507,6 @@ typedef struct riscvInstrInfoS {
     riscvFenceDesc    succ;             // successor fence
     riscvRMDesc       rm;               // rounding mode
     riscvCSRUDesc     csrUpdate;        // CSR update semantics
-    riscvVIType       VIType;           // vector instruction type
     Uns32             csr;              // CSR index
     Uns8              vsew;             // vsew value
     Uns8              vlmul;            // vmul value

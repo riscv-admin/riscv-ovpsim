@@ -65,6 +65,7 @@ static void initLeafModelCBs(riscvP riscv) {
     riscv->cb.getXlenArch        = riscvGetXlenArch;
     riscv->cb.getXRegName        = riscvGetXRegName;
     riscv->cb.getFRegName        = riscvGetFRegName;
+    riscv->cb.getVRegName        = riscvGetVRegName;
     riscv->cb.getTMode           = riscvGetTMode;
     riscv->cb.setTMode           = riscvSetTMode;
 
@@ -78,6 +79,9 @@ static void initLeafModelCBs(riscvP riscv) {
     riscv->cb.getVMIRegFS        = riscvGetVMIRegFS;
     riscv->cb.writeRegSize       = riscvWriteRegSize;
     riscv->cb.writeReg           = riscvWriteReg;
+    riscv->cb.getFPFlagsMt       = riscvGetFPFlagsMT;
+    riscv->cb.checkLegalRMMt     = riscvEmitCheckLegalRM;
+    riscv->cb.morphVOp           = riscvMorphVOp;
 
     // from riscvCSR.h
     riscv->cb.newCSR             = riscvNewCSR;
