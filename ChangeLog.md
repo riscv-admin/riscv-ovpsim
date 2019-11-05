@@ -5,6 +5,15 @@
 # which includes information of the OVP Simulator and RISCV processor model   #
 ###############################################################################
 
+- Behavior for fault-only-first vector segment load instructions has been
+  corrected.
+- Behavior for vector atomic operations with 32-bit memory element width has 
+  been corrected.
+- Behavior for vector register gather operations when index>=VL and index<=VLMAX
+  has been corrected.
+- Vector atomic operations with SEW greater than XLEN now cause an Illegal
+  Instruction exception.
+
 ###############################################################################
 ## Date 2019-October-09                                                      ##
 ## Release 20191009.0                                                        ##

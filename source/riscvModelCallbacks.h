@@ -30,8 +30,10 @@
 #include "riscvExceptionTypes.h"
 #include "riscvMode.h"
 #include "riscvRegisterTypes.h"
+#include "riscvTypes.h"
 #include "riscvTypeRefs.h"
 #include "riscvVariant.h"
+#include "riscvVectorTypes.h"
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -157,6 +159,38 @@ typedef RISCV_WRITE_REG_SIZE_FN((*riscvWriteRegSizeFn));
 typedef RISCV_WRITE_REG_FN((*riscvWriteRegFn));
 
 //
+// Return VMI register for floating point status flags when written
+//
+#define RISCV_GET_FP_FLAGS_MT_FN(_NAME) vmiReg _NAME(riscvP riscv)
+typedef RISCV_GET_FP_FLAGS_MT_FN((*riscvGetFPFlagsMtFn));
+
+//
+// Validate the given rounding mode is legal and emit an Illegal Instruction
+// exception call if not
+//
+#define RISCV_CHECK_LEGAL_RM_MT_FN(_NAME) Bool _NAME( \
+    riscvP      riscv,  \
+    riscvRMDesc rm      \
+)
+typedef RISCV_CHECK_LEGAL_RM_MT_FN((*riscvCheckLegalRMMtFn));
+
+//
+// Emit vector operation from extension library
+//
+#define RISCV_MORPH_VOP_FN(_NAME) void _NAME( \
+    riscvP           riscv,         \
+    Uns64            thisPC,        \
+    riscvRegDesc     r0,            \
+    riscvRegDesc     r1,            \
+    riscvRegDesc     r2,            \
+    riscvRegDesc     mask,          \
+    riscvVShape      shape,         \
+    riscvVExternalFn externalCB,    \
+    void            *userData       \
+)
+typedef RISCV_MORPH_VOP_FN((*riscvMorphVOpFn));
+
+//
 // Register new CSR
 //
 #define RISCV_NEW_CSR_FN(_NAME) void _NAME(riscvCSRAttrsCP attrs, riscvP riscv)
@@ -244,6 +278,7 @@ typedef struct riscvModelCBS {
     riscvGetXlenFn            getXlenArch;
     riscvGetRegNameFn         getXRegName;
     riscvGetRegNameFn         getFRegName;
+    riscvGetRegNameFn         getVRegName;
     riscvSetTModeFn           setTMode;
     riscvGetTModeFn           getTMode;
 
@@ -257,6 +292,9 @@ typedef struct riscvModelCBS {
     riscvGetVMIRegFSFn        getVMIRegFS;
     riscvWriteRegSizeFn       writeRegSize;
     riscvWriteRegFn           writeReg;
+    riscvGetFPFlagsMtFn       getFPFlagsMt;
+    riscvCheckLegalRMMtFn     checkLegalRMMt;
+    riscvMorphVOpFn           morphVOp;
 
     // from riscvCSR.h
     riscvNewCSRFn             newCSR;

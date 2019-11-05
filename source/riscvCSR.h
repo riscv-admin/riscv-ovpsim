@@ -1098,7 +1098,7 @@ typedef struct {
 } CSR_REG_TYPE_64(vtype);
 
 // define 32/64 bit type
-CSR_REG_STRUCT_DECL_32_64(vtype);
+CSR_REG_STRUCT_DECL_32_64_U(vtype);
 
 // define write masks
 #define WM32_vtype  0x00000000

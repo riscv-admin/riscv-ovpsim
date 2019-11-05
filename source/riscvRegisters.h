@@ -43,6 +43,7 @@
 #define RISCV_CPU_VBASE(_I)     VMI_CPU_TEMP(riscvP, vBase[_I])
 #define RISCV_GPR(_I)           RISCV_CPU_REG(x[_I])
 #define RISCV_FPR(_I)           RISCV_CPU_REG(f[_I])
+#define RISCV_SF                RISCV_CPU_TEMP(SF)
 #define RISCV_LR                RISCV_CPU_REG(x[RV_REG_X_RA])
 #define RISCV_EA_TAG            RISCV_CPU_REG(exclusiveTag)
 #define RISCV_FP_FLAGS          RISCV_CPU_REG(fpFlagsMT)
