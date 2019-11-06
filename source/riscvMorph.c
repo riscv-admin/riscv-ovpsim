@@ -5841,6 +5841,7 @@ static void emitVLdInt(riscvMorphStateP state, iterDescP id, vmiReg ra) {
         if(skip) {
             vmimtCondJumpLabel(RISCV_FF, False, skip);
             vmimtMoveRR(id->SEW, vd, vdTmp);
+            freeTmp(state);
         }
     }
 
