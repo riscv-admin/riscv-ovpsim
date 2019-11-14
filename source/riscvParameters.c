@@ -117,6 +117,16 @@ static vmiEnumParameter vectorVariants[] = {
         .value       = RVVV_0_7_1,
         .description = "Vector Architecture Version 0.7.1-draft-20190605",
     },
+    [RVVV_0_8_20190906] = {
+        .name        = "0.8-draft-20190906",
+        .value       = RVVV_0_8_20190906,
+        .description = "Vector Architecture Version 0.8-draft-20190906",
+    },
+    [RVVV_0_8_20191004] = {
+        .name        = "0.8-draft-20191004",
+        .value       = RVVV_0_8_20191004,
+        .description = "Vector Architecture Version 0.8-draft-20191004",
+    },
     [RVVV_MASTER] = {
         .name        = "master",
         .value       = RVVV_MASTER,

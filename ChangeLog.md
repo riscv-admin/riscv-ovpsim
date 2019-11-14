@@ -1,24 +1,46 @@
-###############################################################################
-#                       CHANGELOG.RISCVOVPSIM.txt                             #
-#      Copyright (c) 2005-2019 Imperas Software Ltd., www.imperas.com         #
-# This CHANGELOG contains information for the riscvOVPsim fixed platform      #
-# which includes information of the OVP Simulator and RISCV processor model   #
-###############################################################################
+riscvOVPsim Change Log
+===
+Copyright (c) 2005-2019 Imperas Software Ltd., www.imperas.com
 
-- Behavior for fault-only-first vector segment load instructions has been
-  corrected.
-- Behavior for vector atomic operations with 32-bit memory element width has 
-  been corrected.
-- Behavior for vector register gather operations when index>=VL and index<=VLMAX
-  has been corrected.
-- Vector atomic operations with SEW greater than XLEN now cause an Illegal
-  Instruction exception.
+This CHANGELOG contains information for the riscvOVPsim fixed platform which includes information of the OVP Simulator and RISCV processor model
 
-###############################################################################
-## Date 2019-October-09                                                      ##
-## Release 20191009.0                                                        ##
-###############################################################################
+---
 
+- Some Vector Extension issues have been corrected:
+  - Vector AMO operations for memory element bits less than 32 now cause Illegal
+    Instruction exceptions.
+  - Alignment required for vector AMO operations accessing 32-bit data is now
+    four bytes - previously, eight-byte alignment was required for SEW=64.
+  - Encodings for vwsmaccsu and vwsmaccus instruction variants has been changed
+    in 0.8-draft-20191004 and master versions to comply with a specification
+    change of September 17th 2019.
+- Vector version 0.8-draft-20190906 has been added. The only difference between
+  this version and the stable 0.8-draft-20191004 version is the encodings of
+  vwsmaccsu and vwsmaccus instruction variants.
+- The vector_version master branch currently has the following changes compared
+  to the stable 0.8-draft-20191004 version:
+  - Indexed load/store instructions now zero extend offsets (in version
+    0.8-draft-20191004, they are sign-extended);
+  - vslide1up/vslide1down instructions now sign extend XLEN values to SEW length
+    (in version 0.8-draft-20191004, they are zero-extended);
+  - vadc/vsbc instruction encodings now require vm=0 (in version
+    0.8-draft-20191004, they require vm=1);
+  - vmadc/vmsbc instruction encodings now allow both vm=0, implying carry input
+    is used, and vm=1, implying carry input is zero (in version
+    0.8-draft-20191004, only vm=1 is permitted implying carry input is used).
+  This set of changes will increase as the master specification evolves.
+
+Date 2019-November-04
+Release 20191104.0
+===
+- Behavior for fault-only-first vector segment load instructions has been corrected.
+- Behavior for vector atomic operations with 32-bit memory element width has been corrected.
+- Behavior for vector register gather operations when index>=VL and index<=VLMAX has been corrected.
+- Vector atomic operations with SEW greater than XLEN now cause an Illegal Instruction exception.
+
+Date 2019-October-09
+Release 20191009.0
+===
 - The model has a new parameter vector_version which can be used to select
   either the stable 0.7.1 Vector Extension (the default) or the unstable master
   branch. The master branch currently has the following changes compared to the
@@ -44,11 +66,9 @@
   uses the same set of syscall numbers which are defined as part of the proxy
   kernel library for newlib.
 
-###############################################################################
-## Date 2019-Sept-23                                                         ##
-## Release 20190923.0                                                        ##
-###############################################################################
-
+Date 2019-Sept-23
+Release 20190923.0
+===
 - The model has a new parameter vector_version which can be used to select
   either the stable 0.7.1 Vector Extension (the default) or the unstable master
   branch. The master branch currently has the following changes compared to the
@@ -109,10 +129,9 @@
 - A bug was fixed that could cause incorrect behavior when PMP region mappings
   change.
 
-###############################################################################
-## Date 2019-June-28                                                         ##
-## Release 20190628.0                                                        ##
-###############################################################################
+Date 2019-June-28
+Release 20190628.0
+===
 
 - Fixed bug that caused the Model Specific Documentation for the SiFive 
   U54MC model to be missing the sections under Overview.
@@ -165,11 +184,9 @@
 - The model has been simplified to use the built-in VMI RMM rounding mode
   support.
 
-###############################################################################
-## Date 2019-March-06                                                        ##
-## Release 20190306.0                                                        ##
-###############################################################################
-
+Date 2019-March-06
+Release 20190306.0
+===
 - Relaxed the fence instruction for finer grain as per specification of values
   for imm[11:0], rs1 and rd fields
 - The model now supports save and restore.
@@ -189,11 +206,9 @@
   specified. For example, a value of 3 indicates that the smallest implemented
   PMP region size is 32 bytes.
 
-###############################################################################
-## Date 2018-November-14                                                     ##
-## Release 20181114.0                                                        ##
-###############################################################################
-
+Date 2018-November-14
+Release 20181114.0
+===
 - A bug has been fixed which allowed User mode accesses to unimplemented
   hardware performance registers irrespective of the settings in the counter
   enable registers.
@@ -214,16 +229,13 @@
   registers should be present only if both supervisor mode and user-level
   interrupts are present.
 
-###############################################################################
-## Date 2018-August-03                                                       ##
-## Release 20180716.2                                                        ##
-###############################################################################
+Date 2018-August-03
+Release 20180716.2
+===
 
-###############################################################################
-## Date 2018-July-16                                                         ##
-## Release 20180716.0                                                        ##
-###############################################################################
-
+Date 2018-July-16
+Release 20180716.0
+===
 - The RISCV processor model has been changed to set the default initial PC at 
   simulation start to the value indicated by the processor model's reset_address
   parameter. Previously the default start address was 0x0.
@@ -234,25 +246,20 @@
   See the Model Specific Information document to see what value is implemented 
   for a specific variant.
   
-###############################################################################
-## Date 2018-March-12                                                        ##
-## Release 20180221.1                                                        ##
-###############################################################################
+Date 2018-March-12
+Release 20180221.1
+===
 
-###############################################################################
-## Date 2018-February-21                                                     ##
-## Release 20180221.0                                                        ##
-###############################################################################
-
+Date 2018-February-21
+Release 20180221.0
+===
 - The model has been extensively rewritten to implement privilege levels and
   state consistent with Privileged Architecture version 1.10, including virtual
   memory and physical memory protection registers.
 
-###############################################################################
-## Date 2017-September-19                                                    ##
-## Release 20170919.0                                                        ##
-###############################################################################
-
+Date 2017-September-19
+Release 20170919.0
+===
 This is the first release of the RISC-V models. There is a generic
 model that implements the RISC-V ISA variants and there are vendor specific
 cores.
@@ -262,14 +269,11 @@ To see the available processor models use:
 and to see the specific variants these contain use:
     iss.exe --showvariants --processorname riscv
 
-###############################################################################
-## Date 2017-May-12                                                          ##
-## Release 20170511.0                                                        ##
-###############################################################################
-
+Date 2017-May-12
+Release 20170511.0
+===
 - The model supporting variants RV32G, RV32I, RV64G and RV64I is released.
-    
-###############################################################################
-## Date 2017-February-01                                                     ##
-## Release 20170201.0                                                        ##
-###############################################################################
+
+Date 2017-February-01
+Release 20170201.0
+===
