@@ -1047,6 +1047,21 @@ static void emitStoreCommon(
     emitStoreCommonMBO(state, rs, ra, memBits, offset, constraint);
 }
 
+//
+// Try-store value
+//
+static void emitTryStoreCommon(
+    riscvMorphStateP state,
+    vmiReg           ra,
+    memConstraint    constraint
+) {
+    Uns32 memBits = state->info.memBits;
+    Uns64 offset  = state->info.c;
+
+    // generate Store/AMO exception in preference to Load exception
+    vmimtTryStoreRC(memBits, offset, ra, constraint);
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // BASE INSTRUCTION CALLBACKS
@@ -1499,7 +1514,7 @@ static void emitAMOCommonInt(
     vmimtAtomic();
 
     // generate Store/AMO exception in preference to Load exception
-    vmimtTryStoreRC(bits, 0, ra, constraint);
+    emitTryStoreCommon(state, ra, constraint);
 
     // generate results using tmp1 and tmp2
     emitLoadCommon(state, tmp1, bits, ra, constraint);
@@ -3471,6 +3486,13 @@ typedef struct iterDescS {
 } iterDesc;
 
 //
+// Is vector version the given version or earlier?
+//
+inline static Bool vectVerLE(riscvP riscv, riscvVectVer version) {
+    return (riscv->configInfo.vect_version<=version);
+}
+
+//
 // Convert multiple to shift left amount, returning -1 if not a power of two
 //
 static Int32 mulToShiftLeft(Uns32 mul) {
@@ -3611,7 +3633,7 @@ inline static riscvVLMULMt vlmulToVLMUL(Uns32 vlmul) {
 // NOTE: after version 0.7.1, top parts are preserved, not zeroed
 //
 inline static Bool requireZeroTail(riscvP riscv) {
-    return (riscv->configInfo.vect_version==RVVV_0_7_1);
+    return vectVerLE(riscv, RVVV_0_7_1);
 }
 
 //
@@ -4221,8 +4243,8 @@ static Bool validateNoOverlap(riscvMorphStateP state, iterDescP id) {
     }
 
     // destination must not overlap the mask for some instructions in version
-    // 0.7.1 only (constraint relaxed from 0.7.2)
-    if((ot&OT_M71) && (riscv->configInfo.vect_version==RVVV_0_7_1)) {
+    // 0.7.1 only (constraint relaxed from 0.8)
+    if((ot&OT_M71) && vectVerLE(riscv, RVVV_0_7_1)) {
         ot |= OT_M;
     }
 
@@ -5406,7 +5428,7 @@ static vmiCallFn handleVSetVLArg1(riscvP riscv, Uns32 bits, vmiReg rs1) {
     if(!VMI_ISNOREG(rs1)) {
         vmimtArgReg(bits, rs1);
         return (vmiCallFn)setVLSEWLMUL;
-    } else if(riscv->configInfo.vect_version==RVVV_0_7_1) {
+    } else if(vectVerLE(riscv, RVVV_0_7_1)) {
         return (vmiCallFn)setMaxVLSEWLMUL;
     } else {
         vmimtArgReg(bits, CSR_REG_MT(vl));
@@ -5622,7 +5644,7 @@ static RISCV_MORPH_FN(emitVSetVLRRC) {
         // unknown
         vmimtEndBlock();
 
-    } else if(riscv->configInfo.vect_version==RVVV_0_7_1) {
+    } else if(vectVerLE(riscv, RVVV_0_7_1)) {
 
         // update to maximum vector length
         emitVSetVLRR0MaxVL(state);
@@ -5798,12 +5820,13 @@ static vmiReg emitVLdStSOffset(riscvMorphStateP state, iterDescP id) {
 //
 static vmiReg emitVLdStIOffset(riscvMorphStateP state, iterDescP id) {
 
-    riscvRegDesc rs1A   = getRVReg(state, 1);
-    vmiReg       ra     = newTmp(state);
-    Uns32        raBits = getRBits(rs1A);
-    Uns32        iBits  = (id->SEW<raBits) ? id->SEW : raBits;
+    riscvRegDesc rs1A    = getRVReg(state, 1);
+    vmiReg       ra      = newTmp(state);
+    Uns32        raBits  = getRBits(rs1A);
+    Uns32        iBits   = (id->SEW<raBits) ? id->SEW : raBits;
+    Bool         sExtend = vectVerLE(state->riscv, RVVV_0_8_20191004);
 
-    vmimtMoveExtendRR(raBits, ra, iBits, id->r[2], True);
+    vmimtMoveExtendRR(raBits, ra, iBits, id->r[2], sExtend);
 
     return ra;
 }
@@ -5938,6 +5961,9 @@ static RISCV_MORPHV_FN(emitVStICB) {
 // VECTOR ATOMIC MEMORY OPERATIONS
 ////////////////////////////////////////////////////////////////////////////////
 
+//
+// Do vector AMO SEW checks
+//
 static Bool doVAMOCheck(riscvMorphStateP state, iterDescP id, Bool verbose) {
 
     riscvP riscv   = state->riscv;
@@ -5950,6 +5976,15 @@ static Bool doVAMOCheck(riscvMorphStateP state, iterDescP id, Bool verbose) {
         // Illegal Instruction if SEW < memory element bits
         if(verbose) {
             ILLEGAL_INSTRUCTION_MESSAGE(riscv, "IMB", "SEW < memory element bits");
+        }
+
+        ok = False;
+
+    } else if(memBits < 32) {
+
+        // Illegal Instruction if SEW < 32 (minimum supported in base)
+        if(verbose) {
+            ILLEGAL_INSTRUCTION_MESSAGE(riscv, "IMB", "memory element bits < 32");
         }
 
         ok = False;
@@ -6349,20 +6384,26 @@ typedef struct carryCxtS {
 //
 static void getVCarryIn(riscvMorphStateP state, iterDescP id, carryCxtP cxt) {
 
-    vmiReg t0 = newTmp(state);
+    riscvRegDesc mask = state->info.mask;
+    vmiReg       t0   = newTmp(state);
+    vmiReg       cin  = mask ? t0 : VMI_NOREG;
 
     // prepare predicate and active masks
     prepareMasks(state, id, t0, True, True);
 
     // initialize flags in context
-    vmiFlags flags = {cin:t0, f:{[vmi_CF]=t0}};
+    vmiFlags flags = {cin:cin, f:{[vmi_CF]=t0}};
     cxt->flags = flags;
 
-    // start indexed access to carry input register
-    vmiReg carry = accessMaskField(state, id, state->info.mask);
+    // initialize carry-in if required
+    if(mask) {
 
-    // extract mask element LSB
-    getPaLSB(id, carry, flags.cin);
+        // start indexed access to carry input register
+        vmiReg carry = accessMaskField(state, id, mask);
+
+        // extract mask element LSB
+        getPaLSB(id, carry, flags.cin);
+    }
 }
 
 //
@@ -7508,11 +7549,12 @@ static RISCV_MORPHV_FN(emitVISLIDEDOWNCB) {
 //
 static RISCV_MORPHV_FN(initVRSLIDE1CB) {
 
-    riscvRegDesc rs1A  = getRVReg(state, 2);
-    Uns32        sBits = getMinBits(id, getRBits(rs1A));
+    riscvRegDesc rs1A    = getRVReg(state, 2);
+    Uns32        sBits   = getMinBits(id, getRBits(rs1A));
+    Bool         sExtend = !vectVerLE(state->riscv, RVVV_0_8_20191004);
 
     // prepare zero-extended input
-    vmimtMoveExtendRR(id->SEW, RISCV_VTMP, sBits, id->r[2], False);
+    vmimtMoveExtendRR(id->SEW, RISCV_VTMP, sBits, id->r[2], sExtend);
 }
 
 //

@@ -990,17 +990,17 @@ void riscvDoc(riscvP rootProcessor) {
             "https://github.com/ucb-bar/riscv-torture"
         );
         vmidocAddText(Verification,
-            "The Imperas OVPsim RISC-V models are used in the RISC-V Foundations"
+            "The Imperas OVPsim RISC-V models are used in the RISC-V Foundations "
             "Compliance Framework as a functional Golden Reference:"
         );
         vmidocAddText(Verification,
             "https://github.com/riscv/riscv-compliance"
         );
         vmidocAddText(Verification,
-            "where the simulated model is used to provide the reference signatures"
-            "for compliance testing."
-            "The Imperas OVPsim RISC-V models are used as reference in both open"
-            "source and commercial instruction stream test generators for hardware"
+            "where the simulated model is used to provide the reference signatures "
+            "for compliance testing. "
+            "The Imperas OVPsim RISC-V models are used as reference in both open "
+            "source and commercial instruction stream test generators for hardware "
             "design verification, for example:"
         );
         vmidocAddText(Verification,
@@ -1010,8 +1010,8 @@ void riscvDoc(riscvP rootProcessor) {
             "https://github.com/google/riscv-dv from Google"
         );
         vmidocAddText(Verification,
-            "The Imperas OVPsim RISC-V models are also used by commercial and open"
-            "source RISC-V Core RTL developers as a reference to ensure correct"
+            "The Imperas OVPsim RISC-V models are also used by commercial and open "
+            "source RISC-V Core RTL developers as a reference to ensure correct "
             "functionality of their IP."
         );
     }

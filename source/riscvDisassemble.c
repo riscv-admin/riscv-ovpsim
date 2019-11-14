@@ -374,32 +374,43 @@ static void putOpcode(char **result, riscvP riscv, riscvInstrInfoP info) {
         putString(result, "ff");
     }
 
+    // type describing suffix actions
+    typedef struct viDescInfoS {
+        const char *suffix;     // initial suffix
+        Bool        addMaskM;   // add m if mask is specified
+    } viDescInfo;
+
     // vector suffixes
-    static const char *viDescs[] = {
-        [RV_VIT_NA]  = "",
-        [RV_VIT_V]   = ".v",
-        [RV_VIT_W]   = ".w",
-        [RV_VIT_VV]  = ".vv",
-        [RV_VIT_VI]  = ".vi",
-        [RV_VIT_VX]  = ".vx",
-        [RV_VIT_WV]  = ".wv",
-        [RV_VIT_WI]  = ".wi",
-        [RV_VIT_WX]  = ".wx",
-        [RV_VIT_VF]  = ".vf",
-        [RV_VIT_WF]  = ".wf",
-        [RV_VIT_VS]  = ".vs",
-        [RV_VIT_M]   = ".m",
-        [RV_VIT_MM]  = ".mm",
-        [RV_VIT_VM]  = ".vm",
-        [RV_VIT_VVM] = ".vvm",
-        [RV_VIT_VXM] = ".vxm",
-        [RV_VIT_VIM] = ".vim",
-        [RV_VIT_VFM] = ".vfm",
+    static const viDescInfo viDescs[RV_VIT_LAST] = {
+        [RV_VIT_NA]  = {"",    0},
+        [RV_VIT_V]   = {".v",  0},
+        [RV_VIT_W]   = {".w",  0},
+        [RV_VIT_VV]  = {".vv", 0},
+        [RV_VIT_VI]  = {".vi", 0},
+        [RV_VIT_VX]  = {".vx", 0},
+        [RV_VIT_WV]  = {".wv", 0},
+        [RV_VIT_WI]  = {".wi", 0},
+        [RV_VIT_WX]  = {".wx", 0},
+        [RV_VIT_VF]  = {".vf", 0},
+        [RV_VIT_WF]  = {".wf", 0},
+        [RV_VIT_VS]  = {".vs", 0},
+        [RV_VIT_M]   = {".m",  0},
+        [RV_VIT_MM]  = {".mm", 0},
+        [RV_VIT_VM]  = {".vm", 0},
+        [RV_VIT_VVM] = {".vv", 1},
+        [RV_VIT_VXM] = {".vx", 1},
+        [RV_VIT_VIM] = {".vi", 1},
+        [RV_VIT_VFM] = {".vf", 1}
     };
 
     // emit vector suffix
     VMI_ASSERT(info->VIType<NUM_MEMBERS(viDescs), "bad VIType (%u)", info->VIType);
-    putString(result, viDescs[info->VIType]);
+    putString(result, viDescs[info->VIType].suffix);
+
+    // add additional 'm' if mask is specified
+    if(viDescs[info->VIType].addMaskM && info->mask) {
+        putChar(result, 'm');
+    }
 
     // acquire/release modifier suffixes
     static const char *aqrlDescs[] = {
