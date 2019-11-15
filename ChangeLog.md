@@ -7,6 +7,7 @@ This CHANGELOG contains information for the riscvOVPsim fixed platform which inc
 ---
 
 - Some Vector Extension issues have been corrected:
+  - Behavior of vsetvl instruction on RV64 base has been corrected
   - Vector AMO operations for memory element bits less than 32 now cause Illegal
     Instruction exceptions.
   - Alignment required for vector AMO operations accessing 32-bit data is now

@@ -130,7 +130,8 @@ static vmiEnumParameter vectorVariants[] = {
     [RVVV_MASTER] = {
         .name        = "master",
         .value       = RVVV_MASTER,
-        .description = "Vector Architecture Master Branch (unstable)",
+        .description = "Vector Architecture Master Branch as of commit "
+                       RVVV_MASTER_TAG" (this is subject to change)",
     },
     // KEEP LAST: terminator
     {0}

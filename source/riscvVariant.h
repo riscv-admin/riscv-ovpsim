@@ -147,6 +147,11 @@ typedef enum riscvPrivVerE {
 } riscvPrivVer;
 
 //
+// Tag of master version
+//
+#define RVVV_MASTER_TAG "5a3bb6d"
+
+//
 // Supported Vector Architecture versions
 //
 typedef enum riscvVectVerE {

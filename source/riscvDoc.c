@@ -685,7 +685,9 @@ void riscvDoc(riscvP rootProcessor) {
             "version specified in the References section of this document. "
             "Note that parameter \"vector_version\" can be used to select "
             "the required version, including the unstable \"master\" version "
-            "corresponding to the active specification."
+            "corresponding to the active specification. See section \"Vector "
+            "Extension Versions\" for detailed information about differences "
+            "between each supported version."
         );
 
         vmiDocNodeP Parameters = vmidocAddSection(
@@ -783,6 +785,151 @@ void riscvDoc(riscvP rootProcessor) {
             "aligned to the memory element size. Unaligned accesses will "
             "cause a Load/Store Address Alignment exception."
         );
+
+        ////////////////////////////////////////////////////////////////////////
+        // VECTOR EXTENSION VERSIONS
+        ////////////////////////////////////////////////////////////////////////
+
+        {
+            vmiDocNodeP Versions = vmidocAddSection(
+                Vector, "Vector Extension Versions"
+            );
+
+            vmidocAddText(
+                Versions,
+                "The Vector Extension specification has been under active "
+                "development. To enable simulation of hardware that may be based "
+                "on an older version of the specification, the model implements "
+                "behavior for a number of previous versions of the specification. "
+                "The differing features of these are listed below, in "
+                "chronological order."
+            );
+        }
+
+        ////////////////////////////////////////////////////////////////////////
+        // VECTOR EXTENSION VERSION 0.7.1-draft-20190605
+        ////////////////////////////////////////////////////////////////////////
+
+        {
+            vmiDocNodeP Version_0_7_1_20190605 = vmidocAddSection(
+                Vector, "Version 0.7.1-draft-20190605"
+            );
+
+            vmidocAddText(
+                Version_0_7_1_20190605,
+                "Stable 0.7.1 version of June 10 2019."
+            );
+        }
+
+        ////////////////////////////////////////////////////////////////////////
+        // VECTOR EXTENSION VERSION 0.8-draft-20190906
+        ////////////////////////////////////////////////////////////////////////
+
+        {
+            vmiDocNodeP Version_0_8_20190906 = vmidocAddSection(
+                Vector, "Version 0.8-draft-20190906"
+            );
+
+            vmidocAddText(
+                Version_0_8_20190906,
+                "Stable 0.8 draft of September 6 2019, with these changes "
+                "compared to the previous version:"
+            );
+            vmidocAddText(
+                Version_0_8_20190906,
+                "- vsetvl and vsetvli instructions when rs1 = x0 preserve the "
+                "current vl instead of selecting the maximum possible vl;"
+            );
+            vmidocAddText(
+                Version_0_8_20190906,
+                "- tail vector and scalar elements preserved, not zeroed;"
+            );
+            vmidocAddText(
+                Version_0_8_20190906,
+                "- vext.s.v, vmford.vv and vmford.vf instructions removed;"
+            );
+            vmidocAddText(
+                Version_0_8_20190906,
+                "- encodings for vfmv.f.s, vfmv.s.f, vmv.s.x, vpopc.m, "
+                "vfirst.m, vmsbf.m, vmsif.m, vmsof.m, viota.m and vid.v "
+                "instructions changed;"
+            );
+            vmidocAddText(
+                Version_0_8_20190906,
+                "- overlap constraints for slideup and slidedown instructions "
+                "relaxed to allow overlap of destination and mask when SEW=1;"
+            );
+            vmidocAddText(
+                Version_0_8_20190906,
+                "- 64-bit vector AMO operations replaced with SEW-width vector "
+                "AMO operations;"
+            );
+            vmidocAddText(
+                Version_0_8_20190906,
+                "- The double-width source vector register group for narrowing "
+                "operations signified by a \"w\" in the source operand suffix. "
+                "Previously, a \"v\" was used."
+            );
+        }
+
+        ////////////////////////////////////////////////////////////////////////
+        // VECTOR EXTENSION VERSION 0.8-draft-20191004
+        ////////////////////////////////////////////////////////////////////////
+
+        {
+            vmiDocNodeP Version_0_8_20191004 = vmidocAddSection(
+                Vector, "Version 0.8-draft-20191004"
+            );
+
+            vmidocAddText(
+                Version_0_8_20191004,
+                "Stable 0.8 draft of October 4 2019, with these changes "
+                "compared to the previous version:"
+            );
+            vmidocAddText(
+                Version_0_8_20191004,
+                "- vwsmaccsu and vwsmaccus instruction encodings exchanged."
+            );
+        }
+
+        ////////////////////////////////////////////////////////////////////////
+        // VECTOR EXTENSION VERSION master
+        ////////////////////////////////////////////////////////////////////////
+
+        {
+            vmiDocNodeP Version_master = vmidocAddSection(
+                Vector, "Version master"
+            );
+
+            vmidocAddText(
+                Version_master,
+                "Unstable master version as of 12 November 2019 (commit "
+                RVVV_MASTER_TAG"), with these changes compared to the previous "
+                "version:"
+            );
+            vmidocAddText(
+                Version_master,
+                "- Indexed load/store instructions zero-extend offsets "
+                "(previously, they were sign-extended);"
+            );
+            vmidocAddText(
+                Version_master,
+                "- vslide1up/vslide1down instructions sign-extend XLEN values "
+                "to SEW length (previously, they were zero-extended);"
+            );
+            vmidocAddText(
+                Version_master,
+                "- vadc/vsbc instruction encodings require vm=0 (previously, "
+                "they required vm=1);"
+            );
+            vmidocAddText(
+                Version_master,
+                "- vmadc/vmsbc instruction encodings allow both vm=0, "
+                "implying carry input is used, and vm=1, implying carry input "
+                "is zero (previously, only vm=1 was permitted, implying carry "
+                "input is used)."
+            );
+        }
     }
 
     ////////////////////////////////////////////////////////////////////////////
