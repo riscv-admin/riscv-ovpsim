@@ -1440,7 +1440,7 @@ void riscvSetVType(riscvP riscv, Bool vill, Uns32 vsew, Uns32 vlmul) {
 //
 // Update VL and aliases of it
 //
-void riscvSetVL(riscvP riscv, Uns32 vl) {
+void riscvSetVL(riscvP riscv, Uns64 vl) {
 
     Uns32 maxVL = getMaxVL(riscv);
 

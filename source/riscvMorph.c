@@ -5367,7 +5367,7 @@ riscvSEWMt riscvValidSEW(riscvP riscv, Uns8 vsew) {
 //
 // Update VL, SEW and VLMUL
 //
-static Uns32 setVLSEWLMULInt(riscvP riscv, Uns32 vl, Uns32 vsew, Uns32 vlmul) {
+static Uns32 setVLSEWLMULInt(riscvP riscv, Uns64 vl, Uns32 vsew, Uns32 vlmul) {
 
     Bool vill = !riscvValidSEW(riscv, vsew);
 
@@ -5391,7 +5391,7 @@ static Uns32 setVLSEWLMULInt(riscvP riscv, Uns32 vl, Uns32 vsew, Uns32 vlmul) {
 //
 // VSetVL to specified size
 //
-static Uns32 setVLSEWLMUL(riscvP riscv, Uns32 vl, Uns32 vtypeBits) {
+static Uns32 setVLSEWLMUL(riscvP riscv, Uns64 vl, Uns32 vtypeBits) {
 
     CSR_REG_DECL(vtype) = {u32 : {bits:vtypeBits}};
 
@@ -5423,7 +5423,9 @@ static Uns32 setMaxVLSEWLMUL(riscvP riscv, Uns32 vtypeBits) {
 //
 // Handle the first source argument of VSetVL
 //
-static vmiCallFn handleVSetVLArg1(riscvP riscv, Uns32 bits, vmiReg rs1) {
+static vmiCallFn handleVSetVLArg1(riscvP riscv, vmiReg rs1) {
+
+    Uns32 bits = 64;
 
     if(!VMI_ISNOREG(rs1)) {
         vmimtArgReg(bits, rs1);
@@ -5456,14 +5458,14 @@ static void emitVSetVLRRRCB(riscvMorphStateP state) {
     vmiReg       rd    = getVMIReg(riscv, rdA);
     vmiReg       rs1   = getVMIReg(riscv, rs1A);
     vmiReg       rs2   = getVMIReg(riscv, rs2A);
-    Uns32        bits  = 32;
+    Uns32        dBits = 32;
 
     // call function (may cause exception for invalid SEW)
     vmimtArgProcessor();
-    vmiCallFn cb = handleVSetVLArg1(riscv, bits, rs1);
-    vmimtArgReg(bits, rs2);
-    vmimtCallResultAttrs(cb, bits, rd, VMCA_EXCEPTION|VMCA_NO_INVALIDATE);
-    writeRegSize(riscv, rdA, bits);
+    vmiCallFn cb = handleVSetVLArg1(riscv, rs1);
+    vmimtArgReg(32, rs2);
+    vmimtCallResultAttrs(cb, dBits, rd, VMCA_NO_INVALIDATE);
+    writeRegSize(riscv, rdA, dBits);
 }
 
 //
@@ -5478,14 +5480,14 @@ static void emitVSetVLRRCCB(riscvMorphStateP state) {
     vmiReg       rs1   = getVMIReg(riscv, rs1A);
     Uns8         vsew  = state->info.vsew;
     Uns8         vlmul = state->info.vlmul;
-    Uns32        bits  = 32;
+    Uns32        dBits = 32;
 
     // call update function (SEW is known to be valid)
     vmimtArgProcessor();
-    vmiCallFn cb = handleVSetVLArg1(riscv, bits, rs1);
+    vmiCallFn cb = handleVSetVLArg1(riscv, rs1);
     vmimtArgUns32((vsew<<2)+vlmul);
-    vmimtCallResultAttrs(cb, bits, rd, VMCA_NO_INVALIDATE);
-    writeRegSize(riscv, rdA, bits);
+    vmimtCallResultAttrs(cb, dBits, rd, VMCA_NO_INVALIDATE);
+    writeRegSize(riscv, rdA, dBits);
 }
 
 //
@@ -5516,18 +5518,18 @@ static void emitVSetVLRRCBadSEW(riscvMorphStateP state) {
     riscvRegDesc rdA   = getRVReg(state, 0);
     vmiReg       rd    = getVMIReg(riscv, rdA);
     Uns8         vsew  = state->info.vsew;
-    Uns32        bits  = 32;
+    Uns32        dBits = 32;
 
     // update using invalid SEW
     vmiCallFn cb = (vmiCallFn)setVLSEWLMULInt;
 
     // use embedded call
     vmimtArgProcessor();
-    vmimtArgUns32(0);       // vl (ignored)
+    vmimtArgUns64(0);       // vl (ignored)
     vmimtArgUns32(vsew);    // sew
     vmimtArgUns32(0);       // vlmul (ignored)
-    vmimtCallResultAttrs(cb, bits, rd, VMCA_NO_INVALIDATE);
-    writeRegSize(riscv, rdA, bits);
+    vmimtCallResultAttrs(cb, dBits, rd, VMCA_NO_INVALIDATE);
+    writeRegSize(riscv, rdA, dBits);
 }
 
 //
