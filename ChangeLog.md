@@ -7,6 +7,14 @@ This CHANGELOG contains information for the riscvOVPsim fixed platform which inc
 ---
 
 - Some Vector Extension issues have been corrected:
+  - Behavior of vnclipu.wi and vnclip.wi instructions has been corrected
+  - Behavior of some polymorphic instructions when vl=0 has been corrected
+
+Date 2019-November-14
+Release 20191114.0
+===
+
+- Some Vector Extension issues have been corrected:
   - Behavior of vsetvl instruction on RV64 base has been corrected
   - Vector AMO operations for memory element bits less than 32 now cause Illegal
     Instruction exceptions.

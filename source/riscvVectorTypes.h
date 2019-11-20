@@ -44,6 +44,7 @@ typedef enum riscvVShapeE {
     RVVW_121_IIS,   // SEW   = 2*SEW op SEW, saturating result
     RVVW_211_IIQ,   // 2*SEW = SEW   op SEW, implicit widening
     RVVW_211_II,    // 2*SEW = SEW   op SEW
+    RVVW_411_II,    // 4*SEW = SEW   op SEW
     RVVW_221_II,    // 2*SEW = 2*SEW op SEW
 
                     // FLOATING POINT ARGUMENTS
