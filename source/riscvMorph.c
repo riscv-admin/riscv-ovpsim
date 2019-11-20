@@ -3837,7 +3837,7 @@ typedef enum overlapTypeE {
     OT_NA  = 0x0,    // no special constraints
     OT_S   = 0x1,    // destination must not overlap vector source
     OT_M   = 0x2,    // destination must not overlap mask source
-    OT_M71 = 0x4,    // destination must not overlap mask source (0.71 only)
+    OT_M71 = 0x4,    // destination must not overlap mask source (0.7.1 only)
 
     OT___   = OT_NA,
     OT_S_   = OT_S,
@@ -3882,6 +3882,7 @@ static const shapeInfo shapeDetails[RVVW_LAST] = {
     [RVVW_121_IIS] = {{1,2,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 1, 1, 0, 0, OT___  },
     [RVVW_211_IIQ] = {{2,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 1, 0, 0, 0, 0, OT___  },
     [RVVW_211_II]  = {{2,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_411_II]  = {{4,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, OT___  },
     [RVVW_221_II]  = {{2,2,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, OT___  },
     [RVVW_111_FF]  = {{1,1,1}, {1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, OT___  },
     [RVVW_111_PF]  = {{1,1,1}, {1,1,1}, {1,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, OT___  },
@@ -5093,7 +5094,7 @@ static vmiLabelP zeroVdPdTop(riscvMorphStateP state, iterDescP id) {
 
     // construct a mask of vector registers affected by this operation that
     // require top-zero update
-    if(VdA!=PdA) {
+    if((VdA!=PdA) && isVReg(VdA)) {
         for(i=0; i<=state->info.nf; i++) {
             if(requireTopZero(state, getSegmentRegister(id, VdA, i), id->VLMUL)) {
                 zeroVd |= getTopZeroVdMask(i);
@@ -5151,7 +5152,7 @@ static void endVectorOp(
     if(vlClass==VLCLASSMT_MAX) {
         // no top zero state change
     } else if(!requireZeroTail(state->riscv)) {
-        // after version 0.71, top parts are preserved, not zeroed
+        // after version 0.7.1, top parts are preserved, not zeroed
     } else if(isScalarN(state->attrs->vShape, 0)) {
         updateScalarTopZero(state, id);
     } else {
@@ -5341,6 +5342,13 @@ static RISCV_MORPH_FN(emitScalarOp) {
 ////////////////////////////////////////////////////////////////////////////////
 
 //
+// Should legacy vsetvl/vsetvli behavior be used?
+//
+static Bool requireLegacySetVL(riscvP riscv) {
+    return vectVerLE(riscv, RVVV_0_7_1_P);
+}
+
+//
 // Adjust JIT code generator state after write of vstart CSR
 //
 void riscvWVStart(riscvMorphStateP state, Bool useRS1) {
@@ -5430,7 +5438,7 @@ static vmiCallFn handleVSetVLArg1(riscvP riscv, vmiReg rs1) {
     if(!VMI_ISNOREG(rs1)) {
         vmimtArgReg(bits, rs1);
         return (vmiCallFn)setVLSEWLMUL;
-    } else if(vectVerLE(riscv, RVVV_0_7_1)) {
+    } else if(requireLegacySetVL(riscv)) {
         return (vmiCallFn)setMaxVLSEWLMUL;
     } else {
         vmimtArgReg(bits, CSR_REG_MT(vl));
@@ -5646,7 +5654,7 @@ static RISCV_MORPH_FN(emitVSetVLRRC) {
         // unknown
         vmimtEndBlock();
 
-    } else if(vectVerLE(riscv, RVVV_0_7_1)) {
+    } else if(requireLegacySetVL(riscv)) {
 
         // update to maximum vector length
         emitVSetVLRR0MaxVL(state);
@@ -7947,7 +7955,9 @@ const static riscvMorphAttr dispatchTable[] = {
     [RV_IT_VSADD_VR]         = {morph:emitVectorOp, opTCB:emitVRSBinaryCB,   binop:vmi_ADDSQ,                         argType:RVVX_SS},
     [RV_IT_VSSUBU_VR]        = {morph:emitVectorOp, opTCB:emitVRSBinaryCB,   binop:vmi_SUBUQ,                         argType:RVVX_UU},
     [RV_IT_VSSUB_VR]         = {morph:emitVectorOp, opTCB:emitVRSBinaryCB,   binop:vmi_SUBSQ,                         argType:RVVX_SS},
+    [RV_IT_VAADDU_VR]        = {morph:emitVectorOp, opTCB:emitVRABinaryCB,   binop:vmi_ADDUH,                         argType:RVVX_UU},
     [RV_IT_VAADD_VR]         = {morph:emitVectorOp, opTCB:emitVRABinaryCB,   binop:vmi_ADDSH,                         argType:RVVX_SS},
+    [RV_IT_VASUBU_VR]        = {morph:emitVectorOp, opTCB:emitVRABinaryCB,   binop:vmi_SUBUH,                         argType:RVVX_UU},
     [RV_IT_VASUB_VR]         = {morph:emitVectorOp, opTCB:emitVRABinaryCB,   binop:vmi_SUBSH,                         argType:RVVX_SS},
     [RV_IT_VSMUL_VR]         = {morph:emitVectorOp, opTCB:emitVRSMULCB,      binop:vmi_IMUL,                          argType:RVVX_SS},
     [RV_IT_VWSMACCU_VR]      = {morph:emitVectorOp, opTCB:emitVRSMAccIntCB,  binop:vmi_ADDUQ,    vShape:RVVW_211_II,  argType:RVVX_UU},
@@ -7987,6 +7997,10 @@ const static riscvMorphAttr dispatchTable[] = {
     [RV_IT_VWMACC_VR]        = {morph:emitVectorOp, opTCB:emitVRMAccIntCB,   binop:vmi_ADD,      vShape:RVVW_211_II,  argType:RVVX_SS},
     [RV_IT_VWMACCSU_VR]      = {morph:emitVectorOp, opTCB:emitVRMAccIntCB,   binop:vmi_ADD,      vShape:RVVW_211_II,  argType:RVVX_SU},
     [RV_IT_VWMACCUS_VR]      = {morph:emitVectorOp, opTCB:emitVRMAccIntCB,   binop:vmi_ADD,      vShape:RVVW_211_II,  argType:RVVX_US},
+    [RV_IT_VQMACCU_VR]       = {morph:emitVectorOp, opTCB:emitVRMAccIntCB,   binop:vmi_ADD,      vShape:RVVW_411_II,  argType:RVVX_UU},
+    [RV_IT_VQMACC_VR]        = {morph:emitVectorOp, opTCB:emitVRMAccIntCB,   binop:vmi_ADD,      vShape:RVVW_411_II,  argType:RVVX_SS},
+    [RV_IT_VQMACCSU_VR]      = {morph:emitVectorOp, opTCB:emitVRMAccIntCB,   binop:vmi_ADD,      vShape:RVVW_411_II,  argType:RVVX_SU},
+    [RV_IT_VQMACCUS_VR]      = {morph:emitVectorOp, opTCB:emitVRMAccIntCB,   binop:vmi_ADD,      vShape:RVVW_411_II,  argType:RVVX_US},
 
     // V-extension IVV-type instructions
     [RV_IT_VWREDSUMU_VS]     = {morph:emitVectorOp, opTCB:emitVRedBinaryIntCB, initCB:initVRedCB, endCB:endVRedCB, binop:vmi_ADD, vShape:RVVW_212_SI, argType:RVVX_UU, vstart0:1},
@@ -8113,8 +8127,8 @@ const static riscvMorphAttr dispatchTable[] = {
     [RV_IT_VSSRA_VI]         = {morph:emitVectorOp, opTCB:emitVIRShiftIntCB, binop:vmi_SAR},
     [RV_IT_VNSRL_VI]         = {morph:emitVectorOp, opTCB:emitVIShiftIntCB,  binop:vmi_SHR,          vShape:RVVW_121_II},
     [RV_IT_VNSRA_VI]         = {morph:emitVectorOp, opTCB:emitVIShiftIntCB,  binop:vmi_SAR,          vShape:RVVW_121_II},
-    [RV_IT_VNCLIPU_VI]       = {morph:emitVectorOp, opTCB:emitVIShiftIntCB,  binop:vmi_SHR,          vShape:RVVW_121_IIS},
-    [RV_IT_VNCLIP_VI]        = {morph:emitVectorOp, opTCB:emitVIShiftIntCB,  binop:vmi_SAR,          vShape:RVVW_121_IIS},
+    [RV_IT_VNCLIPU_VI]       = {morph:emitVectorOp, opTCB:emitVIRShiftIntCB, binop:vmi_SHR,          vShape:RVVW_121_IIS, argType:RVVX_UU},
+    [RV_IT_VNCLIP_VI]        = {morph:emitVectorOp, opTCB:emitVIRShiftIntCB, binop:vmi_SAR,          vShape:RVVW_121_IIS, argType:RVVX_SS},
 
     // V-extension FVF-type instructions
     [RV_IT_VFMV_S_F]         = {morph:emitScalarOp, opTCB:emitVFMVSF},

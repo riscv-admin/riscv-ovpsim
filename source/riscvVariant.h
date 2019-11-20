@@ -149,15 +149,18 @@ typedef enum riscvPrivVerE {
 //
 // Tag of master version
 //
-#define RVVV_MASTER_TAG "5a3bb6d"
+#define RVVV_MASTER_TAG "812001b"
 
 //
 // Supported Vector Architecture versions
 //
 typedef enum riscvVectVerE {
     RVVV_0_7_1,                         // version 0.7.1-draft-20190605
+    RVVV_0_7_1_P,                       // version 0.7.1 with some 0.8 features
     RVVV_0_8_20190906,                  // version 0.8-draft-20190906
     RVVV_0_8_20191004,                  // version 0.8-draft-20191004
+    RVVV_0_8_20191117,                  // version 0.8-draft-20191117
+    RVVV_0_8_20191118,                  // version 0.8-draft-20191118
     RVVV_MASTER,                        // master branch
     RVVV_LAST,                          // for sizing
     RVVV_DEFAULT = RVVV_0_8_20191004,   // default version

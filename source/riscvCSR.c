@@ -1416,9 +1416,9 @@ void riscvRefreshVectorPMKey(riscvP riscv) {
     if(villKey) {
         pmKey = VLCLASSMT_UNKNOWN | villKey;
     } else if(!vl) {
-        pmKey = VLCLASSMT_ZERO;
+        pmKey = VLCLASSMT_ZERO    | vtypeKey;
     } else if(vl==getMaxVL(riscv)) {
-        pmKey = VLCLASSMT_MAX | vtypeKey;
+        pmKey = VLCLASSMT_MAX     | vtypeKey;
     } else {
         pmKey = VLCLASSMT_NONZERO | vtypeKey;
     }

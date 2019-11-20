@@ -215,7 +215,9 @@ typedef enum riscvITypeE {
     RV_IT_VSADD_VR,
     RV_IT_VSSUBU_VR,
     RV_IT_VSSUB_VR,
+    RV_IT_VAADDU_VR,
     RV_IT_VAADD_VR,
+    RV_IT_VASUBU_VR,
     RV_IT_VASUB_VR,
     RV_IT_VSMUL_VR,
     RV_IT_VWSMACCU_VR,
@@ -255,6 +257,10 @@ typedef enum riscvITypeE {
     RV_IT_VWMACC_VR,
     RV_IT_VWMACCSU_VR,
     RV_IT_VWMACCUS_VR,
+    RV_IT_VQMACCU_VR,
+    RV_IT_VQMACC_VR,
+    RV_IT_VQMACCSU_VR,
+    RV_IT_VQMACCUS_VR,
 
     // V-extension IVV-type instructions
     RV_IT_VWREDSUMU_VS,
