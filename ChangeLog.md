@@ -6,6 +6,45 @@ This CHANGELOG contains information for the riscvOVPsim fixed platform which inc
 
 ---
 
+- Vector version 0.8-draft-20191117 has been added. Differences to the previous
+  0.8-draft-20191004 version are as follows (with the associated specification
+  commit identifiers):
+  - commit 8d4492e: Indexed load/store instructions now zero extend offsets (in
+    version 0.8-draft-20191004, they are sign-extended);
+  - commit d06438e: vslide1up/vslide1down instructions now sign extend XLEN
+    values to SEW length (in version 0.8-draft-20191004, they are zero-extended);
+  - commit 5a038da: vadc/vsbc instruction encodings now require vm=0 (in version
+    0.8-draft-20191004, they require vm=1);
+  - commit 5a038da: vmadc/vmsbc instruction encodings now allow both vm=0,
+    implying carry input is used, and vm=1, implying carry input is zero (in
+    version 0.8-draft-20191004, only vm=1 is permitted implying carry input is
+    used);
+  - commit c2f3157: vaaddu.vv, vaaddu.vx, vasubu.vv and vasubu.vx instructions
+    have been added;
+  - commit c2f3157: vaadd.vv and vaadd.vx, instruction encodings have been
+    changed;
+  - commit c2f3157: vaadd.vi instruction has been removed;
+  - commit 063b128: all widening saturating scaled multiply-add instructions
+    have been removed;
+  - commit 200a557: vqmaccu.vv, vqmaccu.vx, vqmacc.vv, vqmacc.vx, vqmacc.vx, 
+    vqmaccsu.vx and vqmaccus.vx instructions have been added;
+  - commit 7b02297: CSR vlenb has been added (giving vector register length in
+    bytes);
+  - commit 7b02297: load/store whole register instructions have been added;
+  - commit 7b02297: whole register move instructions have been added.
+- Vector version 0.8-draft-20191118 has been added. Differences to the previous
+  0.8-draft-20191117 version are as follows (with the associated specification
+  commit identifiers):
+  - commit b6c48c3: vsetvl/vsetvli with rd=zero and rs1=zero sets vl to the
+    maximum vector length (previously, this combination preserved vl).
+- The vector_version master branch is currently identical to the stable
+  0.8-draft-20191118 version, but will change as the master specification
+  evolves.
+
+Date 2019-November-19
+Release 20191119.0
+===
+
 - Some Vector Extension issues have been corrected:
   - Behavior of vnclipu.wi and vnclip.wi instructions has been corrected
   - Behavior of some polymorphic instructions when vl=0 has been corrected

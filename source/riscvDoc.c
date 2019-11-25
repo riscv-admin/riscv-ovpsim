@@ -966,6 +966,39 @@ void riscvDoc(riscvP rootProcessor) {
                 "- vqmaccu.vv, vqmaccu.vx, vqmacc.vv, vqmacc.vx, vqmacc.vx, "
                 "vqmaccsu.vx and vqmaccus.vx instructions added;"
             );
+            vmidocAddText(
+                Version,
+                "- CSR vlenb added (vector register length in bytes);"
+            );
+            vmidocAddText(
+                Version,
+                "- load/store whole register instructions added;"
+            );
+            vmidocAddText(
+                Version,
+                "- whole register move instructions added."
+            );
+        }
+
+        ////////////////////////////////////////////////////////////////////////
+        // VECTOR EXTENSION VERSION 0.8-draft-20191118
+        ////////////////////////////////////////////////////////////////////////
+
+        {
+            vmiDocNodeP Version = vmidocAddSection(
+                Vector, "Version 0.8-draft-20191118"
+            );
+
+            vmidocAddText(
+                Version,
+                "Stable 0.8 draft of November 18 2019, with these changes "
+                "compared to the previous version:"
+            );
+            vmidocAddText(
+                Version,
+                "- vsetvl/vsetvli with rd=zero and rs1=zero sets vl to the "
+                "maximum vector length."
+            );
         }
 
         ////////////////////////////////////////////////////////////////////////
@@ -979,9 +1012,9 @@ void riscvDoc(riscvP rootProcessor) {
 
             vmidocAddText(
                 Version,
-                "Unstable master version as of 12 November 2019 (commit "
-                RVVV_MASTER_TAG"), with these changes compared to the previous "
-                "version:"
+                "Unstable master version as of 20 November 2019 (commit "
+                RVVV_MASTER_TAG"), currently identical to the previous "
+                "version."
             );
         }
     }

@@ -120,6 +120,7 @@ typedef struct riscvMorphAttrS {
     riscvMorphVFn         opFCB;            // element operation when mask=0
     riscvMorphVFn         endCB;            // called at end of vector operation
     octiaInstructionClass iClass;           // supplemental instruction class
+    vmiBinop              unop       : 8;   // integer unary operation
     vmiBinop              binop      : 8;   // integer binary operation
     vmiFUnop              fpUnop     : 8;   // floating-point unary operation
     vmiFBinop             fpBinop    : 8;   // floating-point binary operation
@@ -3475,6 +3476,9 @@ typedef struct iterDescS {
     riscvVLMULMt VLMUL;                 // effective VLMUL
     riscvSEWMt   SEW;                   // effective SEW
     Uns32        MLEN;                  // effective MLEN
+    Uns32        SLEN;                  // effective SLEN
+    Uns32        VLEN;                  // effective VLEN
+    Uns32        nf;                    // effective number of fields
     riscvRegDesc PdA;                   // predicate abstract target register
     vmiReg       mask;                  // mask register
     vmiReg       rdNarrow;              // narrow destination register
@@ -4027,13 +4031,8 @@ static Bool argIsGroup(riscvVShape vShape, Uns32 argIndex) {
 //
 // Is the current SEW unequal to but forced to 8?
 //
-static Bool forceSEW8(riscvMorphStateP state) {
-
-    riscvVShape      vShape     = state->attrs->vShape;
-    riscvP           riscv      = state->riscv;
-    riscvBlockStateP blockState = riscv->blockState;
-
-    return isSEW8(vShape) && (blockState->SEWMt>8);
+inline static Bool forceSEW8(riscvMorphStateP state, iterDescP id) {
+    return isSEW8(state->attrs->vShape) && (id->SEW>8);
 }
 
 //
@@ -4056,9 +4055,9 @@ static riscvVLMULMt getVLMULMt(riscvMorphStateP state) {
 }
 
 //
-// Return raw SEW for the current vector operation (ignores fixed SEW)
+// Get effective SEW
 //
-static riscvSEWMt getSEWMtRaw(riscvMorphStateP state) {
+static riscvSEWMt getSEWMt(riscvMorphStateP state) {
 
     riscvP           riscv      = state->riscv;
     riscvBlockStateP blockState = riscv->blockState;
@@ -4075,36 +4074,9 @@ static riscvSEWMt getSEWMtRaw(riscvMorphStateP state) {
 }
 
 //
-// Return SEW for the current vector operation
-//
-static riscvSEWMt getSEWMt(riscvMorphStateP state) {
-
-    riscvSEWMt SEW = getSEWMtRaw(state);
-
-    // force operation SEW to 8 if required
-    if(forceSEW8(state)) {
-        SEW = SEWMT_8;
-    }
-
-    return SEW;
-}
-
-//
-// Get effective maximum vector length
-//
-static Uns32 getVLMAXMt(riscvMorphStateP state) {
-
-    riscvP       riscv = state->riscv;
-    riscvSEWMt   SEW   = getSEWMtRaw(state);
-    riscvVLMULMt VLMUL = getVLMULMt(state);
-
-    return riscv->configInfo.VLEN*VLMUL/SEW;
-}
-
-//
 // Get effective zero/non-zero/max vector length
 //
-static riscvVLClassMt getVLClassMt(riscvMorphStateP state) {
+static riscvVLClassMt getVLClassMt(riscvMorphStateP state, iterDescP id) {
 
     riscvP           riscv      = state->riscv;
     riscvBlockStateP blockState = riscv->blockState;
@@ -4112,8 +4084,10 @@ static riscvVLClassMt getVLClassMt(riscvMorphStateP state) {
 
     if(vlClass==VLCLASSMT_UNKNOWN) {
 
-        Uns32 vl    = RD_CSR(riscv, vl);
-        Uns32 vlMax = getVLMAXMt(state);
+        riscvSEWMt   SEW   = id->SEW;
+        riscvVLMULMt VLMUL = id->VLMUL;
+        Uns32        vl    = RD_CSR(riscv, vl);
+        Uns32        vlMax = id->VLEN*VLMUL/SEW;
 
         emitCheckPolymorphic();
 
@@ -4128,34 +4102,39 @@ static riscvVLClassMt getVLClassMt(riscvMorphStateP state) {
         blockState->VLClassMt = vlClass;
     }
 
-    // force operation class to non-zero if maximum but SEW is restricted
-    if(forceSEW8(state) && (vlClass==VLCLASSMT_MAX)) {
-        vlClass = VLCLASSMT_NONZERO;
-    }
-
     return vlClass;
+}
+
+//
+// Get effective maximum vector length for this operation
+//
+inline static Uns32 getVLMAXOp(iterDescP id) {
+    return id->VLEN*id->VLMUL/id->SEW;
 }
 
 //
 // Return effective VLMUL for operation Nth vector argument
 //
-static Uns32 getVLMULMtN(riscvMorphStateP state, Uns32 argIndex) {
+static Uns32 getVLMULMtN(riscvMorphStateP state, iterDescP id, Uns32 argIndex) {
 
     riscvVShape vShape = state->attrs->vShape;
 
-    return argIsGroup(vShape, argIndex) ? getVLMULMt(state) : 1;
+    return argIsGroup(vShape, argIndex) ? id->VLMUL : 1;
 }
 
 //
 // Return number of vector registers accessed by operation Nth vector argument
 //
-static riscvVLMULMt getVRegNumN(riscvMorphStateP state, Uns32 argIndex) {
-
+static riscvVLMULMt getVRegNumN(
+    riscvMorphStateP state,
+    iterDescP        id,
+    Uns32            argIndex
+) {
     riscvVShape  vShape = state->attrs->vShape;
     riscvVLMULMt result = 1;
 
     if(argIsGroup(vShape, argIndex)) {
-        result = getVLMULMt(state)*getWidthMultiplierN(vShape, argIndex);
+        result = id->VLMUL * getWidthMultiplierN(vShape, argIndex);
     }
 
     return result;
@@ -4165,8 +4144,11 @@ static riscvVLMULMt getVRegNumN(riscvMorphStateP state, Uns32 argIndex) {
 // Return the maximum number of vector registers targeted by any vector
 // argument
 //
-static riscvVLMULMt getVRegNumMax(riscvMorphStateP state, riscvVShape vShape) {
-
+static riscvVLMULMt getVRegNumMax(
+    riscvMorphStateP state,
+    iterDescP        id,
+    riscvVShape      vShape
+) {
     riscvVLMULMt result = 0;
     Uns32        i;
 
@@ -4176,7 +4158,7 @@ static riscvVLMULMt getVRegNumMax(riscvMorphStateP state, riscvVShape vShape) {
 
         if(isVReg(rA)) {
 
-            riscvVLMULMt argVRegNum = getVRegNumN(state, i);
+            riscvVLMULMt argVRegNum = getVRegNumN(state, id, i);
 
             if(result<argVRegNum) {
                 result = argVRegNum;
@@ -4185,6 +4167,33 @@ static riscvVLMULMt getVRegNumMax(riscvMorphStateP state, riscvVShape vShape) {
     }
 
     return result;
+}
+
+//
+// Return the number of vector registers affected by a vector operation
+//
+static Uns32 getVRegNum(riscvMorphStateP state, iterDescP id) {
+
+    Uns32        fieldNum = state->info.nf+1;
+    riscvVLMULMt VLMUL    = id->VLMUL;
+
+    return VLMUL*fieldNum;
+}
+
+//
+// Is the load/store vector register index legal (register numbers must not
+// increment past the last-supported vector register)
+//
+static Bool legalVRegIndex(
+    riscvMorphStateP state,
+    iterDescP        id,
+    Uns32            index
+) {
+    riscvRegDesc rv      = getRVReg(state, index);
+    Uns32        numRegs = getVRegNum(state, id);
+    Uns32        last    = getRIndex(rv)+numRegs-1;
+
+    return last<VREG_NUM;
 }
 
 //
@@ -4226,7 +4235,7 @@ static Bool validateNoOverlap(riscvMorphStateP state, iterDescP id) {
     riscvRegDesc mask      = state->info.mask;
     riscvRegDesc rD        = getRVReg(state, 0);
     Uns32        index     = getRIndex(rD);
-    riscvVLMULMt dstRegNum = getVRegNumN(state, 0);
+    riscvVLMULMt dstRegNum = getVRegNumN(state, id, 0);
     overlapType  ot        = getOverlapType(vShape);
     Bool         ok        = True;
     Uns32        badMask   = 0;
@@ -4267,7 +4276,7 @@ static Bool validateNoOverlap(riscvMorphStateP state, iterDescP id) {
         if(isVReg(rA)) {
 
             Uns32        index     = getRIndex(rA);
-            riscvVLMULMt srcRegNum = getVRegNumN(state, srcNum);
+            riscvVLMULMt srcRegNum = getVRegNumN(state, id, srcNum);
 
             if((ot&OT_S) || (dstRegNum!=srcRegNum)) {
 
@@ -4322,7 +4331,7 @@ static Bool validateVArgWidths(riscvMorphStateP state, iterDescP id) {
     riscvP      riscv  = state->riscv;
     riscvVShape vShape = state->attrs->vShape;
     Uns32       mul    = getWidthMultiplier(vShape);
-    riscvSEWMt  SEW    = getSEWMt(state);
+    riscvSEWMt  SEW    = id->SEW;
     Bool        ok     = validateNoOverlap(state, id);
     Uns32       i;
 
@@ -4331,7 +4340,7 @@ static Bool validateVArgWidths(riscvMorphStateP state, iterDescP id) {
 
         // validate supported general argument widths
         riscvSEWMt   SEWxN   = mul * SEW;
-        riscvVLMULMt VLMULxN = getVRegNumMax(state, vShape);
+        riscvVLMULMt VLMULxN = getVRegNumMax(state, id, vShape);
 
         if(SEWxN>riscv->configInfo.ELEN) {
             ILLEGAL_INSTRUCTION_MESSAGE(riscv, "ISEW", "Illegal widened SEW");
@@ -4400,7 +4409,7 @@ static void widenOperands(riscvMorphStateP state, iterDescP id) {
             // detect arguments requiring extension
             if(mulA!=mul) {
 
-                riscvSEWMt srcSEW = getSEWMt(state);
+                riscvSEWMt srcSEW = id->SEW;
                 riscvSEWMt dstSEW = srcSEW * mul;
                 vmiReg     tmpA   = newTmp(state);
 
@@ -4495,12 +4504,16 @@ static void narrowResult(riscvMorphStateP state, iterDescP id) {
 //
 // Return VMI register for the given abstract vector register
 //
-static vmiReg getVMIRegV(riscvMorphStateP state, riscvRegDesc r, Uns32 i) {
-
+static vmiReg getVMIRegV(
+    riscvMorphStateP state,
+    iterDescP        id,
+    riscvRegDesc     r,
+    Uns32            i
+) {
     riscvP       riscv  = state->riscv;
     riscvVShape  vShape = state->attrs->vShape;
     Uns32        mulE   = getWidthMultiplierN(vShape, i);
-    riscvVLMULMt VLMUL  = getVLMULMtN(state, i)*mulE;
+    riscvVLMULMt VLMUL  = getVLMULMtN(state, id, i)*mulE;
     Uns32        index  = getRIndex(r);
 
     // validate register index is a multiple of the current VLMUL
@@ -4524,6 +4537,7 @@ inline static Uns32 getTopZeroMask(riscvRegDesc rdA) {
 //
 static Bool requireTopZero(
     riscvMorphStateP state,
+    iterDescP        id,
     riscvRegDesc     rdA,
     Uns32            VLMUL
 ) {
@@ -4549,7 +4563,7 @@ static Bool requireTopZero(
 
             // indicate top-zero state of register is known to be zero in this
             // view, unless SEW is forced to 8 by this instruction
-            if(!forceSEW8(state)) {
+            if(!forceSEW8(state, id)) {
                 blockState->VZeroTopMt[setIndex] |= mask;
             }
         }
@@ -4563,10 +4577,9 @@ static Bool requireTopZero(
 // point argument is sometimes not encoded in the instruction itself but instead
 // depends on the current SEW, so this needs to be filled when SEW is known
 //
-static riscvRegDesc setSEWBits(riscvMorphStateP state, riscvRegDesc rA) {
-
+static riscvRegDesc setSEWBits(iterDescP id, riscvRegDesc rA) {
     if(isFReg(rA) && !getRBits(rA)) {
-        rA = setRBits(rA, getSEWMt(state));
+        rA = setRBits(rA, id->SEW);
     }
 
     return rA;
@@ -4593,11 +4606,11 @@ static void getVectorOpRegisters(riscvMorphStateP state, iterDescP id) {
         if(!rA) {
             // no action
         } else if(!isVReg(rA)) {
-            r = getVMIRegFS(state, setSEWBits(state, rA));
+            r = getVMIRegFS(state, setSEWBits(id, rA));
         } else if(isScalarN(vShape, i)) {
             r = getVMIReg(riscv, rA);
         } else if(!isMaskN(vShape, i)) {
-            r = getVMIRegV(state, rA, i);
+            r = getVMIRegV(state, id, rA, i);
         } else {
             r = getVMIReg(riscv, rA);
             if(!i) {id->PdA = rA;}
@@ -4615,12 +4628,11 @@ static Bool isIndexedVRegisterStriped(
     iterDescP        id,
     Uns32            i
 ) {
-    riscvP       riscv  = state->riscv;
-    Uns32        VLEN   = riscv->configInfo.VLEN;
-    Uns32        SLEN   = riscv->configInfo.SLEN;
     riscvVShape  vShape = state->attrs->vShape;
     Uns32        mulE   = getWidthMultiplierN(vShape, i);
+    Uns32        VLEN   = id->VLEN;
     riscvVLMULMt VLMUL  = id->VLMUL*mulE;
+    Uns32        SLEN   = id->SLEN;
 
     return (VLMUL>1) && (VLEN>SLEN);
 }
@@ -4634,15 +4646,14 @@ static void getIndexedVRegisterInt(
     Uns32            i,
     vmiReg           index
 ) {
-    riscvP       riscv    = state->riscv;
-    Uns32        VLEN     = riscv->configInfo.VLEN;
-    Uns32        SLEN     = riscv->configInfo.SLEN;
     riscvVShape  vShape   = state->attrs->vShape;
     Uns32        mulE     = getWidthMultiplierN(vShape, i);
-    riscvVLMULMt VLMUL    = getVLMULMtN(state, i)*mulE;
+    riscvVLMULMt VLMUL    = getVLMULMtN(state, id, i)*mulE;
+    Uns32        VLEN     = id->VLEN;
+    Uns32        SLEN     = id->SLEN;
     riscvSEWMt   SEW      = id->SEW*mulE;
     Bool         striped  = (VLMUL>1) && (VLEN>SLEN);
-    Uns32        fieldNum = state->info.nf+1;
+    Uns32        fieldNum = id->nf+1;
     Uns32        vecBytes = VLEN/8*VLMUL*fieldNum;
 
     getIndexedRegister(state, id, &id->r[i], index, SEW, vecBytes, striped);
@@ -4653,8 +4664,7 @@ static void getIndexedVRegisterInt(
 //
 static void getIndexedMVMIReg(riscvMorphStateP state, iterDescP id, vmiReg *rP) {
 
-    riscvP riscv    = state->riscv;
-    Uns32  VLEN     = riscv->configInfo.VLEN;
+    Uns32  VLEN     = id->VLEN;
     Uns32  vecBytes = VLEN/8;
     vmiReg index    = CSR_REG_MT(vstart);
 
@@ -4720,7 +4730,7 @@ static riscvRegDesc getSegmentRegister(iterDescP id, riscvRegDesc rv, Uns32 i) {
 static vmiReg getSegmentRegisterV0(riscvMorphStateP state, iterDescP id, Uns32 i) {
 
     vmiReg       base  = id->r[0];
-    Int32        VLEN  = state->riscv->configInfo.VLEN;
+    Int32        VLEN  = id->VLEN;
     riscvRegDesc rv0   = getRVReg(state, 0);
     Int32        i1    = getSegmentRegisterIndex(id, rv0, 0);
     Int32        i2    = getSegmentRegisterIndex(id, rv0, i);
@@ -4753,24 +4763,57 @@ static void checkVStartZero(riscvMorphStateP state, iterDescP id) {
 }
 
 //
+// Validate vstart CSR is in range
+//
+static void validateVStart(
+    riscvMorphStateP state,
+    iterDescP        id,
+    vmiCondition     cond,
+    vmiLabelP        label
+) {
+    vmiReg vstart = CSR_REG_MT(vstart);
+
+    if(state->info.isWhole) {
+        vmimtCompareRCJumpLabel(32, cond, vstart, getVLMAXOp(id), label);
+    } else {
+        vmimtCompareRRJumpLabel(32, cond, vstart, CSR_REG_MT(vl), label);
+    }
+}
+
+//
+// Clamp vstart CSR to maximum value
+//
+static void clampVStart(riscvMorphStateP state, iterDescP id) {
+
+    vmiReg vstart = CSR_REG_MT(vstart);
+
+    if(state->info.isWhole) {
+        vmimtMoveRC(64, vstart, getVLMAXOp(id));
+    } else {
+        vmimtMoveExtendRR(64, vstart, 32, CSR_REG_MT(vl), False);
+    }
+}
+
+//
 // Handle non-zero vstart
 //
-static vmiLabelP handleNonZeroVStart(riscvMorphStateP state, Bool iterVStart) {
-
+static vmiLabelP handleNonZeroVStart(
+    riscvMorphStateP state,
+    iterDescP        id,
+    Bool             iterVStart
+) {
     riscvP           riscv      = state->riscv;
     riscvBlockStateP blockState = riscv->blockState;
     vmiLabelP        skip       = 0;
 
     if(!blockState->VStartZeroMt) {
 
-        vmiReg vstart = CSR_REG_MT(vstart);
-
         skip = vmimtNewLabel();
 
         if(!iterVStart) {
 
             // skip operation if required, vstart clamp not required
-            vmimtCompareRRJumpLabel(32, vmi_COND_NL, vstart, CSR_REG_MT(vl), skip);
+            validateVStart(state, id, vmi_COND_NL, skip);
 
         } else {
 
@@ -4778,10 +4821,10 @@ static vmiLabelP handleNonZeroVStart(riscvMorphStateP state, Bool iterVStart) {
             vmiLabelP doOp = vmimtNewLabel();
 
             // go if at least one element should be processed
-            vmimtCompareRRJumpLabel(32, vmi_COND_L, vstart, CSR_REG_MT(vl), doOp);
+            validateVStart(state, id, vmi_COND_L, doOp);
 
             // clamp vstart to vl if it is used as an iteration index
-            vmimtMoveExtendRR(64, vstart, 32, CSR_REG_MT(vl), False);
+            clampVStart(state, id);
 
             // go to zero extension operation
             vmimtUncondJumpLabel(skip);
@@ -4805,15 +4848,6 @@ static vmiLabelP handleNonZeroVStart(riscvMorphStateP state, Bool iterVStart) {
 //
 static Bool checkVectorOp(riscvMorphStateP state, iterDescP id) {
 
-    riscvP riscv = state->riscv;
-    Uns32  VLEN  = riscv->configInfo.VLEN;
-
-    // fill operation-specific data
-    id->VLMUL     = getVLMULMt(state);
-    id->SEW       = getSEWMt(state);
-    id->MLEN      = id->SEW/id->VLMUL;
-    id->vBytesMax = VLEN * id->VLMUL / 8;
-
     // call operation-specific argument check if required
     riscvCheckVFn checkCB = state->attrs->checkCB;
     return !checkCB || checkCB(state, id);
@@ -4825,7 +4859,7 @@ static Bool checkVectorOp(riscvMorphStateP state, iterDescP id) {
 static void startVectorOp(riscvMorphStateP state, iterDescP id, Bool iterVStart) {
 
     // handle non-zero vstart
-    id->skip = handleNonZeroVStart(state, iterVStart);
+    id->skip = handleNonZeroVStart(state, id, iterVStart);
 
     // call operation-specific initialization if required
     dispatchVector(state, state->attrs->initCB, id);
@@ -4862,8 +4896,6 @@ static void killBaseRegistersAndTemps(riscvMorphStateP state, iterDescP id) {
 //
 static void skipIfMask0(riscvMorphStateP state, iterDescP id) {
 
-    riscvP riscv = state->riscv;
-
     if(id->MLEN>=8) {
 
         // mask stride is a byte multiple: byte test and jump
@@ -4875,7 +4907,7 @@ static void skipIfMask0(riscvMorphStateP state, iterDescP id) {
     } else {
 
         // mask stride is not a byte multiple: bit test and jump
-        Uns32  VLEN   = riscv->configInfo.VLEN;
+        Uns32  VLEN   = id->VLEN;
         vmiReg vstart = CSR_REG_MT(vstart);
         vmiReg mbit   = vstart;
         Uns32  shift  = mulToShiftP2(id->MLEN);
@@ -4924,9 +4956,12 @@ static void endVectorLoop(riscvMorphStateP state, iterDescP id, vmiLabelP loop) 
         vmimtInsertLabel(id->maskF);
     }
 
-    // increment vstart and go if not done
+    // increment vstart
     vmimtBinopRC(32, vmi_ADD, vstart, 1, 0);
-    vmimtCompareRRJumpLabel(32, vmi_COND_L, vstart, CSR_REG_MT(vl), loop);
+
+    // terminate when either vl or vlmax is reached (depending on whether this
+    // is a whole-register operation)
+    validateVStart(state, id, vmi_COND_L, loop);
 }
 
 //
@@ -4964,7 +4999,7 @@ static void zeroVdPdTopPE(
     Uns32            zeroVd
 ) {
     riscvP       riscv   = state->riscv;
-    Uns32        VLEN    = riscv->configInfo.VLEN;
+    Uns32        VLEN    = id->VLEN;
     Uns32        elemNum = VLEN/id->MLEN;
     riscvRegDesc PdA     = id->PdA;
     vmiLabelP    loop    = vmimtNewLabel();
@@ -5000,7 +5035,7 @@ static void zeroVdPdTopPE(
         getIndexedVRegister(state, id, 0);
 
         // iterate over all segment registers affected
-        for(i=0; i<=state->info.nf; i++) {
+        for(i=0; i<=id->nf; i++) {
 
             if(zeroVd & getTopZeroVdMask(i)) {
 
@@ -5032,7 +5067,7 @@ static void zeroVdPdTopBLT(
     Uns32            zeroVd
 ) {
     riscvP       riscv   = state->riscv;
-    Uns32        VLEN    = riscv->configInfo.VLEN;
+    Uns32        VLEN    = id->VLEN;
     Uns32        elemNum = VLEN/id->MLEN;
     riscvRegDesc PdA     = id->PdA;
     vmiReg       vstart  = CSR_REG_MT(vstart);
@@ -5063,7 +5098,7 @@ static void zeroVdPdTopBLT(
         vmimtBinopRCR(32, vmi_SUB, t0, elemNum, vstart, 0);
 
         // iterate over all segment registers affected
-        for(i=0; i<=state->info.nf; i++) {
+        for(i=0; i<=id->nf; i++) {
 
             if(zeroVd & getTopZeroVdMask(i)) {
 
@@ -5087,7 +5122,7 @@ static vmiLabelP zeroVdPdTop(riscvMorphStateP state, iterDescP id) {
 
     riscvRegDesc PdA    = id->PdA;
     riscvRegDesc VdA    = getRVReg(state, 0);
-    Bool         zeroPd = requireTopZero(state, PdA, 1);
+    Bool         zeroPd = requireTopZero(state, id, PdA, 1);
     Uns32        zeroVd = 0;
     vmiLabelP    noZero = 0;
     Uns32        i;
@@ -5095,8 +5130,9 @@ static vmiLabelP zeroVdPdTop(riscvMorphStateP state, iterDescP id) {
     // construct a mask of vector registers affected by this operation that
     // require top-zero update
     if((VdA!=PdA) && isVReg(VdA)) {
-        for(i=0; i<=state->info.nf; i++) {
-            if(requireTopZero(state, getSegmentRegister(id, VdA, i), id->VLMUL)) {
+        for(i=0; i<=id->nf; i++) {
+            riscvRegDesc sr = getSegmentRegister(id, VdA, i);
+            if(requireTopZero(state, id, sr, id->VLMUL)) {
                 zeroVd |= getTopZeroVdMask(i);
             }
         }
@@ -5231,6 +5267,53 @@ static Bool emitCheckVILL(riscvMorphStateP state) {
 }
 
 //
+// Validate vector instruction argument widths
+//
+static riscvVLClassMt fillVectorOperationData(
+    riscvMorphStateP state,
+    iterDescP        id
+) {
+    riscvP         riscv = state->riscv;
+    riscvVLClassMt vlClass;
+
+    // configure either for normal or whole-register operations
+    if(state->info.isWhole) {
+        id->VLMUL = 1;
+        id->VLEN  = riscv->configInfo.VLEN * (state->info.nf+1);
+        id->SEW   = riscv->configInfo.ELEN;
+        id->SLEN  = id->VLEN;
+        id->nf    = 0;
+        vlClass   = VLCLASSMT_MAX;
+    } else {
+        id->VLMUL = getVLMULMt(state);
+        id->VLEN  = riscv->configInfo.VLEN;
+        id->SEW   = getSEWMt(state);
+        id->SLEN  = riscv->configInfo.SLEN;
+        id->nf    = state->info.nf;
+        vlClass   = getVLClassMt(state, id);
+    }
+
+    // do actions required when SEW is forced to 8
+    if(forceSEW8(state, id)) {
+
+        // override effective SEW
+        id->SEW = SEWMT_8;
+
+        // force operation class to non-zero if maximum but SEW is restricted
+        if(vlClass==VLCLASSMT_MAX) {
+            vlClass = VLCLASSMT_NONZERO;
+        }
+    }
+
+    // set derived fields
+    id->MLEN      = id->SEW  / id->VLMUL;
+    id->vBytesMax = id->VLEN * id->VLMUL / 8;
+
+    // return effective class for this operation
+    return vlClass;
+}
+
+//
 // Emit code to dispatch a vector operation
 //
 static RISCV_MORPH_FN(emitVectorOp) {
@@ -5238,7 +5321,7 @@ static RISCV_MORPH_FN(emitVectorOp) {
     if(emitCheckVILL(state)) {
 
         iterDesc       id      = {0};
-        riscvVLClassMt vlClass = getVLClassMt(state);
+        riscvVLClassMt vlClass = fillVectorOperationData(state, &id);
 
         // fill all registers for a vector operation (NOTE: this can cause
         // Illegal Instruction exceptions for inappropriate register arguments,
@@ -5248,47 +5331,51 @@ static RISCV_MORPH_FN(emitVectorOp) {
         // validate vstart is zero if required
         checkVStartZero(state, &id);
 
-        if(validateVArgWidths(state, &id) && checkVectorOp(state, &id)) {
+        if(!validateVArgWidths(state, &id)) {
 
-            // no further action unless vector length is non-zero
-            if(vlClass!=VLCLASSMT_ZERO) {
+            // invalid argument widths
 
-                vmiLabelP   loop   = vmimtNewLabel();
-                riscvVShape vShape = state->attrs->vShape;
-                Uns32       SEWMul = getSEWMultiplier(vShape);
+        } else if(!checkVectorOp(state, &id)) {
 
-                // start a new vector operation
-                startVectorOp(state, &id, True);
+            // failed operation-specific check
 
-                // loop to here
-                vmimtInsertLabel(loop);
+        } else if(vlClass!=VLCLASSMT_ZERO) {
 
-                // do actions at start of vector loop
-                startVectorLoop(state, &id);
+            vmiLabelP   loop   = vmimtNewLabel();
+            riscvVShape vShape = state->attrs->vShape;
+            Uns32       SEWMul = getSEWMultiplier(vShape);
 
-                // update base registers for this iteration
-                getIndexedVRegisters(state, &id);
+            // start a new vector operation
+            startVectorOp(state, &id, True);
 
-                // widen source operands if required
-                widenOperands(state, &id);
+            // loop to here
+            vmimtInsertLabel(loop);
 
-                // do operation on one element, scaling the SEW if required
-                id.SEW *= SEWMul;
-                doPerElementOp(state, &id);
-                id.SEW /= SEWMul;
+            // do actions at start of vector loop
+            startVectorLoop(state, &id);
 
-                // narrow destination operands if required
-                narrowResult(state, &id);
+            // update base registers for this iteration
+            getIndexedVRegisters(state, &id);
 
-                // kill base registers and temporaries for this iteration
-                killBaseRegistersAndTemps(state, &id);
+            // widen source operands if required
+            widenOperands(state, &id);
 
-                // repeat until done
-                endVectorLoop(state, &id, loop);
+            // do operation on one element, scaling the SEW if required
+            id.SEW *= SEWMul;
+            doPerElementOp(state, &id);
+            id.SEW /= SEWMul;
 
-                // perform actions at end of instruction
-                endVectorOp(state, &id, vlClass);
-            }
+            // narrow destination operands if required
+            narrowResult(state, &id);
+
+            // kill base registers and temporaries for this iteration
+            killBaseRegistersAndTemps(state, &id);
+
+            // repeat until done
+            endVectorLoop(state, &id, loop);
+
+            // perform actions at end of instruction
+            endVectorOp(state, &id, vlClass);
         }
 
         // zero vstart register on instruction completion
@@ -5305,8 +5392,8 @@ static RISCV_MORPH_FN(emitScalarOp) {
     if(emitCheckVILL(state)) {
 
         iterDesc       id      = {0};
-        riscvVLClassMt vlClass = getVLClassMt(state);
         Bool           scalarD = !isVReg(getRVReg(state, 0));
+        riscvVLClassMt vlClass = fillVectorOperationData(state, &id);
 
         // fill all registers for a vector operation (NOTE: this can cause
         // Illegal Instruction exceptions for inappropriate register arguments,
@@ -5316,19 +5403,24 @@ static RISCV_MORPH_FN(emitScalarOp) {
         // validate vstart is zero if required
         checkVStartZero(state, &id);
 
-        if(validateVArgWidths(state, &id) && checkVectorOp(state, &id)) {
+        if(!validateVArgWidths(state, &id)) {
 
-            if(scalarD || (vlClass!=VLCLASSMT_ZERO)) {
+            // invalid argument widths
 
-                // start a new vector operation
-                startVectorOp(state, &id, False);
+        } else if(!checkVectorOp(state, &id)) {
 
-                // do operation on one element
-                doPerElementOp(state, &id);
+            // failed operation-specific check
 
-                // end vector operation
-                endVectorOp(state, &id, vlClass);
-            }
+        } else if(scalarD || (vlClass!=VLCLASSMT_ZERO)) {
+
+            // start a new vector operation
+            startVectorOp(state, &id, False);
+
+            // do operation on one element
+            doPerElementOp(state, &id);
+
+            // end vector operation
+            endVectorOp(state, &id, vlClass);
         }
 
         // zero vstart register on instruction completion
@@ -5342,10 +5434,46 @@ static RISCV_MORPH_FN(emitScalarOp) {
 ////////////////////////////////////////////////////////////////////////////////
 
 //
-// Should legacy vsetvl/vsetvli behavior be used?
+// This enumeration describes the options for setting vl using vsetvi/vsetvli
 //
-static Bool requireLegacySetVL(riscvP riscv) {
-    return vectVerLE(riscv, RVVV_0_7_1_P);
+typedef enum setVLOptionE {
+    SVT_SET,        // set to value in rs1
+    SVT_PRESERVE,   // preserve current vl
+    SVT_MAX         // set maximum vl
+} setVLOption;
+
+//
+// Return the option for setting vl using vsetvi/vsetvli
+//
+static setVLOption getSetVLOption(riscvMorphStateP state) {
+
+    riscvP       riscv = state->riscv;
+    riscvRegDesc rs1A  = getRVReg(state, 1);
+    vmiReg       rs1   = getVMIReg(riscv, rs1A);
+
+    if(!VMI_ISNOREG(rs1)) {
+
+        // set vl to rs1 if rs1!=zero
+        return SVT_SET;
+
+    } else if(vectVerLE(riscv, RVVV_0_7_1_P)) {
+
+        // legacy behavior when rs1=zero: set vl to maximum
+        return SVT_MAX;
+
+    } else if(vectVerLE(riscv, RVVV_0_8_20191117)) {
+
+        // legacy behavior when rs1=zero: preserve vl
+        return SVT_PRESERVE;
+
+    } else {
+
+        // new behavior: set vl to maximum if rd=zero, otherwise preserve it
+        riscvRegDesc rdA = getRVReg(state, 0);
+        vmiReg       rd  = getVMIReg(riscv, rdA);
+
+        return VMI_ISNOREG(rd) ? SVT_MAX : SVT_PRESERVE;
+    }
 }
 
 //
@@ -5429,19 +5557,38 @@ static Uns32 setMaxVLSEWLMUL(riscvP riscv, Uns32 vtypeBits) {
 }
 
 //
+// Emit variable rs1 argument for vsetvl/vsetvli
+//
+static void emitSetVLRS1Arg(riscvMorphStateP state) {
+
+    riscvRegDesc rs1A = getRVReg(state, 1);
+    vmiReg       rs1  = getVMIReg(state->riscv, rs1A);
+
+    vmimtArgReg(64, rs1);
+}
+
+//
 // Handle the first source argument of VSetVL
 //
-static vmiCallFn handleVSetVLArg1(riscvP riscv, vmiReg rs1) {
+static vmiCallFn handleVSetVLArg1(riscvMorphStateP state) {
 
-    Uns32 bits = 64;
+    setVLOption option = getSetVLOption(state);
 
-    if(!VMI_ISNOREG(rs1)) {
-        vmimtArgReg(bits, rs1);
+    if(option==SVT_SET) {
+
+        // set vl to rs1
+        emitSetVLRS1Arg(state);
         return (vmiCallFn)setVLSEWLMUL;
-    } else if(requireLegacySetVL(riscv)) {
+
+    } else if(option==SVT_MAX) {
+
+        // set vl to maximum
         return (vmiCallFn)setMaxVLSEWLMUL;
+
     } else {
-        vmimtArgReg(bits, CSR_REG_MT(vl));
+
+        // preserve vl
+        vmimtArgReg(64, CSR_REG_MT(vl));
         return (vmiCallFn)setVLSEWLMUL;
     }
 }
@@ -5461,16 +5608,14 @@ static void emitVSetVLRRRCB(riscvMorphStateP state) {
 
     riscvP       riscv = state->riscv;
     riscvRegDesc rdA   = getRVReg(state, 0);
-    riscvRegDesc rs1A  = getRVReg(state, 1);
     riscvRegDesc rs2A  = getRVReg(state, 2);
     vmiReg       rd    = getVMIReg(riscv, rdA);
-    vmiReg       rs1   = getVMIReg(riscv, rs1A);
     vmiReg       rs2   = getVMIReg(riscv, rs2A);
     Uns32        dBits = 32;
 
     // call function (may cause exception for invalid SEW)
     vmimtArgProcessor();
-    vmiCallFn cb = handleVSetVLArg1(riscv, rs1);
+    vmiCallFn cb = handleVSetVLArg1(state);
     vmimtArgReg(32, rs2);
     vmimtCallResultAttrs(cb, dBits, rd, VMCA_NO_INVALIDATE);
     writeRegSize(riscv, rdA, dBits);
@@ -5483,38 +5628,17 @@ static void emitVSetVLRRCCB(riscvMorphStateP state) {
 
     riscvP       riscv = state->riscv;
     riscvRegDesc rdA   = getRVReg(state, 0);
-    riscvRegDesc rs1A  = getRVReg(state, 1);
     vmiReg       rd    = getVMIReg(riscv, rdA);
-    vmiReg       rs1   = getVMIReg(riscv, rs1A);
     Uns8         vsew  = state->info.vsew;
     Uns8         vlmul = state->info.vlmul;
     Uns32        dBits = 32;
 
     // call update function (SEW is known to be valid)
     vmimtArgProcessor();
-    vmiCallFn cb = handleVSetVLArg1(riscv, rs1);
+    vmiCallFn cb = handleVSetVLArg1(state);
     vmimtArgUns32((vsew<<2)+vlmul);
     vmimtCallResultAttrs(cb, dBits, rd, VMCA_NO_INVALIDATE);
     writeRegSize(riscv, rdA, dBits);
-}
-
-//
-// Implement VSetVL <rd>, <rs1>, <rs2> operation
-//
-static RISCV_MORPH_FN(emitVSetVLRRR) {
-
-    // this instruction updates vtype and vl
-    emitUpdateVTypeVL();
-
-    // emit VSetVL <rd>, <rs1>, <rs2> embedded function call
-    emitVSetVLRRRCB(state);
-
-    // zero vstart register on instruction completion
-    setVStartZero(state);
-
-    // terminate the block after this instruction because SEW and VLMUL are
-    // now unknown
-    vmimtEndBlock();
 }
 
 //
@@ -5624,15 +5748,33 @@ static void emitVSetVLRR0SameVL(riscvMorphStateP state) {
 }
 
 //
+// Implement VSetVL <rd>, <rs1>, <rs2> operation
+//
+static RISCV_MORPH_FN(emitVSetVLRRR) {
+
+    // this instruction updates vtype and vl
+    emitUpdateVTypeVL();
+
+    // emit VSetVL <rd>, <rs1>, <rs2> embedded function call
+    emitVSetVLRRRCB(state);
+
+    // zero vstart register on instruction completion
+    setVStartZero(state);
+
+    // terminate the block after this instruction because SEW and VLMUL are
+    // now unknown
+    vmimtEndBlock();
+}
+
+//
 // Implement VSetVL <rd>, <rs1>, <vtypei> operation
 //
 static RISCV_MORPH_FN(emitVSetVLRRC) {
 
-    riscvP       riscv = state->riscv;
-    riscvRegDesc rs1A  = getRVReg(state, 1);
-    vmiReg       rs1   = getVMIReg(riscv, rs1A);
-    Uns8         vsew  = state->info.vsew;
-    riscvSEWMt   SEW   = riscvValidSEW(riscv, vsew);
+    riscvP      riscv  = state->riscv;
+    Uns8        vsew   = state->info.vsew;
+    riscvSEWMt  SEW    = riscvValidSEW(riscv, vsew);
+    setVLOption option = getSetVLOption(state);
 
     // this instruction updates vtype and vl
     emitUpdateVTypeVL();
@@ -5645,7 +5787,7 @@ static RISCV_MORPH_FN(emitVSetVLRRC) {
         // terminate the block after this instruction
         vmimtEndBlock();
 
-    } else if(!VMI_ISNOREG(rs1)) {
+    } else if(option==SVT_SET) {
 
         // update to unknown vector length
         emitVSetVLRRCCB(state);
@@ -5654,7 +5796,7 @@ static RISCV_MORPH_FN(emitVSetVLRRC) {
         // unknown
         vmimtEndBlock();
 
-    } else if(requireLegacySetVL(riscv)) {
+    } else if(option==SVT_MAX) {
 
         // update to maximum vector length
         emitVSetVLRR0MaxVL(state);
@@ -5677,12 +5819,12 @@ static RISCV_MORPH_FN(emitVSetVLRRC) {
 //
 // Return the memory element size in bits
 //
-static Uns32 getVMemBits(riscvMorphStateP state) {
+static Uns32 getVMemBits(riscvMorphStateP state, iterDescP id) {
 
     Uns32 memBits = state->info.memBits;
 
     if(memBits==-1) {
-        memBits = getSEWMt(state);
+        memBits = id->SEW;
     }
 
     return memBits;
@@ -5696,36 +5838,12 @@ inline static Bool legalVMemBits(riscvSEWMt SEW, Uns32 memBits) {
 }
 
 //
-// Return the number of vector registers affected by a vector load/store
-//
-static Uns32 getVLdStRegNum(riscvMorphStateP state) {
-
-    Uns32        fieldNum = state->info.nf+1;
-    riscvVLMULMt VLMUL    = getVLMULMt(state);
-
-    return VLMUL*fieldNum;
-}
-
-//
-// Is the load/store vector register index legal (register numbers must not
-// increment past the last-supported vector register)
-//
-static Bool legalVLdStVRegIndex(riscvMorphStateP state) {
-
-    riscvRegDesc rv0     = getRVReg(state, 0);
-    Uns32        numRegs = getVLdStRegNum(state);
-    Uns32        last    = getRIndex(rv0)+numRegs-1;
-
-    return last<VREG_NUM;
-}
-
-//
 // Operation-specific argument checks for loads and stores
 //
 static RISCV_CHECKV_FN(emitVLdStCheckCB) {
 
     riscvP riscv   = state->riscv;
-    Uns32  memBits = getVMemBits(state);
+    Uns32  memBits = getVMemBits(state, id);
     Bool   ok      = True;
 
     if(!legalVMemBits(id->SEW, memBits)) {
@@ -5738,22 +5856,56 @@ static RISCV_CHECKV_FN(emitVLdStCheckCB) {
 
         // not Zvlsseg extension instruction
 
-    } else if(!riscv->configInfo.Zvlsseg) {
+    } else if(!(riscv->configInfo.Zvlsseg || state->info.isWhole)) {
 
         // VLMUL must be 1 for load/store segment instructions
         ILLEGAL_INSTRUCTION_MESSAGE(riscv, "IVLSEG", "Zvlsseg extension not configured");
         ok = False;
 
-    } else if(getVLdStRegNum(state)>8) {
+    } else if(getVRegNum(state, id)>8) {
 
         // VLMUL*NFIELDS must not exceed 8 for load/store segment instructions
         ILLEGAL_INSTRUCTION_MESSAGE(riscv, "IVLMUL", "Illegal VLMUL*NFIELDS>8");
         ok = False;
 
-    } else if(!legalVLdStVRegIndex(state)) {
+    } else if(!legalVRegIndex(state, id, 0)) {
 
         // register indices must not wrap
         ILLEGAL_INSTRUCTION_MESSAGE(riscv, "IVWRAP", "Illegal vector index wrap-around");
+        ok = False;
+    }
+
+    return ok;
+}
+
+//
+// Operation-specific argument checks for vmv<n>r.v
+//
+static RISCV_CHECKV_FN(emitVMVRCheckCB) {
+
+    riscvP       riscv  = state->riscv;
+    riscvRegDesc rdA    = getRVReg(state, 0);
+    riscvRegDesc rsA    = getRVReg(state, 1);
+    Uns32        dIndex = getRIndex(rdA);
+    Uns32        sIndex = getRIndex(rsA);
+    Bool         ok     = True;
+
+    if(!legalVRegIndex(state, id, 0)) {
+
+        // destination register indices must not wrap
+        ILLEGAL_INSTRUCTION_MESSAGE(riscv, "IVWRAPD", "Illegal destination vector index wrap-around");
+        ok = False;
+
+    } else if(!legalVRegIndex(state, id, 1)) {
+
+        // source register indices must not wrap
+        ILLEGAL_INSTRUCTION_MESSAGE(riscv, "IVWRAPS", "Illegal source vector index wrap-around");
+        ok = False;
+
+    } else if((dIndex>sIndex) && ((dIndex-sIndex)<getVRegNum(state, id))) {
+
+        // illegal destination/source overlap
+        ILLEGAL_INSTRUCTION_MESSAGE(riscv, "IVDSOV", "Illegal destination/source vector overlap");
         ok = False;
     }
 
@@ -5792,8 +5944,8 @@ static vmiReg emitVLdStUOffset(riscvMorphStateP state, iterDescP id) {
     riscvRegDesc rs1A     = getRVReg(state, 1);
     vmiReg       ra       = newTmp(state);
     Uns32        raBits   = getRBits(rs1A);
-    Uns32        fieldNum = state->info.nf+1;
-    Uns32        memBits  = getVMemBits(state) * fieldNum;
+    Uns32        fieldNum = id->nf+1;
+    Uns32        memBits  = getVMemBits(state, id) * fieldNum;
     vmiReg       vstart   = CSR_REG_MT(vstart);
     Uns32        scale    = memBits>>3;
     Uns32        shift    = mulToShiftLeft(scale);
@@ -5846,7 +5998,7 @@ static vmiReg emitVLdStIOffset(riscvMorphStateP state, iterDescP id) {
 //
 static void emitVLdInt(riscvMorphStateP state, iterDescP id, vmiReg ra) {
 
-    Uns32     memBits  = getVMemBits(state);
+    Uns32     memBits  = getVMemBits(state, id);
     Uns32     memBytes = memBits/8;
     vmiLabelP skip     = state->info.isFF ? vmimtNewLabel() : 0;
     Uns32     i;
@@ -5854,7 +6006,7 @@ static void emitVLdInt(riscvMorphStateP state, iterDescP id, vmiReg ra) {
     // add base
     emitVLdStAddBase(state, id, ra);
 
-    for(i=0; i<=state->info.nf; i++) {
+    for(i=0; i<=id->nf; i++) {
 
         vmiReg vd    = getSegmentRegisterV0(state, id, i);
         vmiReg vdTmp = skip ? newTmp(state) : vd;
@@ -5889,14 +6041,14 @@ static void emitVLdInt(riscvMorphStateP state, iterDescP id, vmiReg ra) {
 //
 static void emitVStInt(riscvMorphStateP state, iterDescP id, vmiReg ra) {
 
-    Uns32 memBits  = getVMemBits(state);
+    Uns32 memBits  = getVMemBits(state, id);
     Uns32 memBytes = memBits/8;
     Uns32 i;
 
     // add base
     emitVLdStAddBase(state, id, ra);
 
-    for(i=0; i<=state->info.nf; i++) {
+    for(i=0; i<=id->nf; i++) {
 
         vmiReg vs = getSegmentRegisterV0(state, id, i);
 
@@ -5916,7 +6068,7 @@ static void emitVStInt(riscvMorphStateP state, iterDescP id, vmiReg ra) {
 // Per-element callback for unit-stride loads
 //
 static RISCV_MORPHV_FN(emitVLdUCB) {
-    if(legalVMemBits(id->SEW, getVMemBits(state))) {
+    if(legalVMemBits(id->SEW, getVMemBits(state, id))) {
         emitVLdInt(state, id, emitVLdStUOffset(state, id));
     }
 }
@@ -5925,7 +6077,7 @@ static RISCV_MORPHV_FN(emitVLdUCB) {
 // Per-element callback for unit-stride stores
 //
 static RISCV_MORPHV_FN(emitVStUCB) {
-    if(legalVMemBits(id->SEW, getVMemBits(state))) {
+    if(legalVMemBits(id->SEW, getVMemBits(state, id))) {
         emitVStInt(state, id, emitVLdStUOffset(state, id));
     }
 }
@@ -5934,7 +6086,7 @@ static RISCV_MORPHV_FN(emitVStUCB) {
 // Per-element callback for strided loads
 //
 static RISCV_MORPHV_FN(emitVLdSCB) {
-    if(legalVMemBits(id->SEW, getVMemBits(state))) {
+    if(legalVMemBits(id->SEW, getVMemBits(state, id))) {
         emitVLdInt(state, id, emitVLdStSOffset(state, id));
     }
 }
@@ -5943,7 +6095,7 @@ static RISCV_MORPHV_FN(emitVLdSCB) {
 // Per-element callback for strided stores
 //
 static RISCV_MORPHV_FN(emitVStSCB) {
-    if(legalVMemBits(id->SEW, getVMemBits(state))) {
+    if(legalVMemBits(id->SEW, getVMemBits(state, id))) {
         emitVStInt(state, id, emitVLdStSOffset(state, id));
     }
 }
@@ -5952,7 +6104,7 @@ static RISCV_MORPHV_FN(emitVStSCB) {
 // Per-element callback for indexed loads
 //
 static RISCV_MORPHV_FN(emitVLdICB) {
-    if(legalVMemBits(id->SEW, getVMemBits(state))) {
+    if(legalVMemBits(id->SEW, getVMemBits(state, id))) {
         emitVLdInt(state, id, emitVLdStIOffset(state, id));
     }
 }
@@ -5961,7 +6113,7 @@ static RISCV_MORPHV_FN(emitVLdICB) {
 // Per-element callback for indexed stores
 //
 static RISCV_MORPHV_FN(emitVStICB) {
-    if(legalVMemBits(id->SEW, getVMemBits(state))) {
+    if(legalVMemBits(id->SEW, getVMemBits(state, id))) {
         emitVStInt(state, id, emitVLdStIOffset(state, id));
     }
 }
@@ -5978,7 +6130,7 @@ static Bool doVAMOCheck(riscvMorphStateP state, iterDescP id, Bool verbose) {
 
     riscvP riscv   = state->riscv;
     Uns32  XLEN    = riscvGetXlenMode(riscv);
-    Uns32  memBits = getVMemBits(state);
+    Uns32  memBits = getVMemBits(state, id);
     Bool   ok      = True;
 
     if(!legalVMemBits(id->SEW, memBits)) {
@@ -6494,6 +6646,14 @@ static RISCV_MORPHV_FN(emitVIMERGETCB) {
 static RISCV_MORPHV_FN(emitVRMERGEFCB) {
 
     vmimtMoveRR(id->SEW, id->r[0], id->r[1]);
+}
+
+//
+// Per-element callback for integer instructions with one register operand
+//
+static RISCV_MORPHV_FN(emitVRUnaryIntCB) {
+
+    vmimtUnopRR(id->SEW, state->attrs->unop, id->r[0], id->r[1], 0);
 }
 
 //
@@ -7072,7 +7232,7 @@ static RISCV_MORPHV_FN(endVRedCB) {
     Uns32       mulE   = getWidthMultiplierN(vShape, 0);
 
     // zero target register
-    zeroTail(riscv, riscv->configInfo.VLEN, id->r[0]);
+    zeroTail(riscv, id->VLEN, id->r[0]);
 
     // set element 0 of target register
     vmimtMoveRR(id->SEW*mulE, id->r[0], RISCV_VTMP);
@@ -7356,7 +7516,7 @@ static RISCV_MORPHV_FN(emitVEXTXV) {
 
         Uns32      offsetBits = IMPERAS_POINTER_BITS;
         vmiReg     index      = newTmp(state);
-        Uns32      VLEN       = riscv->configInfo.VLEN;
+        Uns32      VLEN       = id->VLEN;
         riscvSEWMt SEW        = id->SEW;
         Uns32      eNum       = VLEN/SEW;
         Uns32      indexBits  = (offsetBits<rdBits) ? offsetBits : rdBits;
@@ -7400,7 +7560,7 @@ static RISCV_MORPHV_FN(emitVMVSX) {
     Uns32        sBits = getMinBits(id, getRBits(rs1A));
 
     // zero target register
-    zeroTail(riscv, riscv->configInfo.VLEN, vd);
+    zeroTail(riscv, id->VLEN, vd);
 
     // assign element 0 of result
     vmimtMoveExtendRR(id->SEW, vd, sBits, rs1, False);
@@ -7436,7 +7596,7 @@ static RISCV_MORPHV_FN(emitVFMVSF) {
     Uns32        sBits = getMinBits(id, getRBits(fs1A));
 
     // zero target register
-    zeroTail(riscv, riscv->configInfo.VLEN, vd);
+    zeroTail(riscv, id->VLEN, vd);
 
     // assign element 0 of result
     vmimtMoveRR(sBits, vd, fs1);
@@ -7618,7 +7778,7 @@ static RISCV_MORPHV_FN(emitVRSLIDE1DOWNCB) {
 //
 static RISCV_MORPHV_FN(emitVRRGATHERCB) {
 
-    Uns32     vlMax      = getVLMAXMt(state);
+    Uns32     vlMax      = getVLMAXOp(id);
     Uns32     offsetBits = IMPERAS_POINTER_BITS;
     vmiLabelP skip       = vmimtNewLabel();
     vmiReg    offset     = id->r[2];
@@ -7642,9 +7802,9 @@ static RISCV_MORPHV_FN(emitVRRGATHERCB) {
 //
 // Is the constant offset for this instruction less than effective VLMAX?
 //
-static Bool offsetLTVLMax(riscvMorphStateP state) {
+static Bool offsetLTVLMax(riscvMorphStateP state, iterDescP id) {
 
-    Uns32 vlMax  = getVLMAXMt(state);
+    Uns32 vlMax  = getVLMAXOp(id);
     Uns32 offset = state->info.c;
 
     return (offset<vlMax);
@@ -7656,7 +7816,7 @@ static Bool offsetLTVLMax(riscvMorphStateP state) {
 static RISCV_MORPHV_FN(initVIRGATHERCB) {
 
     // prepare operation-constant source value if index is in range
-    if(offsetLTVLMax(state)) {
+    if(offsetLTVLMax(state, id)) {
 
         Uns32  offsetBits = IMPERAS_POINTER_BITS;
         vmiReg index      = RISCV_VTMP;
@@ -7677,7 +7837,7 @@ static RISCV_MORPHV_FN(initVIRGATHERCB) {
 //
 static RISCV_MORPHV_FN(emitVIRGATHERCB) {
 
-    if(offsetLTVLMax(state)) {
+    if(offsetLTVLMax(state, id)) {
         vmimtMoveRR(id->SEW, id->r[0], RISCV_VTMP);
     } else {
         vmimtMoveRC(id->SEW, id->r[0], 0);
@@ -7691,10 +7851,10 @@ static RISCV_MORPHV_FN(initVCOMPRESSCB) {
 
     riscvP       riscv      = state->riscv;
     Uns32        offsetBits = IMPERAS_POINTER_BITS;
-    riscvVLMULMt VLMUL      = getVLMULMtN(state, 0);
+    riscvVLMULMt VLMUL      = getVLMULMtN(state, id, 0);
 
     // zero target register
-    zeroTail(riscv, riscv->configInfo.VLEN*VLMUL, id->r[0]);
+    zeroTail(riscv, id->VLEN*VLMUL, id->r[0]);
 
     // zero target index
     vmimtMoveRC(offsetBits, RISCV_VTMP, 0);
@@ -8121,6 +8281,7 @@ const static riscvMorphAttr dispatchTable[] = {
     [RV_IT_VSADD_VI]         = {morph:emitVectorOp, opTCB:emitVISBinaryCB,   binop:vmi_ADDSQ,        argType:RVVX_SS},
     [RV_IT_VAADD_VI]         = {morph:emitVectorOp, opTCB:emitVIABinaryCB,   binop:vmi_ADDSH,        argType:RVVX_SS},
     [RV_IT_VSLL_VI]          = {morph:emitVectorOp, opTCB:emitVIShiftIntCB,  binop:vmi_SHL},
+    [RV_IT_VMVR_VI]          = {morph:emitVectorOp, opTCB:emitVRUnaryIntCB,  unop :vmi_MOV, checkCB:emitVMVRCheckCB},
     [RV_IT_VSRL_VI]          = {morph:emitVectorOp, opTCB:emitVIShiftIntCB,  binop:vmi_SHR},
     [RV_IT_VSRA_VI]          = {morph:emitVectorOp, opTCB:emitVIShiftIntCB,  binop:vmi_SAR},
     [RV_IT_VSSRL_VI]         = {morph:emitVectorOp, opTCB:emitVIRShiftIntCB, binop:vmi_SHR},
