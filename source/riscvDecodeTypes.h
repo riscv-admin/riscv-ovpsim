@@ -381,6 +381,7 @@ typedef enum riscvITypeE {
     RV_IT_VSADD_VI,
     RV_IT_VAADD_VI,
     RV_IT_VSLL_VI,
+    RV_IT_VMVR_VI,
     RV_IT_VSRL_VI,
     RV_IT_VSRA_VI,
     RV_IT_VSSRL_VI,
@@ -518,6 +519,7 @@ typedef struct riscvInstrInfoS {
     Uns8              vsew;             // vsew value
     Uns8              vlmul;            // vmul value
     Uns8              nf;               // nf value
+    Bool              isWhole;          // is this a whole-register instruction?
     Bool              isFF;             // is this a first-fault instruction?
 
 } riscvInstrInfo;

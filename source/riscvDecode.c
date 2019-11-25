@@ -147,12 +147,14 @@ inline static riscvVectVer vectorVersion(riscvP riscv) {
 #define U_13_12(_I)         UBITS(2, (_I)>>12)
 #define U_14(_I)            UBITS(1, (_I)>>14)
 #define U_14_12(_I)         UBITS(3, (_I)>>12)
+#define U_17_15(_I)         UBITS(3, (_I)>>15)
 #define U_19_12(_I)         UBITS(8, (_I)>>12)
 #define U_19_15(_I)         UBITS(5, (_I)>>15)
 #define U_20(_I)            UBITS(1, (_I)>>20)
 #define U_21(_I)            UBITS(1, (_I)>>21)
 #define U_21_20(_I)         UBITS(2, (_I)>>20)
 #define U_23_20(_I)         UBITS(4, (_I)>>20)
+#define U_23(_I)            UBITS(1, (_I)>>23)
 #define U_24(_I)            UBITS(1, (_I)>>24)
 #define U_24_20(_I)         UBITS(5, (_I)>>20)
 #define U_24_22(_I)         UBITS(3, (_I)>>22)
@@ -348,6 +350,15 @@ typedef enum vlmulSpecE {
 //
 // Define the encoding of vector vlmul specifier in an instruction
 //
+typedef enum wholeSpecE {
+    WR_NA,              // not whole register
+    WR_T,               // always whole register
+    WR_23,              // whole register in bit 23
+} wholeSpec;
+
+//
+// Define the encoding of vector vlmul specifier in an instruction
+//
 typedef enum firstFaultSpecE {
     FF_NA,              // not first-fault
     FF_24,              // first-fault in bit 24
@@ -359,6 +370,7 @@ typedef enum firstFaultSpecE {
 typedef enum numFieldsSpecE {
     NF_NA,              // no nf
     NF_31_29,           // nf in bits 31:29
+    NF_17_15,           // nf in bits 17:15
 } numFieldsSpec;
 
 //
@@ -386,11 +398,12 @@ typedef struct opAttrsS {
     unsExtSpec        unsExt   :  4;    // unsigned extend specification
     Uns32             priDelta :  4;    // decode priority delta
     rmSpec            rm       :  4;    // rounding mode specification
+    numFieldsSpec     nf       :  4;    // nf specification
+    wholeSpec         whole    :  4;    // whole register specification
     aqrlSpec          aqrl     :  1;    // acquire/release specification
     vsewSpec          vsew     :  1;    // vsew specification
     vlmulSpec         vlmul    :  1;    // vlmul specification
     firstFaultSpec    ff       :  1;    // first fault specification
-    numFieldsSpec     nf       :  1;    // nf specification
     Bool              csrInOp  :  1;    // whether to emit CSR as part of opcode
     Bool              xQuiet   :  1;    // are X registers type-quiet?
 } opAttrs;
@@ -824,6 +837,7 @@ typedef enum riscvIType32E {
     IT32_VSADD_VI,
     IT32_VAADD_VI,
     IT32_VSLL_VI,
+    IT32_VMVR_VI,
     IT32_VSRL_VI,
     IT32_VSRA_VI,
     IT32_VSSRL_VI,
@@ -1653,6 +1667,11 @@ const static decodeEntry32 decodePre20190906[] = {
 //
 const static decodeEntry32 decodePost20191004[] = {
 
+    // V-extension load/store instructions (whole registers)
+    //                               | nf|mop|m|  xs2|  rs1|wth|  vs3| opcode|
+    DECODE32_ENTRY(          VLE_I, "|...|000|1|01000|.....|111|.....|0000111|"),
+    DECODE32_ENTRY(          VSE_I, "|...|000|1|01000|.....|111|.....|0100111|"),
+
     // V-extension IVV-type instructions
     //                               |funct6|m|  vs2|  vs1|IVV|  vs3| opcode|
     DECODE32_ENTRY(        VADC_VV, "|010000|0|.....|.....|000|.....|1010111|"),
@@ -1674,6 +1693,7 @@ const static decodeEntry32 decodePost20191004[] = {
     //                               |funct6|m|  vs2|simm5|IVI|  vs3| opcode|
     DECODE32_ENTRY(        VADC_VI, "|010000|0|.....|.....|011|.....|1010111|"),
     DECODE32_ENTRY(       VMADC_VI, "|010001|.|.....|.....|011|.....|1010111|"),
+    DECODE32_ENTRY(        VMVR_VI, "|100111|1|.....|00...|011|.....|1010111|"),
 
     // V-extension IVX-type instructions
     //                               |funct6|m|  vs2|  rs1|IVX|  vs3| opcode|
@@ -2174,6 +2194,7 @@ const static opAttrs attrsArray32[] = {
     ATTR32_VI        (      VSADD_VI,       VSADD_VI, RVANYV,  "vsadd"     ),
     ATTR32_VI        (      VAADD_VI,       VAADD_VI, RVANYV,  "vaadd"     ),
     ATTR32_VU        (       VSLL_VI,        VSLL_VI, RVANYV,  "vsll"      ),
+    ATTR32_VMVR      (       VMVR_VI,        VMVR_VI, RVANYV,  "vmv"       ),
     ATTR32_VU        (       VSRL_VI,        VSRL_VI, RVANYV,  "vsrl"      ),
     ATTR32_VU        (       VSRA_VI,        VSRA_VI, RVANYV,  "vsra"      ),
     ATTR32_VU        (      VSSRL_VI,       VSSRL_VI, RVANYV,  "vssrl"     ),
@@ -2233,10 +2254,10 @@ const static opAttrs attrsArray32[] = {
     ATTR32_VX3       (    VWSMACC_VX,     VWSMACC_VR, RVANYV,  "vwsmacc"   ),
     ATTR32_VX3       (  VWSMACCSU_VX,   VWSMACCSU_VR, RVANYV,  "vwsmaccsu" ),
     ATTR32_VX3       (  VWSMACCUS_VX,   VWSMACCUS_VR, RVANYV,  "vwsmaccus" ),
-    ATTR32_VX3       (    VQMACCU_VX,     VQMACCU_VR, RVANYV,  "vqmaccu"    ),
-    ATTR32_VX3       (     VQMACC_VX,      VQMACC_VR, RVANYV,  "vqmacc"     ),
-    ATTR32_VX3       (   VQMACCSU_VX,    VQMACCSU_VR, RVANYV,  "vqmaccsu"   ),
-    ATTR32_VX3       (   VQMACCUS_VX,    VQMACCUS_VR, RVANYV,  "vqmaccus"   ),
+    ATTR32_VX3       (    VQMACCU_VX,     VQMACCU_VR, RVANYV,  "vqmaccu"   ),
+    ATTR32_VX3       (     VQMACC_VX,      VQMACC_VR, RVANYV,  "vqmacc"    ),
+    ATTR32_VX3       (   VQMACCSU_VX,    VQMACCSU_VR, RVANYV,  "vqmaccsu"  ),
+    ATTR32_VX3       (   VQMACCUS_VX,    VQMACCUS_VR, RVANYV,  "vqmaccus"  ),
 
     // V-extension FVF-type instructions
     ATTR32_VF        (      VFADD_VF,       VFADD_VR, RVANYV,  "vfadd"   ),
@@ -3330,6 +3351,31 @@ static Uns8 getVLMUL(riscvInstrInfoP info, vlmulSpec vlmul) {
 }
 
 //
+// Return while-register specification encoded in the instruction
+//
+static Bool getWholeReg(riscvInstrInfoP info, wholeSpec wr) {
+
+    Bool  result = False;
+    Uns32 instr  = info->instruction;
+
+    switch(wr) {
+        case WR_NA:
+            break;
+        case WR_T:
+            result = True;
+            break;
+        case WR_23:
+            result = U_23(instr);
+            break;
+        default:
+            VMI_ABORT("unimplemented case"); // LCOV_EXCL_LINE
+            break;
+    }
+
+    return result;
+}
+
+//
 // Return first-fault specification encoded in the instruction
 //
 static Bool getFirstFault(riscvInstrInfoP info, firstFaultSpec ff) {
@@ -3364,6 +3410,9 @@ static Uns32 getNumFields(riscvInstrInfoP info, numFieldsSpec nf) {
             break;
         case NF_31_29:
             result = U_31_29(instr);
+            break;
+        case NF_17_15:
+            result = U_17_15(instr);
             break;
         default:
             VMI_ABORT("unimplemented case"); // LCOV_EXCL_LINE
@@ -3485,6 +3534,7 @@ static void interpretInstruction(
     info->vsew      = getVSEW(info, attrs->vsew);
     info->vlmul     = getVLMUL(info, attrs->vlmul);
     info->VIType    = getVIType(riscv, info, attrs->VIType);
+    info->isWhole   = getWholeReg(info, attrs->whole);
     info->isFF      = getFirstFault(info, attrs->ff);
     info->nf        = getNumFields(info, attrs->nf);
 

@@ -344,19 +344,28 @@ static void putOpcode(char **result, riscvP riscv, riscvInstrInfoP info) {
         type = putType(result, info, info->r[i], type);
     }
 
-    // emit number of fields if required
-    if(info->nf) {
-        putString(result, "seg");
-        putD(result, info->nf+1);
-    }
+    if(info->isWhole) {
 
-    // emit size modifier if required
-    switch(info->memBits) {
-        case 8:  putChar(result, 'b'); break;
-        case 16: putChar(result, 'h'); break;
-        case 32: putChar(result, 'w'); break;
-        case 64: putChar(result, 'd'); break;
-        case -1: putChar(result, 'e'); break;
+        // whole register load/store
+        putD(result, info->nf+1);
+        putChar(result, 'r');
+
+    } else {
+
+        // emit number of fields if required
+        if(info->nf) {
+            putString(result, "seg");
+            putD(result, info->nf+1);
+        }
+
+        // emit size modifier if required
+        switch(info->memBits) {
+            case 8:  putChar(result, 'b'); break;
+            case 16: putChar(result, 'h'); break;
+            case 32: putChar(result, 'w'); break;
+            case 64: putChar(result, 'd'); break;
+            case -1: putChar(result, 'e'); break;
+        }
     }
 
     // emit unsigned modifier if required

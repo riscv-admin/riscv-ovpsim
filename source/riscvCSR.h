@@ -116,6 +116,7 @@ typedef enum riscvCSRIdE {
     CSR_ID_3_31 (hpmcounter),   // 0xC03-0xC1F
     CSR_ID      (vl),           // 0xC20
     CSR_ID      (vtype),        // 0xC21
+    CSR_ID      (vlenb),        // 0xC22
     CSR_ID      (cycleh),       // 0xC80
     CSR_ID      (timeh),        // 0xC80
     CSR_ID      (instreth),     // 0xC80
@@ -1104,6 +1105,16 @@ CSR_REG_STRUCT_DECL_32_64_U(vtype);
 #define WM32_vtype  0x00000000
 #define WM64_vtype  0x00000000
 
+// -----------------------------------------------------------------------------
+// vlenb        (id 0xC22)
+// -----------------------------------------------------------------------------
+
+// define alias types
+typedef CSR_REG_TYPE(genericXLEN) CSR_REG_TYPE(vlenb);
+
+// define write masks
+#define WM32_vlenb  0x00000000
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // SYSTEM REGISTER CONTAINER
@@ -1133,6 +1144,7 @@ typedef struct riscvCSRsS {
     CSR_REG_DECL(utval);        // 0x043
     CSR_REG_DECL(vl);           // 0xC20
     CSR_REG_DECL(vtype);        // 0xC21
+    CSR_REG_DECL(vlenb);        // 0xC22
 
     // SUPERVISOR MODE CSRS
     CSR_REG_DECL(sedeleg);      // 0x102
