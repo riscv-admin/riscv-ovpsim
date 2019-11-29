@@ -19,6 +19,12 @@
 
 #pragma once
 
+// Imperas header files
+#include "hostapi/impTypes.h"
+
+// model header files
+#include "riscvTypeRefs.h"
+
 //
 // Map from feature character to feature mask
 //
@@ -26,9 +32,11 @@
 #define XLEN64_CHAR             ('Z'+2)
 #define RM_INVALID_CHAR         ('Z'+3)
 #define RISCV_FAND_CHAR         ('Z'+4)
+#define MSTATUS_FS_CHAR         ('Z'+5)
 #define RISCV_FEATURE_INDEX(_C) ((_C)-'A')
 #define RISCV_FEATURE_BIT(_C)   (1<<RISCV_FEATURE_INDEX(_C))
 #define XLEN_SHIFT              RISCV_FEATURE_INDEX(XLEN32_CHAR)
+#define MSTATUS_FS_SHIFT        RISCV_FEATURE_INDEX(MSTATUS_FS_CHAR)
 
 //
 // This enumerates architecture features in a format compatible with the MISA
@@ -44,8 +52,11 @@ typedef enum riscvArchitectureE {
     // ROUNDING MODE INVALID
     ISA_RM_INVALID = RISCV_FEATURE_BIT(RM_INVALID_CHAR),
 
+    // MSTATUS FIELDS
+    ISA_FS    = RISCV_FEATURE_BIT(MSTATUS_FS_CHAR),
+
     // FEATURES A AND B
-    ISA_and  = RISCV_FEATURE_BIT(RISCV_FAND_CHAR),
+    ISA_and   = RISCV_FEATURE_BIT(RISCV_FAND_CHAR),
 
     // BASE ISA FEATURES
     ISA_A     = RISCV_FEATURE_BIT('A'), // atomic instructions
@@ -149,7 +160,7 @@ typedef enum riscvPrivVerE {
 //
 // Tag of master version
 //
-#define RVVV_MASTER_TAG "4635055"
+#define RVVV_MASTER_TAG "6701109"
 
 //
 // Supported Vector Architecture versions
@@ -199,3 +210,29 @@ typedef enum riscvFSModeE {
 // macro returning 16-bit floating point version
 #define RISCV_FS_MODE(_P)       ((_P)->configInfo.mstatus_fs_mode)
 
+//
+// Supported version-dependent architectural features
+//
+typedef enum riscvVFeatureE {
+    RVVF_W_SYNTAX,          // use .w syntax in disassembly (not .v)
+    RVVF_ZERO_TAIL,         // is zeroing of tail elements required?
+    RVVF_STRICT_OVERLAP,    // strict source/destination overlap?
+    RVVF_SEXT_IOFFSET,      // sign-extend indexed load/store offset?
+    RVVF_SETVLZ_MAX,        // setvl* with rs1=zero: set vl to maximum
+    RVVF_SETVLZ_PRESERVE,   // setvl* with rs1=zero: preserve vl
+    RVVF_VAMO_SEW,          // use SEW AMO size (not 64-bit size)
+    RVVF_ADC_SBC_MASK,      // vadc/vmadc/vsbc/vmsbc use standard mask bit
+    RVVF_SEXT_SLIDE1_SRC,   // sign-extend slide1* ssource value?
+    RVVF_FP_REQUIRES_FSNZ,  // VFP instructions require mstatus.FS!=0?
+    RVVF_VXSAT_VXRM_IN_FCSR,// vxsat/vxrm treated as members of fcsr?
+    RVVF_VLENB_PRESENT,     // is vlenb register present?
+    RVVF_FP_RESTRICT_WHOLE, // whole register load/store/move restricted?
+    RVVF_UNIT_STRIDE_ONLY,  // only unit-stride load/store supported?
+    RVVF_VSTART_Z,          // is vstart forced to zero?
+    RVVF_LAST,              // for sizing
+} riscvVFeature;
+
+//
+// Is the indicated feature supported?
+//
+Bool riscvVFSupport(riscvP riscv, riscvVFeature feature);

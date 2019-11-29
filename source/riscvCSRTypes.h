@@ -95,7 +95,8 @@ typedef struct riscvCSRAttrsS {
     const char       *desc;             // register description
     void             *object;           // client-specific object
     Uns32             csrNum;           // CSR number (includes privilege and r/w access)
-    riscvArchitecture arch;             // required architecture
+    riscvArchitecture arch;             // required architecture (presence)
+    riscvArchitecture access;           // required architecture (access)
     riscvPrivVer      version;          // minimum specification version
     Bool              wEndBlock;        // whether write terminates this block
     Bool              wEndRM;           // whether write invalidates RM assumption

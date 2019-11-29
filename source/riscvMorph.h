@@ -119,6 +119,12 @@ void riscvConfigureFPU(riscvP riscv);
 void riscvWFS(riscvMorphStateP state, Bool useRS1);
 
 //
+// Adjust JIT code generator state after write of vector register that affects
+// floating point state (behavior clearly defined only after version 20191118)
+//
+void riscvWFSVS(riscvMorphStateP state, Bool useRS1);
+
+//
 // Reset JIT code generator state after possible write of mstatus.FS
 //
 void riscvRstFS(riscvMorphStateP state, Bool useRS1);

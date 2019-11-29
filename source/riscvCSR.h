@@ -458,7 +458,8 @@ typedef struct {
     Uns32 TVM  : 1;         // Trap virtual memory (requires S extension)
     Uns32 TW   : 1;         // Timeout wait (requires S extension)
     Uns32 TSR  : 1;         // Trap SRET (requires S extension)
-    Uns32 _u3  : 8;
+    Uns32 VS   : 2;         // Vector Extension dirty state
+    Uns32 _u3  : 6;
     Uns32 SD   : 1;         // Dirty state summary bit (read only)
 } CSR_REG_TYPE_32(status);
 
@@ -483,7 +484,8 @@ typedef struct {
     Uns64 TVM  :  1;        // Trap virtual memory (requires S extension)
     Uns64 TW   :  1;        // Timeout wait (requires S extension)
     Uns64 TSR  :  1;        // Trap SRET (requires S extension)
-    Uns64 _u3  :  9;
+    Uns32 VS   :  2;        // Vector Extension dirty state
+    Uns64 _u3  :  7;
     Uns64 UXL  :  2;        // TODO: User mode XLEN
     Uns64 SXL  :  2;        // TODO: Supervisor mode XLEN
     Uns64 _u4  : 27;
@@ -499,7 +501,7 @@ typedef CSR_REG_TYPE(status) CSR_REG_TYPE(sstatus);
 typedef CSR_REG_TYPE(status) CSR_REG_TYPE(mstatus);
 
 // define alias masks
-#define sstatus_AMASK 0x80000003800de133ULL
+#define sstatus_AMASK 0x80000003818de133ULL
 #define ustatus_AMASK 0x0000000000000011ULL
 
 // define bit masks
@@ -507,6 +509,7 @@ typedef CSR_REG_TYPE(status) CSR_REG_TYPE(mstatus);
 #define WM_mstatus_TVM (1<<20)
 #define WM_mstatus_TW  (1<<21)
 #define WM_mstatus_TSR (1<<22)
+#define WM_mstatus_VS  (3<<23)
 #define WM_mstatus_IE  0xf
 
 // -----------------------------------------------------------------------------
@@ -1261,6 +1264,12 @@ typedef struct riscvCSRMasksS {
     (RISCV_XLEN_IS_32(_CPU) ?                           \
         (_CPU)->csrMask._RNAME.u32.bits :               \
         (_CPU)->csrMask._RNAME.u64.bits)                \
+
+// get CSR mask field using current XLEN
+#define RD_CSR_MASK_FIELD(_CPU, _RNAME, _FIELD) \
+    (RISCV_XLEN_IS_32(_CPU) ?                           \
+        (_CPU)->csrMask._RNAME.u32.fields._FIELD :      \
+        (_CPU)->csrMask._RNAME.u64.fields._FIELD)       \
 
 
 ////////////////////////////////////////////////////////////////////////////////
