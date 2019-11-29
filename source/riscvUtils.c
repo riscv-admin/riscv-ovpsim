@@ -47,17 +47,28 @@ inline static riscvP getChild(riscvP riscv) {
 //
 void riscvSetCurrentArch(riscvP riscv) {
 
+    Uns32 MXL = RD_CSR_FIELD(riscv, misa, MXL);
+    Bool  FS  = (RD_CSR_FIELD(riscv, mstatus, FS) != 0);
+
     // derive new architecture value based on misa value, preserving rounding
     // mode invalid setting
     riscvArchitecture arch = (
         (riscv->currentArch & ISA_RM_INVALID) |
         RD_CSR_FIELD(riscv, misa, Extensions) |
-        (RD_CSR_FIELD(riscv, misa, MXL)<<XLEN_SHIFT)
+        (MXL<< XLEN_SHIFT)                    |
+        (FS << MSTATUS_FS_SHIFT)
     );
 
     // mstatus.FS=0 disables floating point extensions
-    if(!RD_CSR_FIELD(riscv, mstatus, FS)) {
+    if(!FS) {
         arch &= ~ISA_DF;
+    }
+
+    // mstatus.VS=0 disables vector extensions (if implemented)
+    if(!RD_CSR_MASK_FIELD(riscv, mstatus, VS)) {
+        // mstatus.VS not implemented
+    } else if(!RD_CSR_FIELD(riscv, mstatus, VS)) {
+        arch &= ~ISA_V;
     }
 
     if(riscv->currentArch != arch) {

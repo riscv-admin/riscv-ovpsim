@@ -33,6 +33,8 @@ typedef enum riscvVShapeE {
 
                     // INTEGER ARGUMENTS
     RVVW_111_II,    // SEW
+    RVVW_111_IIS,   // SEW, saturating result
+    RVVW_111_IIX,   // SEW, uses vxrm
     RVVW_BBB_II,    // SEW8
     RVVW_EXT_II,    // SEW, VEXT.X.V
     RVVW_111_PI,    // SEW, Vd is predicate
@@ -44,6 +46,7 @@ typedef enum riscvVShapeE {
     RVVW_121_IIS,   // SEW   = 2*SEW op SEW, saturating result
     RVVW_211_IIQ,   // 2*SEW = SEW   op SEW, implicit widening
     RVVW_211_II,    // 2*SEW = SEW   op SEW
+    RVVW_211_IIS,   // 2*SEW = SEW   op SEW, saturating result
     RVVW_411_II,    // 4*SEW = SEW   op SEW
     RVVW_221_II,    // 2*SEW = 2*SEW op SEW
 

@@ -4,38 +4,77 @@ Copyright (c) 2005-2019 Imperas Software Ltd., www.imperas.com
 
 This CHANGELOG contains information for the riscvOVPsim fixed platform which includes information of the OVP Simulator and RISCV processor model
 
+NOTE: X-commit messages below refer to git commits in the following Risc-V  
+      specification document repositories:                                  
+  I-commit: https://github.com/riscv/riscv-isa-manual                        
+  V-commit: https://github.com/riscv/riscv-v-spec                            
+
 ---
 
+- New parameter require_vstart0 has been added to control whether
+  non-interruptible Vector Extension instructions require CSR vstart to be zero.
+- Some Vector Extension issues have been corrected:
+  - An issue has been corrected that caused some variants of AMO instructions
+    discarding the operation result to cause Illegal Instruction exceptions
+    incorrectly.
+  - Reduction operations with destination overlapping a source are now legal
+    when LMUL>1; previously, such operations caused Illegal Instruction
+    exceptions.
+
+Date 2019-November-26
+Release 20191126.0
+===
+
+- Bit Manipulation Extension has been updated to Version 0.92
+- The vector version master branch currently has these differences compared to
+  the previous 0.8-draft-20191118 version:
+  - V-commit a6f94e7: vector context status in mstatus register is now
+    implemented;
+  - V-commit 49cbd95: whole register load and store operations have been
+    restricted to a single register only;
+  - V-commit 49cbd95: whole register move operations have been restricted to
+    aligned groups of 1, 2, 4 or 8 registers only.
+  This set of changes will increase as the master specification evolves.
+
+Date 2019-November-25
+Release 20191122.0
+===
+
+- Memory exceptions now produce information about the failure in verbose mode.
+- Vector version 0.8-draft-20190906 has been added. The only difference between
+  this version and the stable 0.8-draft-20191004 version is the encodings of
+  vwsmaccsu and vwsmaccus instruction variants.
 - Vector version 0.8-draft-20191117 has been added. Differences to the previous
   0.8-draft-20191004 version are as follows (with the associated specification
-  commit identifiers):
-  - commit 8d4492e: Indexed load/store instructions now zero extend offsets (in
-    version 0.8-draft-20191004, they are sign-extended);
-  - commit d06438e: vslide1up/vslide1down instructions now sign extend XLEN
-    values to SEW length (in version 0.8-draft-20191004, they are zero-extended);
-  - commit 5a038da: vadc/vsbc instruction encodings now require vm=0 (in version
-    0.8-draft-20191004, they require vm=1);
-  - commit 5a038da: vmadc/vmsbc instruction encodings now allow both vm=0,
+  V-commit identifiers):
+  - V-commit 8d4492e: Indexed load/store instructions now zero extend offsets
+    (in version 0.8-draft-20191004, they are sign-extended);
+  - V-commit d06438e: vslide1up/vslide1down instructions now sign extend XLEN
+    values to SEW length (in version 0.8-draft-20191004, they are
+    zero-extended);
+  - V-commit 5a038da: vadc/vsbc instruction encodings now require vm=0 (in 
+    version 0.8-draft-20191004, they require vm=1);
+  - V-commit 5a038da: vmadc/vmsbc instruction encodings now allow both vm=0,
     implying carry input is used, and vm=1, implying carry input is zero (in
     version 0.8-draft-20191004, only vm=1 is permitted implying carry input is
     used);
-  - commit c2f3157: vaaddu.vv, vaaddu.vx, vasubu.vv and vasubu.vx instructions
-    have been added;
-  - commit c2f3157: vaadd.vv and vaadd.vx, instruction encodings have been
+  - V-commit c2f3157: vaaddu.vv, vaaddu.vx, vasubu.vv and vasubu.vx
+    instructions have been added;
+  - V-commit c2f3157: vaadd.vv and vaadd.vx, instruction encodings have been
     changed;
-  - commit c2f3157: vaadd.vi instruction has been removed;
-  - commit 063b128: all widening saturating scaled multiply-add instructions
+  - V-commit c2f3157: vaadd.vi instruction has been removed;
+  - V-commit 063b128: all widening saturating scaled multiply-add instructions
     have been removed;
-  - commit 200a557: vqmaccu.vv, vqmaccu.vx, vqmacc.vv, vqmacc.vx, vqmacc.vx, 
+  - V-commit 200a557: vqmaccu.vv, vqmaccu.vx, vqmacc.vv, vqmacc.vx, vqmacc.vx, 
     vqmaccsu.vx and vqmaccus.vx instructions have been added;
-  - commit 7b02297: CSR vlenb has been added (giving vector register length in
-    bytes);
-  - commit 7b02297: load/store whole register instructions have been added;
-  - commit 7b02297: whole register move instructions have been added.
+  - V-commit 7b02297: CSR vlenb has been added (giving vector register length
+    in bytes);
+  - V-commit 7b02297: load/store whole register instructions have been added;
+  - V-commit 7b02297: whole register move instructions have been added.
 - Vector version 0.8-draft-20191118 has been added. Differences to the previous
   0.8-draft-20191117 version are as follows (with the associated specification
-  commit identifiers):
-  - commit b6c48c3: vsetvl/vsetvli with rd=zero and rs1=zero sets vl to the
+  V-commit identifiers):
+  - V-commit b6c48c3: vsetvl/vsetvli with rd!=zero and rs1=zero sets vl to the
     maximum vector length (previously, this combination preserved vl).
 - The vector_version master branch is currently identical to the stable
   0.8-draft-20191118 version, but will change as the master specification
