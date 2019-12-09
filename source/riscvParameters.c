@@ -177,7 +177,7 @@ static vmiEnumParameter fp16Variants[] = {
 };
 
 //
-// Supported 16-bit floating point variants
+// Specify effect of flag writes on FS
 //
 static vmiEnumParameter FSModes[] = {
     [RVFS_WRITE_NZ] = {

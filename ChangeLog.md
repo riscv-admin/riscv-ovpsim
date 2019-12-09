@@ -11,6 +11,14 @@ NOTE: X-commit messages below refer to git commits in the following Risc-V
 
 ---
 
+- Some Vector Extension issues have been corrected:
+  - vfmne behavior has been corrected to return 1 for unordered operands
+    (previously, 0 was returned).
+
+Date 2019-November-29
+Release 20191128.0
+===
+
 - New parameter require_vstart0 has been added to control whether
   non-interruptible Vector Extension instructions require CSR vstart to be zero.
 - Some Vector Extension issues have been corrected:
