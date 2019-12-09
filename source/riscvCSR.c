@@ -411,41 +411,17 @@ typedef enum extStatusE {
 //
 static void consolidateFPFlags(riscvP riscv) {
 
-    Bool setDirty = False;
+    Uns8 fpFlagsMT = riscv->fpFlagsMT;
+    Uns8 SFMT      = riscv->SFMT;
 
-    // handle floating point flags
-    if(riscv->fpFlagsMT) {
-
-        riscvFSMode mode      = riscv->configInfo.mstatus_fs_mode;
-        Uns8        fpFlagsMT = riscv->fpFlagsMT;
-
-        // consolidate flags on CSR view
-        riscv->fpFlagsCSR |= fpFlagsMT;
-        riscv->fpFlagsMT   = 0;
-
-        // determine whether mstatus.FS should be set to dirty
-        if(mode==RVFS_WRITE_ANY) {
-            // dirty state always set elsewhere
-        } else if(mode==RVFS_ALWAYS_DIRTY) {
-            setDirty = True;
-        } else if(mode==RVFS_WRITE_NZ) {
-            setDirty = fpFlagsMT;
-        }
-    }
-
-    // handle fixed point flags
-    if(riscv->SFMT && vxRequiresFS(riscv)) {
-
-        // consolidate flags on CSR view
-        riscv->SFCSR |= riscv->SFMT;
-        riscv->SFMT   = 0;
-
-        // indicate floating point extension status is dirty
-        setDirty = True;
-    }
+    // consolidate floating point and fixed point flags on CSR view
+    riscv->fpFlagsCSR |= fpFlagsMT;
+    riscv->fpFlagsMT   = 0;
+    riscv->SFCSR      |= SFMT;
+    riscv->SFMT        = 0;
 
     // indicate floating point extension status is dirty if required
-    if(setDirty) {
+    if(fpFlagsMT || (SFMT && vxRequiresFS(riscv))) {
         WR_CSR_FIELD(riscv, mstatus, FS, ES_DIRTY);
     }
 }
@@ -463,11 +439,21 @@ static Uns64 statusR(riscvP riscv) {
     Uns8 VS = RD_CSR_FIELD(riscv, mstatus, VS);
     Uns8 XS = RD_CSR_FIELD(riscv, mstatus, XS);
 
-    // if fs_always_dirty is set, force mstatus.FS to be either 0 or 3 (so if
-    // it is enabled, it is always seen as dirty)
-    if(FS && (riscv->configInfo.mstatus_fs_mode==RVFS_ALWAYS_DIRTY)) {
-        FS = ES_DIRTY;
-        WR_CSR_FIELD(riscv, mstatus, FS, FS);
+    // if fs_always_dirty is set, force mstatus.FS and mstatus.VS to be either
+    // 0 or 3 (so if enabled, they are always seen as dirty)
+    if(riscv->configInfo.mstatus_fs_mode==RVFS_ALWAYS_DIRTY) {
+
+        // handle mstatus.FS
+        if(FS) {
+            FS = ES_DIRTY;
+            WR_CSR_FIELD(riscv, mstatus, FS, FS);
+        }
+
+        // handle mstatus.VS
+        if(VS) {
+            VS = ES_DIRTY;
+            WR_CSR_FIELD(riscv, mstatus, VS, VS);
+        }
     }
 
     // overall state is dirty if any of FS, VS or XS indicates dirty

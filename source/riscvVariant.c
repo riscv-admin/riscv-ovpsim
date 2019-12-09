@@ -105,7 +105,7 @@ Bool riscvVFSupport(riscvP riscv, riscvVFeature feature) {
             [RVVF_FP_RESTRICT_WHOLE]  = 0,
             [RVVF_UNIT_STRIDE_ONLY]   = 0,
             [RVVF_VSTART_Z]           = 0,
-       },
+        },
 
         // version 0.8-draft-20191117
         [RVVV_0_8_20191117] = {

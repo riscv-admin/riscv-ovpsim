@@ -100,9 +100,9 @@ typedef enum riscvVArgTypeE {
 //
 typedef enum riscvFPRelationE {
     RVFCMP_QNOK = 0x10,
-    RVFCMP_ORD  = vmi_FPRL_EQUAL|vmi_FPRL_LESS|vmi_FPRL_GREATER | RVFCMP_QNOK,
-    RVFCMP_EQ   = vmi_FPRL_EQUAL                                | RVFCMP_QNOK,
-    RVFCMP_NE   = vmi_FPRL_LESS|vmi_FPRL_GREATER                | RVFCMP_QNOK,
+    RVFCMP_ORD  = vmi_FPRL_EQUAL|vmi_FPRL_LESS|vmi_FPRL_GREATER    |RVFCMP_QNOK,
+    RVFCMP_EQ   = vmi_FPRL_EQUAL                                   |RVFCMP_QNOK,
+    RVFCMP_NE   = vmi_FPRL_LESS|vmi_FPRL_GREATER|vmi_FPRL_UNORDERED|RVFCMP_QNOK,
     RVFCMP_LT   = vmi_FPRL_LESS,
     RVFCMP_LE   = vmi_FPRL_LESS|vmi_FPRL_EQUAL,
     RVFCMP_GT   = vmi_FPRL_GREATER,
@@ -587,11 +587,25 @@ static void emitTrapInstructionMask(
 ////////////////////////////////////////////////////////////////////////////////
 
 //
+// Is mstatus.FS always dirty if enabled?
+//
+inline static Bool alwaysDirtyFS(riscvP riscv) {
+    return riscv->configInfo.mstatus_fs_mode==RVFS_ALWAYS_DIRTY;
+}
+
+//
+// Is mstatus.FS always dirty if flags are written?
+//
+inline static Bool writeAnyFS(riscvP riscv) {
+    return riscv->configInfo.mstatus_fs_mode==RVFS_WRITE_ANY;
+}
+
+//
 // Indicate that this instruction may update mstatus (by changing mstatus.FS)
 //
 inline static void mayWriteMStatusFS(riscvP riscv) {
 
-    if(riscv->configInfo.mstatus_fs_mode!=RVFS_ALWAYS_DIRTY) {
+    if(!alwaysDirtyFS(riscv)) {
         vmimtRegReadImpl("mstatus");
         vmimtRegWriteImpl("mstatus");
     }
@@ -602,7 +616,7 @@ inline static void mayWriteMStatusFS(riscvP riscv) {
 //
 inline static void mayWriteMStatusVS(riscvP riscv) {
 
-    if(RD_CSR_MASK_FIELD(riscv, mstatus, VS)) {
+    if(RD_CSR_MASK_FIELD(riscv, mstatus, VS) && !alwaysDirtyFS(riscv)) {
         vmimtRegReadImpl("mstatus");
         vmimtRegWriteImpl("mstatus");
     }
@@ -613,7 +627,7 @@ inline static void mayWriteMStatusVS(riscvP riscv) {
 //
 static void updateFS(riscvP riscv) {
 
-    if(riscv->configInfo.mstatus_fs_mode!=RVFS_ALWAYS_DIRTY) {
+    if(!alwaysDirtyFS(riscv)) {
 
         riscvBlockStateP blockState = riscv->blockState;
 
@@ -632,7 +646,7 @@ static void updateFS(riscvP riscv) {
 //
 static void updateVS(riscvP riscv) {
 
-    if(RD_CSR_MASK_FIELD(riscv, mstatus, VS)) {
+    if(RD_CSR_MASK_FIELD(riscv, mstatus, VS) && !alwaysDirtyFS(riscv)) {
 
         riscvBlockStateP blockState = riscv->blockState;
 
@@ -844,11 +858,6 @@ void riscvWriteRegSize(riscvP riscv, riscvRegDesc r, Uns32 srcBits) {
 
         // set mstatus.FS
         updateFS(riscv);
-
-    } else if(isVReg(r)) {
-
-        // set mstatus.VS
-        updateVS(riscv);
 
     } else {
 
@@ -3037,7 +3046,7 @@ vmiReg riscvGetFPFlagsMT(riscvP riscv) {
     mayWriteMStatusFS(riscv);
 
     // set mstatus.FS if required
-    if(riscv->configInfo.mstatus_fs_mode==RVFS_WRITE_ANY) {
+    if(writeAnyFS(riscv)) {
         updateFS(riscv);
     }
 
@@ -4597,7 +4606,15 @@ static vmiFlagsCP getSatFlags(riscvMorphStateP state) {
 //
 // Update vxsat after saturating operation
 //
-static void updateVXSat(void) {
+static void updateVXSat(riscvMorphStateP state) {
+
+    riscvP riscv = state->riscv;
+
+    // set mstatus.FS if required
+    if(writeAnyFS(riscv) && vxSatRMInFCSR(riscv)) {
+        updateFS(riscv);
+    }
+
     vmimtBinopRR(8, vmi_OR, RISCV_SF_FLAGS, RISCV_SF_TMP, 0);
 }
 
@@ -4629,7 +4646,7 @@ static void narrowResult(riscvMorphStateP state, iterDescP id) {
         vmimtBinopRC(id->SEW*2, shiftop, id->r[0], id->SEW, flags);
 
         // merge saturation flag with sticky vxsat
-        updateVXSat();
+        updateVXSat(state);
 
         // extract high part of result
         vmimtMoveRR(id->SEW, id->rdNarrow, VMI_REG_DELTA(id->r[0], bytes));
@@ -7216,7 +7233,7 @@ static RISCV_MORPHV_FN(emitVRSBinaryCB) {
     vmimtBinopRRR(id->SEW, state->attrs->binop, id->r[0], id->r[1], arg2, flags);
 
     // merge saturation flag with sticky vxsat
-    updateVXSat();
+    updateVXSat(state);
 }
 
 //
@@ -7232,7 +7249,7 @@ static RISCV_MORPHV_FN(emitVISBinaryCB) {
     vmimtBinopRRC(id->SEW, state->attrs->binop, id->r[0], id->r[1], arg2, flags);
 
     // merge saturation flag with sticky vxsat
-    updateVXSat();
+    updateVXSat(state);
 }
 
 //
@@ -7366,7 +7383,7 @@ static RISCV_MORPHV_FN(emitVRSMULCB) {
     vmimtBinopRC(bits, vmi_SHLSQ, id->r[0], 1, flags);
 
     // merge saturation flag with sticky vxsat
-    updateVXSat();
+    updateVXSat(state);
 
     // rotate LSW to place retained bit at bit 0 and discard bits at N..1
     vmimtBinopRC(bits, vmi_ROL, t1, 1, 0);
@@ -7422,7 +7439,7 @@ static void emitVRSMAddIntInt(
     vmimtBinopRRR(bits, state->attrs->binop, id->r[0], arg1, t0, flags);
 
     // merge saturation flag with sticky vxsat
-    updateVXSat();
+    updateVXSat(state);
 }
 
 //
