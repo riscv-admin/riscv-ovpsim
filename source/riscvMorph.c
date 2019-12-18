@@ -8150,6 +8150,31 @@ static RISCV_MORPHV_FN(emitVExternalCB) {
 ////////////////////////////////////////////////////////////////////////////////
 
 //
+// Operation-specific argument checks for quad-widening extension
+//
+static RISCV_CHECKV_FN(emitQMACCheckCB) {
+
+    riscvP riscv = state->riscv;
+    Bool   ok    = True;
+
+    if(!riscv->configInfo.Zvqmac) {
+
+        // VLMUL must be 1 for load/store segment instructions
+        ILLEGAL_INSTRUCTION_MESSAGE(
+            riscv, "IVQMAC", "Zvqmac extension not configured"
+        );
+        ok = False;
+    }
+
+    return ok;
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// DIVIDED ELEMENT EXTENSION
+////////////////////////////////////////////////////////////////////////////////
+
+//
 // Operation-specific argument checks for divided element extension
 //
 static RISCV_CHECKV_FN(emitEDIVCheckCB) {
@@ -8159,7 +8184,7 @@ static RISCV_CHECKV_FN(emitEDIVCheckCB) {
 
     if(!riscv->configInfo.Zvediv) {
 
-        // VLMUL must be 1 for load/store segment instructions
+        // extension not configured
         ILLEGAL_INSTRUCTION_MESSAGE(
             riscv, "IVEDIV", "Zvediv extension not configured"
         );
@@ -8409,10 +8434,12 @@ const static riscvMorphAttr dispatchTable[] = {
     [RV_IT_VWMACC_VR]        = {morph:emitVectorOp, opTCB:emitVRMAccIntCB,   binop:vmi_ADD,      vShape:RVVW_211_II,  argType:RVVX_SS},
     [RV_IT_VWMACCSU_VR]      = {morph:emitVectorOp, opTCB:emitVRMAccIntCB,   binop:vmi_ADD,      vShape:RVVW_211_II,  argType:RVVX_SU},
     [RV_IT_VWMACCUS_VR]      = {morph:emitVectorOp, opTCB:emitVRMAccIntCB,   binop:vmi_ADD,      vShape:RVVW_211_II,  argType:RVVX_US},
-    [RV_IT_VQMACCU_VR]       = {morph:emitVectorOp, opTCB:emitVRMAccIntCB,   binop:vmi_ADD,      vShape:RVVW_411_II,  argType:RVVX_UU},
-    [RV_IT_VQMACC_VR]        = {morph:emitVectorOp, opTCB:emitVRMAccIntCB,   binop:vmi_ADD,      vShape:RVVW_411_II,  argType:RVVX_SS},
-    [RV_IT_VQMACCSU_VR]      = {morph:emitVectorOp, opTCB:emitVRMAccIntCB,   binop:vmi_ADD,      vShape:RVVW_411_II,  argType:RVVX_SU},
-    [RV_IT_VQMACCUS_VR]      = {morph:emitVectorOp, opTCB:emitVRMAccIntCB,   binop:vmi_ADD,      vShape:RVVW_411_II,  argType:RVVX_US},
+
+    // V-extension MVV/MVX-type common instructions (Zvqmac extension)
+    [RV_IT_VQMACCU_VR]       = {morph:emitVectorOp, opTCB:emitVRMAccIntCB, checkCB:emitQMACCheckCB, binop:vmi_ADD, vShape:RVVW_411_II, argType:RVVX_UU},
+    [RV_IT_VQMACC_VR]        = {morph:emitVectorOp, opTCB:emitVRMAccIntCB, checkCB:emitQMACCheckCB, binop:vmi_ADD, vShape:RVVW_411_II, argType:RVVX_SS},
+    [RV_IT_VQMACCSU_VR]      = {morph:emitVectorOp, opTCB:emitVRMAccIntCB, checkCB:emitQMACCheckCB, binop:vmi_ADD, vShape:RVVW_411_II, argType:RVVX_SU},
+    [RV_IT_VQMACCUS_VR]      = {morph:emitVectorOp, opTCB:emitVRMAccIntCB, checkCB:emitQMACCheckCB, binop:vmi_ADD, vShape:RVVW_411_II, argType:RVVX_US},
 
     // V-extension IVV-type instructions
     [RV_IT_VWREDSUMU_VS]     = {morph:emitVectorOp, opTCB:emitVRedBinaryIntCB, initCB:initVRedCB, endCB:endVRedCB, binop:vmi_ADD, vShape:RVVW_212_SI, argType:RVVX_UU, vstart0:RVVS_ZERO},

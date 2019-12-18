@@ -9,7 +9,23 @@ NOTE: X-commit messages below refer to git commits in the following Risc-V
   I-commit: https://github.com/riscv/riscv-isa-manual                        
   V-commit: https://github.com/riscv/riscv-v-spec                            
 
+- Vector version 0.8 has been added, and is now used by default. Differences
+  compared to the previous 0.8-draft-20191118 version are as follows (with the
+  associated specification V-commit identifiers):
+  - V-commit a6f94e7: vector context status in mstatus register is now
+    implemented;
+  - V-commit 49cbd95: whole register load and store operations have been
+    restricted to a single register only;
+  - V-commit 49cbd95: whole register move operations have been restricted to
+    aligned groups of 1, 2, 4 or 8 registers only.
+- The vector version master branch currently has no differences compared to
+  the previous 0.8 version, but will change as the specification evolves.
+
 ---
+
+Date 2019-December-09
+Release 20191206.0
+===
 
 - Some Vector Extension issues have been corrected:
   - vfmne behavior has been corrected to return 1 for unordered operands

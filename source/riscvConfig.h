@@ -81,6 +81,7 @@ typedef struct riscvConfigS {
     Bool              Zvlsseg;          // Zvlsseg implemented?
     Bool              Zvamo;            // Zvamo implemented?
     Bool              Zvediv;           // Zvediv implemented?
+    Bool              Zvqmac;           // Zvqmac implemented?
     Bool              updatePTEA;       // hardware update of PTE A bit?
     Bool              updatePTED;       // hardware update of PTE D bit?
     Bool              unaligned;        // whether unaligned accesses supported

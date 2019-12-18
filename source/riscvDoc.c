@@ -752,6 +752,16 @@ void riscvDoc(riscvP rootProcessor) {
         );
         vmidocAddText(Parameters, string);
 
+        // document Zvqmac
+        snprintf(
+            SNPRINTF_TGT(string),
+            "Parameter Zvqmac is used to specify whether the Zvqmac "
+            "extension is implemented (from version 0.8-draft-20191117 only). "
+            "By default, Zvqmac is set to %u in this variant.",
+            riscv->configInfo.Zvqmac
+        );
+        vmidocAddText(Parameters, string);
+
         // document require_vstart0
         snprintf(
             SNPRINTF_TGT(string),
@@ -1012,19 +1022,18 @@ void riscvDoc(riscvP rootProcessor) {
         }
 
         ////////////////////////////////////////////////////////////////////////
-        // VECTOR EXTENSION VERSION master
+        // VECTOR EXTENSION VERSION 0.8
         ////////////////////////////////////////////////////////////////////////
 
         {
             vmiDocNodeP Version = vmidocAddSection(
-                Vector, "Version master"
+                Vector, "Version 0.8"
             );
 
             vmidocAddText(
                 Version,
-                "Unstable master version as of 26 November 2019 (commit "
-                RVVV_MASTER_TAG"), with these changes compared to version "
-                "0.8-draft-20191118:"
+                "Stable 0.8 official release (commit 9a65519), with these "
+                "changes compared to version 0.8-draft-20191118:"
             );
             vmidocAddText(
                 Version,
@@ -1040,6 +1049,22 @@ void riscvDoc(riscvP rootProcessor) {
                 Version,
                 "- whole register move operations have been restricted to "
                 "aligned groups of 1, 2, 4 or 8 registers only."
+            );
+        }
+
+        ////////////////////////////////////////////////////////////////////////
+        // VECTOR EXTENSION VERSION master
+        ////////////////////////////////////////////////////////////////////////
+
+        {
+            vmiDocNodeP Version = vmidocAddSection(
+                Vector, "Version master"
+            );
+
+            vmidocAddText(
+                Version,
+                "Unstable master version as of 14 December 2019 (commit "
+                RVVV_MASTER_TAG"), currently identical to version 0.8."
             );
         }
     }

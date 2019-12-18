@@ -34,6 +34,7 @@
     .Zvlsseg       = 1,                         \
     .Zvamo         = 1,                         \
     .Zvediv        = 0,                         \
+    .Zvqmac        = 1,                         \
     .PMP_registers = _PMP_REGS,                 \
     .tval_ii_code  = True,                      \
     .ASID_bits     = ((_ARCH)&RV64) ? 16 : 9    \
