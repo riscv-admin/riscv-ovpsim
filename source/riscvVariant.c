@@ -145,6 +145,25 @@ Bool riscvVFSupport(riscvP riscv, riscvVFeature feature) {
             [RVVF_VSTART_Z]           = 0,
         },
 
+        // version 0.8
+        [RVVV_0_8] = {
+            [RVVF_W_SYNTAX]           = 1,
+            [RVVF_ZERO_TAIL]          = 0,
+            [RVVF_STRICT_OVERLAP]     = 0,
+            [RVVF_SEXT_IOFFSET]       = 0,
+            [RVVF_SETVLZ_MAX]         = 0,
+            [RVVF_SETVLZ_PRESERVE]    = 0,
+            [RVVF_VAMO_SEW]           = 1,
+            [RVVF_ADC_SBC_MASK]       = 1,
+            [RVVF_SEXT_SLIDE1_SRC]    = 1,
+            [RVVF_FP_REQUIRES_FSNZ]   = 1,
+            [RVVF_VXSAT_VXRM_IN_FCSR] = 1,
+            [RVVF_VLENB_PRESENT]      = 1,
+            [RVVF_FP_RESTRICT_WHOLE]  = 1,
+            [RVVF_UNIT_STRIDE_ONLY]   = 0,
+            [RVVF_VSTART_Z]           = 0,
+        },
+
         // version master
         [RVVV_MASTER] = {
             [RVVF_W_SYNTAX]           = 1,

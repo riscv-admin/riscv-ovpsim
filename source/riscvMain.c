@@ -268,6 +268,9 @@ static void applyParamsSMP(riscvP riscv, riscvParamValuesP params) {
     cfg->Zvamo             = params->Zvamo;
     cfg->Zvediv            = params->Zvediv;
 
+    // Zvqmac extension is only available after version RVVV_0_8_20191004
+    cfg->Zvqmac = params->Zvqmac && (params->vector_version>RVVV_0_8_20191004);
+
     // force VLEN >= ELEN
     if(cfg->VLEN<cfg->ELEN) {
         vmiMessage("W", CPU_PREFIX"_IVLEN",

@@ -90,6 +90,7 @@ typedef struct riscvParamValuesS {
     VMI_BOOL_PARAM(Zvlsseg);
     VMI_BOOL_PARAM(Zvamo);
     VMI_BOOL_PARAM(Zvediv);
+    VMI_BOOL_PARAM(Zvqmac);
 
 } riscvParamValues;
 
