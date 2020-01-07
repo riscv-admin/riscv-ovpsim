@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2019 Imperas Software Ltd., www.imperas.com
+ * Copyright (c) 2005-2020 Imperas Software Ltd., www.imperas.com
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -817,10 +817,15 @@ static Bool requireNaNBox(
 }
 
 //
-// Do actions when a register is written (sign extending or NaN boxing, if
+// Do actions when a register is written (extending or NaN boxing, if
 // required)
 //
-void riscvWriteRegSize(riscvP riscv, riscvRegDesc r, Uns32 srcBits) {
+void riscvWriteRegSize(
+    riscvP       riscv,
+    riscvRegDesc r,
+    Uns32        srcBits,
+    Bool         signExtend
+) {
 
     vmiReg dst = getVMIReg(riscv, r);
 
@@ -829,7 +834,7 @@ void riscvWriteRegSize(riscvP riscv, riscvRegDesc r, Uns32 srcBits) {
         Uns32 dstBits = riscvGetXlenArch(riscv);
 
         // sign-extend result
-        vmimtMoveExtendRR(dstBits, dst, srcBits, dst, True);
+        vmimtMoveExtendRR(dstBits, dst, srcBits, dst, signExtend);
 
         // add to record of X registers written by this instruction
         riscv->writtenXMask |= getRegMask(r);
@@ -870,15 +875,15 @@ void riscvWriteRegSize(riscvP riscv, riscvRegDesc r, Uns32 srcBits) {
 // required)
 //
 inline static void writeRegSize(riscvP riscv, riscvRegDesc r, Uns32 srcBits) {
-    riscvWriteRegSize(riscv, r, srcBits);
+    riscvWriteRegSize(riscv, r, srcBits, True);
 }
 
 //
-// Do actions when a register is written (sign extending or NaN boxing, if
+// Do actions when a register is written (extending or NaN boxing, if
 // required) using the derived register size
 //
-void riscvWriteReg(riscvP riscv, riscvRegDesc r) {
-    writeRegSize(riscv, r, getRBits(r));
+void riscvWriteReg(riscvP riscv, riscvRegDesc r, Bool signExtend) {
+    riscvWriteRegSize(riscv, r, getRBits(r), signExtend);
 }
 
 //
@@ -886,7 +891,7 @@ void riscvWriteReg(riscvP riscv, riscvRegDesc r) {
 // required) using the derived register size
 //
 inline static void writeReg(riscvP riscv, riscvRegDesc r) {
-    riscvWriteReg(riscv, r);
+    riscvWriteReg(riscv, r, True);
 }
 
 

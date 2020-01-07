@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2019 Imperas Software Ltd., www.imperas.com
+ * Copyright (c) 2005-2020 Imperas Software Ltd., www.imperas.com
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -920,6 +920,10 @@ void riscvDoc(riscvP rootProcessor) {
                 Version,
                 "Stable 0.8 draft of October 4 2019, with these changes "
                 "compared to version 0.8-draft-20190906:"
+            );
+            vmidocAddText(
+                Version,
+                "- vwmaccsu and vwmaccus instruction encodings exchanged;"
             );
             vmidocAddText(
                 Version,

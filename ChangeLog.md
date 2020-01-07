@@ -1,13 +1,29 @@
 riscvOVPsim Change Log
 ===
-Copyright (c) 2005-2019 Imperas Software Ltd., www.imperas.com
+Copyright (c) 2005-2020 Imperas Software Ltd., www.imperas.com
 
 This CHANGELOG contains information for the riscvOVPsim fixed platform which includes information of the OVP Simulator and RISCV processor model
 
-NOTE: X-commit messages below refer to git commits in the following Risc-V  
-      specification document repositories:                                  
+---
+
+NOTE: X-commit messages below refer to git commits in the following 
+      Risc-V specification document repositories:                                  
   I-commit: https://github.com/riscv/riscv-isa-manual                        
   V-commit: https://github.com/riscv/riscv-v-spec                            
+
+---
+- New command line argument 'memory' allows regions of memory to be defined using
+  using a colon separated list of triplets "low,high,permission"
+  for example -memory "0x0000,0xffff,7:0xffff0000,0xffffffff,7" will create two
+  memory regions with RWX permissions bit 1: Read, bit 2: Write, bit 3: eXecute 
+ 
+- V-commit f4056da: Encodings for vwmaccsu and vwmaccus instruction variants
+  have been changed in 0.8-draft-20191004 and all subsequent versions to comply
+  with a specification change of September 17th 2019.
+
+Date 2019-December-18
+Release 20191217.0
+===
 
 - Vector version 0.8 has been added, and is now used by default. Differences
   compared to the previous 0.8-draft-20191118 version are as follows (with the
@@ -20,8 +36,6 @@ NOTE: X-commit messages below refer to git commits in the following Risc-V
     aligned groups of 1, 2, 4 or 8 registers only.
 - The vector version master branch currently has no differences compared to
   the previous 0.8 version, but will change as the specification evolves.
-
----
 
 Date 2019-December-09
 Release 20191206.0
