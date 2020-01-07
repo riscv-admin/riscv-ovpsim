@@ -4,8 +4,8 @@ A Complete, Fully Functional, Configurable RISC-V Simulator
 ===
 
 Author: Imperas Software, Ltd., using OVP Open Standard APIs  
-Date   : 17 Dec 2019 
-Version: 20191217.0  
+Date   : 06 Jan 2020 
+Version: 20200106.0  
 License: Model source included under Apache 2.0 open source license  
 License: Simulator riscvOVPsim licensed under Open Virtual Platforms (OVP) Fixed Platform Kits license  
 RISC-V Specifications currently supported:
@@ -61,7 +61,7 @@ For example on Linux:
 > $ RUN_RV32_fibonacci.sh  
 > 
 > CpuManagerFixedPlatform (64-Bit) 20180425.0 Open Virtual Platform simulator from [www.IMPERAS.com](http://www.imperas.com).  
-> Copyright (c) 2005-2019 Imperas Software Ltd.  Contains Imperas Proprietary Information.  
+> Copyright (c) 2005-2020 Imperas Software Ltd.  Contains Imperas Proprietary Information.  
 > Licensed Software, All Rights Reserved.  
 > Visit [www.IMPERAS.com](http://www.imperas.com) for multicore debug, verification and analysis solutions.  
 >   
