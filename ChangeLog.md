@@ -12,10 +12,19 @@ NOTE: X-commit messages below refer to git commits in the following
   V-commit: https://github.com/riscv/riscv-v-spec                            
 
 ---
-- New command line argument 'memory' allows regions of memory to be defined using
-  using a colon separated list of triplets "low,high,permission"
-  for example -memory "0x0000,0xffff,7:0xffff0000,0xffffffff,7" will create two
-  memory regions with RWX permissions bit 1: Read, bit 2: Write, bit 3: eXecute 
+
+- Bit Manipulation Extension
+  - Added sign extension for *w insructions on 64-bit processors.
+
+- Command line argument 'memory' allows regions of memory to be defined using
+  a string of form "low:high:permission"
+  for example
+     -memory 0x0000:0xffff:7 -memory 0xffff0000:0xffffffff:7
+  or, as a comma separated list
+     -memory 0x0000:0xffff:7,0xffff0000:0xffffffff:7
+  both create two memory regions with read, write and execute permissions.
+  The permissions field is optional, the default is RWX, if defined the
+  bits signify 1:Read, 2:Write, 3:eXecute permission for the memory region. 
  
 - V-commit f4056da: Encodings for vwmaccsu and vwmaccus instruction variants
   have been changed in 0.8-draft-20191004 and all subsequent versions to comply
