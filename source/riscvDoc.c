@@ -126,8 +126,7 @@ void riscvDoc(riscvP rootProcessor) {
     Bool             isSMP    = numHarts && child && !cfg->members;
     Uns32            extIndex;
     riscvExtConfigCP extCfg;
-
-    char          string[1024];
+    char             string[1024];
 
     // move to first child if an SMP object
     if(isSMP) {

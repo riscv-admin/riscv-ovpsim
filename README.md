@@ -4,8 +4,8 @@ A Complete, Fully Functional, Configurable RISC-V Simulator
 ===
 
 Author: Imperas Software, Ltd., using OVP Open Standard APIs  
-Date   : 06 Jan 2020 
-Version: 20200106.0  
+Date   : 10 Jan 2020 
+Version: 20200110.0  
 License: Model source included under Apache 2.0 open source license  
 License: Simulator riscvOVPsim licensed under Open Virtual Platforms (OVP) Fixed Platform Kits license  
 RISC-V Specifications currently supported:
@@ -14,8 +14,7 @@ RISC-V Specifications currently supported:
 - RISC-V Instruction Set Manual, RISC-V "V" Vector Extension (with version configurable in the model using the 'vector_version' parameter. 'master' version conforms to specification changes up to 14 December 2019 and is regularly updated to track the evolving specification.)
 - RISCV Extension B (Bit Manipulation)
   - Run command: riscvOVPsim.exe --override riscvOVPsim/cpu/add_Extensions=B --showoverrides 
-  - This will produce a formatted string, similar to
-  - Info (Bit Manipulation) extB Version(0.92) November 08 2019
+  - This will produce a formatted string, similar to 'Info (Bit Manipulation) extB Version(0.92) November 08 2019'
   
 About riscvOVPsim
 ---
