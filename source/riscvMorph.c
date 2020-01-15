@@ -911,7 +911,7 @@ inline static Bool inTransactionMode(riscvMorphStateP state) {
         emitCheckPolymorphic();
     }
 
-    if ((riscv->pmKey & PMK_TRANSACTION)) {
+    if((riscv->pmKey & PMK_TRANSACTION)) {
 
         // Assume any instruction that checks for transaction mode could
         // result in a transaction abort that exits transaction mode, which
@@ -5797,6 +5797,10 @@ static void emitVSetVLRRRCB(riscvMorphStateP state) {
     vmimtArgReg(32, rs2);
     vmimtCallResultAttrs(cb, dBits, rd, VMCA_NO_INVALIDATE);
     writeRegSize(riscv, rdA, dBits);
+
+    // terminate the block after this instruction because polymorphic state
+    // differs from initial state
+    vmimtEndBlock();
 }
 
 //
@@ -5817,6 +5821,10 @@ static void emitVSetVLRRCCB(riscvMorphStateP state) {
     vmimtArgUns32((vsew<<2)+vlmul);
     vmimtCallResultAttrs(cb, dBits, rd, VMCA_NO_INVALIDATE);
     writeRegSize(riscv, rdA, dBits);
+
+    // terminate the block after this instruction because polymorphic state
+    // differs from initial state
+    vmimtEndBlock();
 }
 
 //
@@ -5840,6 +5848,10 @@ static void emitVSetVLRRCBadSEW(riscvMorphStateP state) {
     vmimtArgUns32(0);       // vlmul (ignored)
     vmimtCallResultAttrs(cb, dBits, rd, VMCA_NO_INVALIDATE);
     writeRegSize(riscv, rdA, dBits);
+
+    // terminate the block after this instruction because polymorphic state
+    // differs from initial state
+    vmimtEndBlock();
 }
 
 //
@@ -5918,10 +5930,6 @@ static void emitVSetVLRR0SameVL(riscvMorphStateP state) {
 
         // update to different configuration
         emitVSetVLRRCCB(state);
-
-        // terminate the block after this instruction because VLClass is now
-        // unknown
-        vmimtEndBlock();
     }
 }
 
@@ -5938,10 +5946,6 @@ static RISCV_MORPH_FN(emitVSetVLRRR) {
 
     // zero vstart register on instruction completion
     setVStartZero(state);
-
-    // terminate the block after this instruction because SEW and VLMUL are
-    // now unknown
-    vmimtEndBlock();
 }
 
 //
@@ -5962,17 +5966,10 @@ static RISCV_MORPH_FN(emitVSetVLRRC) {
         // update using invalid SEW
         emitVSetVLRRCBadSEW(state);
 
-        // terminate the block after this instruction
-        vmimtEndBlock();
-
     } else if(option==SVT_SET) {
 
         // update to unknown vector length
         emitVSetVLRRCCB(state);
-
-        // terminate the block after this instruction because VLClass is now
-        // unknown
-        vmimtEndBlock();
 
     } else if(option==SVT_MAX) {
 

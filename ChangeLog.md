@@ -13,6 +13,14 @@ NOTE: X-commit messages below refer to git commits in the following
 
 ---
 
+- Some Vector Extension issues have been corrected:
+  - An issue has been corrected that caused a simulator error in blocks with
+    some variants of vsetvl/vsetvli instructions.
+
+Date 2020-January-10
+Release 20200110.0
+===
+
 - Bit Manipulation Extension
   - Added sign extension for *w insructions on 64-bit processors.
 
