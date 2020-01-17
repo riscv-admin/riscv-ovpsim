@@ -902,7 +902,14 @@ void riscvDoc(riscvP rootProcessor) {
             vmidocAddText(
                 Version,
                 "- instruction vfncvt.rod.f.f.w added (to allow narrowing "
-                "floating point conversions with jamming semantics)."
+                "floating point conversions with jamming semantics);"
+            );
+            vmidocAddText(
+                Version,
+                "- instructions that transfer values between vector registers "
+                "and general purpose registers (vmv.s.x and vmv.x.s) "
+                "sign-extend the source if required (previously, it was "
+                "zero-extended)."
             );
         }
 

@@ -14,6 +14,15 @@ NOTE: X-commit messages below refer to git commits in the following
 ---
 
 - Some Vector Extension issues have been corrected:
+  - V-commit b9fd7c9: For vector versions 0.8-draft-20190906 and later, vmv.s.x
+    and vmv.x.s now sign extend their operands if required (previously, they
+    were zero extended)
+
+Date 2020-January-15
+Release 20200114.0
+===
+
+- Some Vector Extension issues have been corrected:
   - An issue has been corrected that caused a simulator error in blocks with
     some variants of vsetvl/vsetvli instructions.
 

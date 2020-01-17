@@ -231,8 +231,15 @@ inline static Bool vectorFPRequiresFSNZ(riscvP riscv) {
 //
 // Are whole-register move and load/store instructions restricted?
 //
-static Bool vectorRestrictWhole(riscvP riscv) {
+inline static Bool vectorRestrictWhole(riscvP riscv) {
     return riscvVFSupport(riscv, RVVF_FP_RESTRICT_WHOLE);
+}
+
+//
+// Do vmv.x.s and vmv.s.x sign-extend short sources?
+//
+inline static Bool vectorSignExtVMVXS(riscvP riscv) {
+    return riscvVFSupport(riscv, RVVF_SEXT_VMV_X_S);
 }
 
 
@@ -826,7 +833,6 @@ void riscvWriteRegSize(
     Uns32        srcBits,
     Bool         signExtend
 ) {
-
     vmiReg dst = getVMIReg(riscv, r);
 
     if(isXReg(r)) {
@@ -1712,7 +1718,7 @@ static void generateEATag(riscvMorphStateP state, vmiReg rtag, vmiReg ra) {
     Uns32 bits   = getEABits(state);
     Uns32 raBits = getModeBits(state);
 
-    vmimtMoveExtendRR(bits, rtag, raBits, ra, 0);
+    vmimtMoveExtendRR(bits, rtag, raBits, ra, False);
     vmimtBinopRC(bits, vmi_AND, rtag, state->riscv->exclusiveTagMask, 0);
 }
 
@@ -1979,7 +1985,7 @@ static RISCV_MORPH_FN(emitSFENCE_VMA) {
     // emit VA argument if required
     if(haveVADDRr) {
         vmiReg tmp = newTmp(state);
-        vmimtMoveExtendRR(64, tmp, bits, VADDRr, 0);
+        vmimtMoveExtendRR(64, tmp, bits, VADDRr, False);
         vmimtArgReg(64, tmp);
     }
 
@@ -7754,17 +7760,18 @@ static void moveIndexedVd0Vs1(
 //
 static RISCV_MORPHV_FN(emitVEXTXV) {
 
-    riscvP       riscv  = state->riscv;
-    vmiReg       rd     = id->r[0];
-    vmiReg       rs1    = id->r[2];
-    riscvRegDesc rdA    = getRVReg(state, 0);
-    Uns32        rdBits = getRBits(rdA);
-    Uns32        eBits  = getMinBits(id, rdBits);
+    riscvP       riscv   = state->riscv;
+    vmiReg       rd      = id->r[0];
+    vmiReg       rs1     = id->r[2];
+    riscvRegDesc rdA     = getRVReg(state, 0);
+    Uns32        rdBits  = getRBits(rdA);
+    Uns32        eBits   = getMinBits(id, rdBits);
+    Bool         sExtend = vectorSignExtVMVXS(riscv);
 
     if(VMI_ISNOREG(rs1)) {
 
         // using x0 as index
-        vmimtMoveExtendRR(rdBits, rd, eBits, id->r[1], False);
+        vmimtMoveExtendRR(rdBits, rd, eBits, id->r[1], sExtend);
 
     } else {
 
@@ -7790,7 +7797,7 @@ static RISCV_MORPHV_FN(emitVEXTXV) {
         getIndexedVRegisterInt(state, id, 1, index);
 
         // get indexed value
-        vmimtMoveExtendRR(rdBits, rd, eBits, id->r[1], False);
+        vmimtMoveExtendRR(rdBits, rd, eBits, id->r[1], sExtend);
 
         // kill base registers and temporaries
         killBaseRegistersAndTemps(state, id);
@@ -7807,17 +7814,18 @@ static RISCV_MORPHV_FN(emitVEXTXV) {
 //
 static RISCV_MORPHV_FN(emitVMVSX) {
 
-    riscvP       riscv = state->riscv;
-    vmiReg       vd    = id->r[0];
-    vmiReg       rs1   = id->r[1];
-    riscvRegDesc rs1A  = getRVReg(state, 1);
-    Uns32        sBits = getMinBits(id, getRBits(rs1A));
+    riscvP       riscv   = state->riscv;
+    vmiReg       vd      = id->r[0];
+    vmiReg       rs1     = id->r[1];
+    riscvRegDesc rs1A    = getRVReg(state, 1);
+    Uns32        sBits   = getMinBits(id, getRBits(rs1A));
+    Bool         sExtend = vectorSignExtVMVXS(riscv);
 
     // zero target register
     zeroTail(riscv, id->VLEN, vd);
 
     // assign element 0 of result
-    vmimtMoveExtendRR(id->SEW, vd, sBits, rs1, False);
+    vmimtMoveExtendRR(id->SEW, vd, sBits, rs1, sExtend);
 }
 
 //
