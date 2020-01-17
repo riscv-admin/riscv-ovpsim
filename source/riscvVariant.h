@@ -219,6 +219,7 @@ typedef enum riscvVFeatureE {
     RVVF_ZERO_TAIL,         // is zeroing of tail elements required?
     RVVF_STRICT_OVERLAP,    // strict source/destination overlap?
     RVVF_SEXT_IOFFSET,      // sign-extend indexed load/store offset?
+    RVVF_SEXT_VMV_X_S,      // sign-extend vmv.x.s and vmv.s.x?
     RVVF_SETVLZ_MAX,        // setvl* with rs1=zero: set vl to maximum
     RVVF_SETVLZ_PRESERVE,   // setvl* with rs1=zero: preserve vl
     RVVF_VAMO_SEW,          // use SEW AMO size (not 64-bit size)
