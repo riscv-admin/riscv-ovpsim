@@ -13,6 +13,15 @@ NOTE: X-commit messages below refer to git commits in the following
 
 ---
 
+- Fix the vector version (0.7.1-draft-20190605) selected by Vector example scripts
+  to match the cross compiler toolchain used to build the ELF files executed.
+
+- Fixed memory argument so that more than two memory regions can be added 
+
+Date 2020-January-17
+Release 20200116.0
+===
+
 - Some Vector Extension issues have been corrected:
   - V-commit b9fd7c9: For vector versions 0.8-draft-20190906 and later, vmv.s.x
     and vmv.x.s now sign extend their operands if required (previously, they
