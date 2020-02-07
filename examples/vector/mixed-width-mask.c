@@ -21,6 +21,7 @@
 #include <stdlib.h>
 
 #include "vsupport.h"
+
 //            a0       a1       a2       a3
 void func1(int n, v512P a, v512P b, v512P c) {
     // # Code using one width for predicate and different width for masked
@@ -70,6 +71,8 @@ void check(int verbose, v512P a, v512P b, v512P c) {
 }
 
 int main () {
+
+    enableVEC();
 
     v512P a = malloc(sizeof(v512T));
     v512P b = malloc(sizeof(v512T));

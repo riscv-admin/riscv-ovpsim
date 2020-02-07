@@ -67,6 +67,8 @@ void check(int verbose, v512P a, v512P b, v512P c) {
 
 int main () {
 
+    enableVEC();
+
     v512P a = malloc(sizeof(v512T));
     v512P b = malloc(sizeof(v512T));
     v512P c = malloc(sizeof(v512T));

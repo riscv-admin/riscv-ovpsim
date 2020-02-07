@@ -21,6 +21,7 @@
 #include <stdlib.h>
 
 #include "vsupport.h"
+
 //            a0       a1       a2       a3       a4
 void func1(int n, v512P x, v512P a, v512P b, v512P z) {
     // # (int16) z[i] = ((int8) x[i] < 5) ? (int16) a[i] : (int16) b[i];
@@ -69,6 +70,8 @@ void check(int verbose, v512P x, v512P a, v512P b, v512P z) {
 
 // (int16) z[i] = ((int8) x[i] < 5) ? (int16) a[i] : (int16) b[i];
 int main () {
+
+    enableVEC();
 
     v512P a = malloc(sizeof(v512T));
     v512P b = malloc(sizeof(v512T));

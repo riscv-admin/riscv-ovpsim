@@ -22,15 +22,6 @@
 
 #include "vsupport.h"
 
-void enableFP() {
-    // enable floating point instructions
-    asm (
-        "    csrr s4, mstatus  \n"
-        "    li   s5, 1<<13    \n"
-        "    or   s4, s4, s5   \n"
-        "    csrw mstatus, s4  \n"
-    );
-}
 
 float fmadd_s(float a, float x, float y) {
     // fmadd.s = (a * x) + y
@@ -132,6 +123,7 @@ void op() {
 }
 
 int main () {
+    enableVEC();
     enableFP();
     op();
 }

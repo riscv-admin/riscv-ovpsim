@@ -81,20 +81,22 @@ int main () {
     v512P v2P0 = &v2[0];
     v512P v2P1 = &v2[1];
 
+    enableVEC();
+
     int i;
     for (i=0; i<VEC16; i++) {
         v0P->vu16[i] = i+1;
     }
-    vec_print(v0P, 16, "%d");
+    printVEC(v0P, 16, "%d");
     printf("REPORT: func1()\n");
     func1(32, v0P, v1P0, 16);
-    vec_print(v1P0, 32, "%d");
-    vec_print(v1P1, 32, "%d");
+    printVEC(v1P0, 32, "%d");
+    printVEC(v1P1, 32, "%d");
 
     printf("REPORT: func2()\n");
     func2(32, v0P, v2P0, 16);
-    vec_print(v2P0, 32, "%d");
-    vec_print(v2P1, 32, "%d");
+    printVEC(v2P0, 32, "%d");
+    printVEC(v2P1, 32, "%d");
 
     if (memcmp(v1P0, v2P0, (2*sizeof(v512T)))) {
         printf("REPORT: Memory Compare Failed\n");
