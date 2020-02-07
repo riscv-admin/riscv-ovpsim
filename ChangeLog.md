@@ -13,6 +13,18 @@ NOTE: X-commit messages below refer to git commits in the following
 
 ---
 
+- Bit Manipulation Extension
+  - Corrected sign extension for addwu, subwu, addiwu and slliu.w that were 
+    incorrectly changed in the last fix.
+
+- Command line argument 'memory' is modified so that permissions argument is required
+  and uses the characters rR, wW and xX for read, write and execute.
+
+
+Date 2020-January-21
+Release 20200120.0
+===
+
 - Fix the vector version (0.7.1-draft-20190605) selected by Vector example scripts
   to match the cross compiler toolchain used to build the ELF files executed.
 

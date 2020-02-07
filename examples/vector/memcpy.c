@@ -42,6 +42,8 @@ void vec_memcpy(void* dest, const void* src, int n) {
 #define MBYTE 1024*1024
 int main () {
 
+    enableVEC();
+
     Uns8 *buf1 = (Uns8 *)malloc(MBYTE);
     Uns8 *buf2 = (Uns8 *)malloc(MBYTE);
     Uns8 *buf3 = (Uns8 *)malloc(MBYTE);
