@@ -483,6 +483,17 @@ typedef enum riscvVITypeE {
 } riscvVIType;
 
 //
+// This is used to categorize CSR update semantics
+//
+typedef enum riscvWholeDescE {
+
+    RV_WD_NA,       // not a whole register instruction
+    RV_WD_LD_ST,    // whole register load/store
+    RV_WD_MV,       // whole register move
+
+} riscvWholeDesc;
+
+//
 // This defines the maximum number of argument registers
 //
 #define RV_MAX_AREGS 4
@@ -515,11 +526,11 @@ typedef struct riscvInstrInfoS {
     riscvFenceDesc    succ;             // successor fence
     riscvRMDesc       rm;               // rounding mode
     riscvCSRUDesc     csrUpdate;        // CSR update semantics
+    riscvWholeDesc    isWhole;          // is this a whole-register instruction?
     Uns32             csr;              // CSR index
     Uns8              vsew;             // vsew value
     Uns8              vlmul;            // vmul value
     Uns8              nf;               // nf value
-    Bool              isWhole;          // is this a whole-register instruction?
     Bool              isFF;             // is this a first-fault instruction?
 
 } riscvInstrInfo;

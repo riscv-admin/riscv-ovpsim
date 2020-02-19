@@ -13,6 +13,18 @@ NOTE: X-commit messages below refer to git commits in the following
 
 ---
 
+- Some Vector Extension issues have been corrected:
+  - Behavior of vmv.x.s and vfmv.f.s has been corrected when vstart>=vl so that
+    the result register is correctly updated (previously it was left unchanged 
+    in this case).
+  - Behavior of whole-register operations when vtype.vill=1 has been corrected
+    (these instructions should execute even when vtype.vill=1).
+  - Behavior of vid.v has been corrected when vstart!=0.
+
+Date 2020-February-13
+Release 20200212.0
+===
+
 - Some details of CSR access behavior have been corrected:
   - For Vector Extension version 0.8, access to vxsat and vxrm now requires both
     mstatus.FS and mstatus.VS to be non-zero; previously, only non-zero
