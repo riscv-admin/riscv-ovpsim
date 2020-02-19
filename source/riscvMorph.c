@@ -4055,6 +4055,7 @@ typedef struct shapeInfoS {
     Bool        usesVXRM;       // does operation use vxrm?
     Bool        isMaskCIn;      // is apparent mask a carry-in?
     Bool        SEW8;           // use fixed SEW=8?
+    Bool        noVStartCheck;  // skip vstart<vl check?
     overlapType ot;             // overlap constraints
 } shapeInfo;
 
@@ -4062,45 +4063,45 @@ typedef struct shapeInfoS {
 // Information for each vector operation shape
 //
 static const shapeInfo shapeDetails[RVVW_LAST] = {
-    [RVVW_111_II]    = {{1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_111_IIXSM] = {{1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, OT_XSM },
-    [RVVW_111_IIS]   = {{1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 1, 1, 0, 0, OT___  },
-    [RVVW_111_IIX]   = {{1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 1, 0, 0, OT___  },
-    [RVVW_BBB_II]    = {{1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 1, OT___  },
-    [RVVW_111_IS]    = {{1,1,1}, {0,0,0}, {0,0,0}, {0,1,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_111_SI]    = {{1,1,1}, {0,0,0}, {0,0,0}, {1,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_111_PI]    = {{1,1,1}, {0,0,0}, {1,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_111_SIS]   = {{1,1,1}, {0,0,0}, {0,0,0}, {1,0,1}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_CIN_II]    = {{1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 1, 0, OT___  },
-    [RVVW_CIN_PI]    = {{1,1,1}, {0,0,0}, {1,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 1, 0, OT___  },
-    [RVVW_212_SIS]   = {{2,1,2}, {0,0,0}, {0,0,0}, {1,0,1}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_121_II]    = {{1,2,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 1, 0, 0, 0, 0, OT___  },
-    [RVVW_121_IIS]   = {{1,2,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 1, 1, 1, 0, 0, OT___  },
-    [RVVW_211_IIQ]   = {{2,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 1, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_211_II]    = {{2,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_211_IIS]   = {{2,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 1, 1, 0, 0, OT___  },
-    [RVVW_411_II]    = {{4,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_221_II]    = {{2,2,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_111_FF]    = {{1,1,1}, {1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_111_PF]    = {{1,1,1}, {1,1,1}, {1,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_111_SFS]   = {{1,1,1}, {1,1,1}, {0,0,0}, {1,0,1}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_212_SFS]   = {{2,1,2}, {1,1,1}, {0,0,0}, {1,0,1}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_121_FFQ]   = {{1,2,1}, {1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 1, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_211_FFQ]   = {{2,1,1}, {1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 1, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_211_FF]    = {{2,1,1}, {1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_221_FF]    = {{2,2,1}, {1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_111_FI]    = {{1,1,1}, {1,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_111_IF]    = {{1,1,1}, {0,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_21_FIQ]    = {{2,1,0}, {1,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 1, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_21_IFQ]    = {{2,1,0}, {0,1,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 1, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_12_FIQ]    = {{1,2,0}, {1,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 1, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_12_IFQ]    = {{1,2,0}, {0,1,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 1, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_111_PP]    = {{1,1,1}, {0,0,0}, {1,1,1}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_111_IP]    = {{1,1,1}, {0,0,0}, {0,1,1}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, OT_SM  },
-    [RVVW_111_GR]    = {{1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,1,0}, 0, 0, 0, 0, 0, 0, 0, OT_SM  },
-    [RVVW_111_UP]    = {{1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,1,0}, 0, 0, 0, 0, 0, 0, 0, OT_SM71},
-    [RVVW_111_DN]    = {{1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,1,0}, 0, 0, 0, 0, 0, 0, 0, OT__M71},
-    [RVVW_111_CMP]   = {{1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {1,0,0}, 0, 0, 0, 0, 0, 0, 0, OT_SM  },
+    [RVVW_111_II]    = {{1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_111_IIXSM] = {{1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT_XSM },
+    [RVVW_111_IIS]   = {{1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 1, 1, 0, 0, 0, OT___  },
+    [RVVW_111_IIX]   = {{1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 1, 0, 0, 0, OT___  },
+    [RVVW_BBB_II]    = {{1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 1, 0, OT___  },
+    [RVVW_111_IS]    = {{1,1,1}, {0,0,0}, {0,0,0}, {0,1,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 1, OT___  },
+    [RVVW_111_SI]    = {{1,1,1}, {0,0,0}, {0,0,0}, {1,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_111_PI]    = {{1,1,1}, {0,0,0}, {1,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_111_SIS]   = {{1,1,1}, {0,0,0}, {0,0,0}, {1,0,1}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_CIN_II]    = {{1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 1, 0, 0, OT___  },
+    [RVVW_CIN_PI]    = {{1,1,1}, {0,0,0}, {1,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 1, 0, 0, OT___  },
+    [RVVW_212_SIS]   = {{2,1,2}, {0,0,0}, {0,0,0}, {1,0,1}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_121_II]    = {{1,2,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 1, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_121_IIS]   = {{1,2,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 1, 1, 1, 0, 0, 0, OT___  },
+    [RVVW_211_IIQ]   = {{2,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 1, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_211_II]    = {{2,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_211_IIS]   = {{2,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 1, 1, 0, 0, 0, OT___  },
+    [RVVW_411_II]    = {{4,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_221_II]    = {{2,2,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_111_FF]    = {{1,1,1}, {1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_111_PF]    = {{1,1,1}, {1,1,1}, {1,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_111_SFS]   = {{1,1,1}, {1,1,1}, {0,0,0}, {1,0,1}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_212_SFS]   = {{2,1,2}, {1,1,1}, {0,0,0}, {1,0,1}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_121_FFQ]   = {{1,2,1}, {1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 1, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_211_FFQ]   = {{2,1,1}, {1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 1, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_211_FF]    = {{2,1,1}, {1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_221_FF]    = {{2,2,1}, {1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_111_FI]    = {{1,1,1}, {1,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_111_IF]    = {{1,1,1}, {0,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_21_FIQ]    = {{2,1,0}, {1,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 1, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_21_IFQ]    = {{2,1,0}, {0,1,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 1, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_12_FIQ]    = {{1,2,0}, {1,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 1, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_12_IFQ]    = {{1,2,0}, {0,1,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 1, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_111_PP]    = {{1,1,1}, {0,0,0}, {1,1,1}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_111_IP]    = {{1,1,1}, {0,0,0}, {0,1,1}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT_SM  },
+    [RVVW_111_GR]    = {{1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,1,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT_SM  },
+    [RVVW_111_UP]    = {{1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,1,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT_SM71},
+    [RVVW_111_DN]    = {{1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,1,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT__M71},
+    [RVVW_111_CMP]   = {{1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {1,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT_SM  },
 };
 
 //
@@ -4205,6 +4206,13 @@ inline static Bool isMaskCIn(riscvVShape vShape) {
 //
 inline static Bool isSEW8(riscvVShape vShape) {
     return shapeDetails[vShape].SEW8;
+}
+
+//
+// Should this operation skip and vstart<vl check?
+//
+inline static Bool noVStartCheck(riscvVShape vShape) {
+    return shapeDetails[vShape].noVStartCheck;
 }
 
 //
@@ -5021,6 +5029,20 @@ static void validateVStart(
 }
 
 //
+// Clamp vstart CSR if required
+//
+static void clampVStart(riscvMorphStateP state, iterDescP id) {
+
+    vmiReg vstart = CSR_REG_MT(vstart);
+
+    if(state->info.isWhole) {
+        vmimtMoveRC(64, vstart, getVLMAXOp(id));
+    } else {
+        vmimtMoveExtendRR(64, vstart, 32, CSR_REG_MT(vl), False);
+    }
+}
+
+//
 // Handle non-zero vstart
 //
 static vmiLabelP handleNonZeroVStart(
@@ -5034,10 +5056,13 @@ static vmiLabelP handleNonZeroVStart(
 
     if(!blockState->VStartZeroMt) {
 
-        vmiReg vstart = CSR_REG_MT(vstart);
+        vmiReg      vstart = CSR_REG_MT(vstart);
+        riscvVShape vShape = state->attrs->vShape;
 
-        if(state->info.isWhole) {
+        if((state->info.isWhole==RV_WD_MV) || noVStartCheck(vShape)) {
 
+            // whole-register operations and some scalar operations do not
+            // require vstart<vl check
             vmimtMoveRC(64, vstart, 0);
 
         } else {
@@ -5058,7 +5083,7 @@ static vmiLabelP handleNonZeroVStart(
                 validateVStart(state, id, vmi_COND_L, doOp);
 
                 // clamp vstart to vl if it is used as an iteration index
-                vmimtMoveExtendRR(64, vstart, 32, CSR_REG_MT(vl), False);
+                clampVStart(state, id);
 
                 // go to zero extension operation
                 vmimtUncondJumpLabel(skip);
@@ -5487,12 +5512,12 @@ static void doPerElementOp(riscvMorphStateP state, iterDescP id) {
 }
 
 //
-// Return a Boolean indicating if vector instruction can be executed because
-// vtype.vill=0
+// Return a Boolean indicating if vector instruction cannot be executed because
+// vtype.vill=1 (does not apply to whole-register instructions)
 //
 static Bool emitCheckVILL(riscvMorphStateP state) {
 
-    Bool vill = RD_CSR_FIELD(state->riscv, vtype, vill);
+    Bool vill = RD_CSR_FIELD(state->riscv, vtype, vill) && !state->info.isWhole;
 
     // indicate this is a vector instruction
     vmimtInstructionClassAdd(OCL_IC_VECTOR);
@@ -6807,7 +6832,7 @@ static RISCV_MORPHV_FN(emitVMSOFCB) {
 // Initialization callback for VIOTA/VID
 //
 static RISCV_MORPHV_FN(initVIOTACB) {
-    vmimtMoveRC(id->SEW, RISCV_VTMP, 0);
+    vmimtMoveRR(id->SEW, RISCV_VTMP, CSR_REG_MT(vstart));
 }
 
 //

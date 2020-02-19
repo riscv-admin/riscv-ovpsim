@@ -3370,19 +3370,19 @@ static Uns8 getVLMUL(riscvInstrInfoP info, vlmulSpec vlmul) {
 //
 // Return while-register specification encoded in the instruction
 //
-static Bool getWholeReg(riscvInstrInfoP info, wholeSpec wr) {
+static riscvWholeDesc getWholeReg(riscvInstrInfoP info, wholeSpec wr) {
 
-    Bool  result = False;
-    Uns32 instr  = info->instruction;
+    riscvWholeDesc result = RV_WD_NA;
+    Uns32          instr  = info->instruction;
 
     switch(wr) {
         case WR_NA:
             break;
         case WR_T:
-            result = True;
+            result = RV_WD_MV;
             break;
         case WR_23:
-            result = U_23(instr);
+            result = U_23(instr) ? RV_WD_LD_ST : RV_WD_NA;
             break;
         default:
             VMI_ABORT("unimplemented case"); // LCOV_EXCL_LINE
