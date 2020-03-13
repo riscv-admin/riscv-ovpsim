@@ -25,9 +25,10 @@
 typedef enum riscvModeS {
     RISCV_MODE_USER       = 0,
     RISCV_MODE_SUPERVISOR = 1,
-    RISCV_MODE_HYPERVISOR = 2,   // not currently in use
+    RISCV_MODE_HYPERVISOR = 2,  // not currently in use
     RISCV_MODE_MACHINE    = 3,
-    RISCV_MODE_LAST
+    RISCV_MODE_LAST,
+    RISCV_MODE_DEBUG      = 4   // pseudo-mode (uses M-mode privileges)
 } riscvMode;
 
 //
@@ -57,12 +58,11 @@ typedef enum riscvDisableReasonE {
 
     RVD_ACTIVE = 0x0,   // processor running
     RVD_WFI    = 0x1,   // processor halted in WFI
-    RVD_NMI    = 0x2,   // processor halted in NMI
-    RVD_RESET  = 0x4,   // processor halted in reset
+    RVD_RESET  = 0x2,   // processor halted in reset
 
     // states from which to restart
     RVD_RESTART_WFI   = (RVD_WFI),
-    RVD_RESTART_NMI   = (RVD_WFI|RVD_NMI),
+    RVD_RESTART_NMI   = (RVD_WFI),
     RVD_RESTART_RESET = (RVD_WFI|RVD_RESET)
 
 } riscvDisableReason;

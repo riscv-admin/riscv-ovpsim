@@ -24,12 +24,14 @@
 #include "vmi/vmiAttrs.h"
 #include "vmi/vmiDbg.h"
 #include "vmi/vmiMessage.h"
+#include "vmi/vmiMt.h"
 #include "vmi/vmiRt.h"
 
 // model header files
 #include "riscvCSR.h"
 #include "riscvCSRTypes.h"
 #include "riscvDebug.h"
+#include "riscvExceptions.h"
 #include "riscvFunctions.h"
 #include "riscvMessage.h"
 #include "riscvRegisters.h"
@@ -104,7 +106,7 @@ static const vmiRegGroup groups[RV_RG_LAST+1] = {
 DEFINE_CS(isrDetails);
 
 //
-// Structure filled with CSR register details by riscvGetCSRDetails
+// Structure providing details of integration support registers
 //
 typedef struct isrDetailsS {
     const char       *name;
@@ -117,14 +119,29 @@ typedef struct isrDetailsS {
     vmiRegWriteFn     writeCB;
     vmiRegAccess      access;
     Bool              noTraceChange;
+    Bool              DM;
 } isrDetails;
+
+//
+// Write processor DM bit (enables or disables Debug mode)
+//
+static VMI_REG_WRITE_FN(writeDM) {
+
+    riscvP riscv = (riscvP)processor;
+    Uns8   DM    = *(Uns8*)buffer;
+
+    riscvSetDM(riscv, DM&1);
+
+    return True;
+}
 
 //
 // List of integration support registers
 //
 static const isrDetails isRegs[] = {
 
-    {"LRSCAddress", "LR/SC active lock address", ISA_A, 0, 0,  RISCV_EA_TAG, 0, 0, vmi_RA_RW, 0},
+    {"LRSCAddress", "LR/SC active lock address", ISA_A, 0, 0, RISCV_EA_TAG, 0, 0,       vmi_RA_RW, 0, 0},
+    {"DM",          "Debug mode active",         0,     1, 8, RISCV_DM,     0, writeDM, vmi_RA_RW, 0, 1},
 
     // KEEP LAST
     {0}
@@ -144,7 +161,15 @@ static isrDetailsCP getNextISRDetails(
         riscvArchitecture arch = riscv->configInfo.arch;
         isrDetailsCP      this = prev ? prev+1 : isRegs;
 
-        while(this->name && ((this->arch&arch)!=this->arch)) {
+        while(
+            this->name &&
+            (
+                // exclude registers not applicable to this architecture
+                ((this->arch&arch)!=this->arch) ||
+                // exclude debug mode registers if that mode is absent
+                (this->DM && !riscv->configInfo.debug_mode)
+            )
+        ) {
             this++;
         }
 
@@ -506,7 +531,7 @@ void riscvFreeRegInfo(riscvP riscv) {
     vmirtRegImplRaw(processor, _REG, _FIELD, _BITS)
 
 //
-// Helper macro for defining field-to register mappings
+// Helper macro for defining field-to-register mappings
 //
 #define RISCV_FIELD_IMPL_RAW(_REGINFO, _FIELD) { \
     Uns32 bits = sizeof(((riscvP)0)->_FIELD) * 8;               \
@@ -520,10 +545,28 @@ void riscvFreeRegInfo(riscvP riscv) {
     RISCV_FIELD_IMPL_RAW(0, _FIELD)
 
 //
+// Ignore register definitions for artifact vector index tables
+//
+static void offsetRegIgnore(riscvP riscv, riscvStrideOffset *base, Uns32 mul) {
+
+	vmiProcessorP processor = (vmiProcessorP)riscv;
+    Uns32         vRegBytes = riscv->configInfo.VLEN/8;
+
+    vmirtRegImplRaw(
+        processor,
+	    0,
+        vmimtGetExtReg(processor, base),
+	    vRegBytes*sizeof(*base)*8*mul
+    );
+}
+
+//
 // Specify vmiReg-to-vmiRegInfoCP correspondence for registers for which this
 // cannot be automatically derived
 //
 VMI_REG_IMPL_FN(riscvRegImpl) {
+
+    riscvP riscv = (riscvP)processor;
 
     // specify that fpFlags is in fflags
     vmiRegInfoCP fflags = vmirtGetRegByName(processor, "fflags");
@@ -541,6 +584,13 @@ VMI_REG_IMPL_FN(riscvRegImpl) {
     RISCV_FIELD_IMPL_IGNORE(offsetsLMULx4);
     RISCV_FIELD_IMPL_IGNORE(offsetsLMULx8);
     RISCV_FIELD_IMPL_IGNORE(jumpBase);
+
+    // exclude artifact vector index registers
+    if(riscv->configInfo.arch & ISA_V) {
+    	offsetRegIgnore(riscv, riscv->offsetsLMULx2, 2);
+    	offsetRegIgnore(riscv, riscv->offsetsLMULx4, 4);
+    	offsetRegIgnore(riscv, riscv->offsetsLMULx8, 8);
+    }
 }
 
 

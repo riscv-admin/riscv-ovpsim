@@ -493,6 +493,21 @@ static void consolidateFPFlags(riscvP riscv) {
 }
 
 //
+// This function is called when configurable endianness has changed
+//
+static void updateEndian(riscvP riscv) {
+
+    vmiProcessorP processor = (vmiProcessorP)riscv;
+
+    // if this is the first time endianness has been changed, flush all
+    // dictionaries (endianness checking is required)
+    if(!riscv->checkEndian) {
+        riscv->checkEndian = True;
+        vmirtFlushAllDicts(processor);
+    }
+}
+
+//
 // Common routine to read status using mstatus, sstatus or ustatus alias
 //
 static Uns64 statusR(riscvP riscv) {
@@ -549,8 +564,10 @@ static void statusW(riscvP riscv, Uns64 newValue, Uns64 mask) {
 
     // get new value using writable bit mask
     Uns32 oldIE = oldValue & WM_mstatus_IE;
+    Uns64 oldBE = oldValue & WM_mstatus_BE;
     newValue = ((newValue & mask) | (oldValue & ~mask));
     Uns32 newIE = newValue & WM_mstatus_IE;
+    Uns64 newBE = newValue & WM_mstatus_BE;
 
     // update the CSR
     Uns8 oldMPP = RD_CSR_FIELD(riscv, mstatus, MPP);
@@ -561,6 +578,11 @@ static void statusW(riscvP riscv, Uns64 newValue, Uns64 mask) {
     // from WLRL to WARL in privileged Specification version 1.11)
     if(!riscvHasMode(riscv, newMPP)) {
         WR_CSR_FIELD(riscv, mstatus, MPP, oldMPP);
+    }
+
+    // handle update of endianness if required
+    if(oldBE!=newBE) {
+        updateEndian(riscv);
     }
 
     // update current architecture if required
@@ -599,6 +621,43 @@ static RISCV_CSR_WRITEFN(mstatusW) {
 
     // return written value
     return RD_CSR(riscv, mstatus);
+}
+
+//
+// Common routine to write statush using mstatush alias
+//
+static void statushW(riscvP riscv, Uns64 newValue, Uns32 mask) {
+
+    // get old value
+    Uns32 oldValue = RD_CSR(riscv, mstatush);
+
+    // get new value using writable bit mask
+    Uns32 oldBE = oldValue & WM_mstatush_BE;
+    newValue = ((newValue & mask) | (oldValue & ~mask));
+    Uns32 newBE = newValue & WM_mstatush_BE;
+
+    // update the CSR
+    WR_CSR(riscv, mstatush, newValue);
+
+    // handle update of endianness if required
+    if(oldBE!=newBE) {
+        updateEndian(riscv);
+        riscvSetCurrentArch(riscv);
+    }
+}
+
+//
+// Write mstatush
+//
+static RISCV_CSR_WRITEFN(mstatushW) {
+
+    Uns32 mask = RD_CSR_MASK(riscv, mstatush);
+
+    // update the CSR
+    statushW(riscv, newValue, mask);
+
+    // return written value
+    return RD_CSR(riscv, mstatush);
 }
 
 //
@@ -1119,13 +1178,38 @@ inline static Uns64 getInstructions(riscvP riscv) {
 }
 
 //
+// Should a counter be inhibited because dcsr.stopcount=1?
+//
+static Bool stopCount(riscvP riscv, Bool singleOnly) {
+    return (
+        inDebugMode(riscv) &&
+        RD_CSR_FIELD(riscv, dcsr, stopcount) &&
+        (!singleOnly || !riscv->parent)
+    );
+}
+
+//
+// Is cycle count inhibited?
+//
+Bool riscvInhibitCycle(riscvP riscv) {
+    return RD_CSR_FIELD(riscv, mcountinhibit, CY) || stopCount(riscv, True);
+}
+
+//
+// Is retired instruction count inhibited?
+//
+Bool riscvInhibitInstret(riscvP riscv) {
+    return RD_CSR_FIELD(riscv, mcountinhibit, IR) || stopCount(riscv, False);
+}
+
+//
 // Common routine to read cycle counter
 //
 static Uns64 cycleR(riscvP riscv) {
 
     Uns64 result = riscv->baseCycles;
 
-    if(!RD_CSR_FIELD(riscv, mcountinhibit, CY)) {
+    if(!riscvInhibitCycle(riscv)) {
         result = getCycles(riscv) - result;
     }
 
@@ -1134,15 +1218,15 @@ static Uns64 cycleR(riscvP riscv) {
 
 //
 // Common routine to write cycle counter (NOTE: count is notionally incremented
-// *before* the write)
+// *before* the write if this is the result of a CSR write)
 //
-static void cycleW(riscvP riscv, Uns64 newValue) {
+static void cycleW(riscvP riscv, Uns64 newValue, Bool preIncrement) {
 
-    if(!RD_CSR_FIELD(riscv, mcountinhibit, CY)) {
+    if(!riscvInhibitCycle(riscv)) {
 
         newValue = getCycles(riscv) - newValue;
 
-        if(!riscv->artifactAccess) {
+        if(preIncrement && !riscv->artifactAccess) {
             newValue++;
         }
     }
@@ -1172,9 +1256,9 @@ static RISCV_CSR_WRITEFN(mcycleW) {
     if(!hpmAccessValid(attrs, riscv)) {
         // no action
     } else if(RISCV_XLEN_IS_32(riscv)) {
-        cycleW(riscv, setLower(newValue, cycleR(riscv)));
+        cycleW(riscv, setLower(newValue, cycleR(riscv)), True);
     } else {
-        cycleW(riscv, newValue);
+        cycleW(riscv, newValue, True);
     }
 
     return newValue;
@@ -1200,7 +1284,7 @@ static RISCV_CSR_READFN(mcyclehR) {
 static RISCV_CSR_WRITEFN(mcyclehW) {
 
     if(hpmAccessValid(attrs, riscv)) {
-        cycleW(riscv, setUpper(newValue, cycleR(riscv)));
+        cycleW(riscv, setUpper(newValue, cycleR(riscv)), True);
     }
 
     return newValue;
@@ -1248,7 +1332,7 @@ static Uns64 instretR(riscvP riscv) {
 
     Uns64 result = riscv->baseInstructions;
 
-    if(!RD_CSR_FIELD(riscv, mcountinhibit, IR)) {
+    if(!riscvInhibitInstret(riscv)) {
         result = getInstructions(riscv) - result;
     }
 
@@ -1261,7 +1345,7 @@ static Uns64 instretR(riscvP riscv) {
 //
 static void instretW(riscvP riscv, Uns64 newValue) {
 
-    if(!RD_CSR_FIELD(riscv, mcountinhibit, IR)) {
+    if(!riscvInhibitInstret(riscv)) {
         newValue = getInstructions(riscv) - newValue + 1;
     }
 
@@ -1325,27 +1409,45 @@ static RISCV_CSR_WRITEFN(minstrethW) {
 }
 
 //
+// Get state before possible inhibit update
+//
+void riscvPreInhibit(riscvP riscv, riscvCountStateP state) {
+
+    state->inhibitCycle   = riscvInhibitCycle(riscv);
+    state->inhibitInstret = riscvInhibitInstret(riscv);
+    state->cycle          = cycleR(riscv);
+    state->instret        = instretR(riscv);
+}
+
+//
+// Update state after possible inhibit update
+//
+void riscvPostInhibit(riscvP riscv, riscvCountStateP state, Bool preIncrement) {
+
+    // set cycle and instret counters *after* mcountinhibit update
+    if(state->inhibitCycle != riscvInhibitCycle(riscv)) {
+        cycleW(riscv, state->cycle, preIncrement);
+    }
+    if(state->inhibitInstret != riscvInhibitInstret(riscv)) {
+        instretW(riscv, state->instret);
+    }
+}
+
+//
 // Write mcountinhibit
 //
 static RISCV_CSR_WRITEFN(mcountinhibitW) {
 
-    Bool oldCY = RD_CSR_FIELD(riscv, mcountinhibit, CY);
-    Bool oldIR = RD_CSR_FIELD(riscv, mcountinhibit, IR);
+    riscvCountState state;
 
-    // get cycle and instret counters *before* mcountinhibit update
-    Uns64 cycle   = cycleR(riscv);
-    Uns64 instret = instretR(riscv);
+    // get state before possible inhibit update
+    riscvPreInhibit(riscv, &state);
 
     // update the CSR
     WR_CSR(riscv, mcountinhibit, newValue);
 
-    // set cycle and instret counters *after* mcountinhibit update
-    if(oldCY != RD_CSR_FIELD(riscv, mcountinhibit, CY)) {
-        cycleW(riscv, cycle);
-    }
-    if(oldIR != RD_CSR_FIELD(riscv, mcountinhibit, IR)) {
-        instretW(riscv, instret);
-    }
+    // refresh state after possible inhibit update
+    riscvPostInhibit(riscv, &state, True);
 
     return newValue;
 }
@@ -1543,23 +1645,6 @@ static RISCV_CSR_READFN(vcsrR) {
     // initially clear register
     WR_CSR(riscv, vcsr, 0);
 
-    // update floating point fields only if enabled
-    if(riscv->currentArch & ISA_DF) {
-
-        // construct effective flags from CSR and JIT flags
-        vmiFPFlags vmiFlags = getFPFlags(riscv);
-
-        // compose flags in register value
-        WR_CSR_FIELD(riscv, vcsr, NX, vmiFlags.f.P);
-        WR_CSR_FIELD(riscv, vcsr, UF, vmiFlags.f.U);
-        WR_CSR_FIELD(riscv, vcsr, OF, vmiFlags.f.O);
-        WR_CSR_FIELD(riscv, vcsr, DZ, vmiFlags.f.Z);
-        WR_CSR_FIELD(riscv, vcsr, NV, vmiFlags.f.I);
-
-        // compose frm in register value (mastered in fcsr)
-        WR_CSR_FIELD(riscv, vcsr, frm, getMasterFRM(riscv));
-    }
-
     // get fixed point saturation alias
     WR_CSR_FIELD(riscv, vcsr, vxsat, getSatFlags(riscv));
 
@@ -1575,30 +1660,8 @@ static RISCV_CSR_READFN(vcsrR) {
 //
 static RISCV_CSR_WRITEFN(vcsrW) {
 
-    Uns64 mask  = RD_CSR_MASK(riscv, vcsr);
-    Uns8  oldRM = getMasterFRM(riscv);
-
     // update the CSR
-    WR_CSR(riscv, vcsr, newValue & mask);
-
-    // update floating point fields only if enabled
-    if(riscv->currentArch & ISA_DF) {
-
-        vmiFPFlags vmiFlags = {bits: 0};
-
-        // extract flags from register value
-        vmiFlags.f.P = RD_CSR_FIELD(riscv, vcsr, NX);
-        vmiFlags.f.U = RD_CSR_FIELD(riscv, vcsr, UF);
-        vmiFlags.f.O = RD_CSR_FIELD(riscv, vcsr, OF);
-        vmiFlags.f.Z = RD_CSR_FIELD(riscv, vcsr, DZ);
-        vmiFlags.f.I = RD_CSR_FIELD(riscv, vcsr, NV);
-
-        // assign CSR flags and clear JIT flags (floating point)
-        setFPFlags(riscv, vmiFlags);
-
-        // handle change to rounding modes
-        setFPRoundingMode(riscv, oldRM, RD_CSR_FIELD(riscv, vcsr, frm));
-    }
+    WR_CSR(riscv, vcsr, newValue & WM32_vcsr);
 
     // assign CSR flags and clear JIT flags (fixed point)
     setSatFlags(riscv, RD_CSR_FIELD(riscv, vcsr, vxsat));
@@ -1659,6 +1722,75 @@ void riscvSetVL(riscvP riscv, Uns64 vl) {
 
     // update vl CSR
     WR_CSR(riscv, vl, vl);
+}
+
+//
+// Reset vector state
+//
+static void resetVLVType(riscvP riscv) {
+
+    if(riscv->configInfo.arch & ISA_V) {
+
+        // reset vtype CSR
+        riscvSetVType(riscv, !riscvValidSEW(riscv, 0), 0, 0);
+
+        // reset VL CSR
+        riscvSetVL(riscv, 0);
+
+        // set vector polymorphic key
+        riscvRefreshVectorPMKey(riscv);
+    }
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// DEBUG MODE REGISTERS
+////////////////////////////////////////////////////////////////////////////////
+
+//
+// Are Debug Mode registers present?
+//
+inline static RISCV_CSR_PRESENTFN(debugP) {
+    return riscv->configInfo.debug_mode;
+}
+
+//
+// Internal interface for dcsr write
+//
+static void dcsrWInt(riscvP riscv, Uns32 newValue, Bool updateCause) {
+
+    Uns32           oldValue = RD_CSR(riscv, dcsr);
+    Uns32           mask     = RD_CSR_MASK(riscv, dcsr);
+    riscvCountState state;
+
+    // get state before possible inhibit update
+    riscvPreInhibit(riscv, &state);
+
+    // preserve cause value unless an artifact write
+    if(!updateCause) {
+        mask &= ~(WM32_dcsr_cause|WM32_dcsr_nmip);
+    }
+
+    // update value
+    WR_CSR(riscv, dcsr, ((newValue & mask) | (oldValue & ~mask)));
+
+    // set step breakpoint if required
+    riscvSetStepBreakpoint(riscv);
+
+    // refresh state after possible inhibit update
+    riscvPostInhibit(riscv, &state, True);
+}
+
+//
+// Write dcsr
+//
+static RISCV_CSR_WRITEFN(dcsrW) {
+
+    // call internal interface
+    dcsrWInt(riscv, newValue, riscv->artifactAccess);
+
+    // return written value
+    return RD_CSR(riscv, dcsr);
 }
 
 
@@ -1922,6 +2054,7 @@ static const riscvCSRAttrs csrs[CSR_ID(LAST)] = {
     CSR_ATTR_T__     (mie,          0x304, 0,           0,          1_10,   1,0,0,  "Machine Interrupt Enable",                      0,      0,           0,          0,     mieW          ),
     CSR_ATTR_T__     (mtvec,        0x305, 0,           0,          1_10,   0,0,0,  "Machine Trap-Vector Base-Address",              0,      0,           0,          0,     mtvecW        ),
     CSR_ATTR_TV_     (mcounteren,   0x306, ISA_SorU,    0,          1_10,   0,0,0,  "Machine Counter Enable",                        0,      0,           0,          0,     0             ),
+    CSR_ATTR_TV_     (mstatush,     0x310, ISA_XLEN_32, 0,          1_12,   0,0,0,  "Machine Status High",                           0,      0,           0,          0,     mstatushW     ),
     CSR_ATTR_TV_     (mcountinhibit,0x320, 0,           0,          1_11,   0,0,0,  "Machine Counter Inhibit",                       0,      0,           0,          0,     mcountinhibitW),
     CSR_ATTR_T__     (mscratch,     0x340, 0,           0,          1_10,   0,0,0,  "Machine Scratch",                               0,      0,           0,          0,     0             ),
     CSR_ATTR_TV_     (mepc,         0x341, 0,           0,          1_10,   0,0,0,  "Machine Exception Program Counter",             0,      0,           mepcR,      0,     0             ),
@@ -1952,10 +2085,10 @@ static const riscvCSRAttrs csrs[CSR_ID(LAST)] = {
     CSR_ATTR_NIP     (tdata3,       0x7A3, 0,           0,          1_10,   0,0,0,  "Debug/Trace Trigger Data 3"                                                                           ),
 
     //                name          num    arch         access      version attrs   description                                      present wState       rCB         rwCB   wCB
-    // TODO: these are undefined in all modes
-    CSR_ATTR_NIP     (dcsr,         0x7B0, 0,           0,          1_10,   0,0,0,  "Debug Control and Status"                                                                             ),
-    CSR_ATTR_NIP     (dpc,          0x7B1, 0,           0,          1_10,   0,0,0,  "Debug PC"                                                                                             ),
-    CSR_ATTR_NIP     (dscratch,     0x7B2, 0,           0,          1_10,   0,0,0,  "Debug Scratch"                                                                                        ),
+    CSR_ATTR_TV_     (dcsr,         0x7B0, 0,           0,          1_10,   0,0,0,  "Debug Control and Status",                      debugP, 0,           0,          0,     dcsrW         ),
+    CSR_ATTR_T__     (dpc,          0x7B1, 0,           0,          1_10,   0,0,0,  "Debug PC",                                      debugP, 0,           0,          0,     0             ),
+    CSR_ATTR_T__     (dscratch0,    0x7B2, 0,           0,          1_10,   0,0,0,  "Debug Scratch 0",                               debugP, 0,           0,          0,     0             ),
+    CSR_ATTR_T__     (dscratch1,    0x7B3, 0,           0,          1_10,   0,0,0,  "Debug Scratch 1",                               debugP, 0,           0,          0,     0             ),
 };
 
 
@@ -2517,6 +2650,11 @@ static void fromConfiguredArch(riscvCSRAttrsCP attrs, riscvP riscv) {
     SET_CSR_FIELD_MASK_1_32(_CPU, _RNAME, _FIELD); \
     SET_CSR_FIELD_MASK_1_64(_CPU, _RNAME, _FIELD)
 
+// set field mask to all 1's in all CSR masks, alternate names for 32/64 bit
+#define SET_CSR_FIELD_MASK_1_ALT(_CPU, _RNAME32, _RNAME64, _FIELD) \
+    SET_CSR_FIELD_MASK_1_32(_CPU, _RNAME32, _FIELD); \
+    SET_CSR_FIELD_MASK_1_64(_CPU, _RNAME64, _FIELD)
+
 //
 // Reset CSR state
 //
@@ -2538,11 +2676,17 @@ void riscvCSRReset(riscvP riscv) {
     // update cause register (to zero)
     WR_CSR(riscv, mcause, 0);
 
+    // reset vector state
+    resetVLVType(riscv);
+
     // update current architecture on change to misa or mstatus
     riscvSetCurrentArch(riscv);
 
     // reset PMP unit
     riscvVMResetPMP(riscv);
+
+    // reset dcsr
+    dcsrWInt(riscv, RISCV_MODE_MACHINE, True);
 
     // clear exclusive tag
     riscv->exclusiveTag = RISCV_NO_TAG;
@@ -2721,6 +2865,28 @@ void riscvCSRInit(riscvP riscv, Uns32 index) {
             SET_CSR_FIELD_MASK_1(riscv, mstatus, VS_8);
         } else if(statusVS9(riscv)) {
             SET_CSR_FIELD_MASK_1(riscv, mstatus, VS_9);
+        }
+    }
+
+    // initialize endian values and write masks
+    if(riscvSupportEndian(riscv)) {
+
+        Bool BE = riscv->dendian;
+
+        // enable and initialize MBE field in mstatus or mstatush
+        SET_CSR_FIELD_MASK_1_ALT(riscv, mstatush, mstatus, MBE);
+        WR_CSR_FIELD_ALT(riscv, mstatush, mstatus, MBE, BE);
+
+        // enable and initialize SBE field in mstatus or mstatush
+        if(arch&ISA_S) {
+            SET_CSR_FIELD_MASK_1_ALT(riscv, mstatush, mstatus, SBE);
+            WR_CSR_FIELD_ALT(riscv, mstatush, mstatus, SBE, BE);
+        }
+
+        // enable and initialize UBE field in mstatus
+        if(arch&ISA_U) {
+            SET_CSR_FIELD_MASK_1(riscv, mstatus, UBE);
+            WR_CSR_FIELD(riscv, mstatus, UBE, BE);
         }
     }
 
@@ -2913,25 +3079,6 @@ void riscvCSRInit(riscvP riscv, Uns32 index) {
     updateCurrentRMValid(riscv);
 
     //--------------------------------------------------------------------------
-    // vcsr mask
-    //--------------------------------------------------------------------------
-
-    if((arch&ISA_V) && riscvVFSupport(riscv, RVVF_VCSR_PRESENT)) {
-
-        Uns32 vcsrMask = 0;
-
-        // enable floating point fields if required
-        if(arch&ISA_DF) {
-            vcsrMask |= WM32_vcsr_f;
-        }
-
-        // enable fixed point fields
-        vcsrMask |= WM32_vcsr_v;
-
-        SET_CSR_MASK_V(riscv, vcsr, vcsrMask);
-    }
-
-    //--------------------------------------------------------------------------
     // vlenb
     //--------------------------------------------------------------------------
 
@@ -2941,12 +3088,38 @@ void riscvCSRInit(riscvP riscv, Uns32 index) {
     // vstart mask and polymorphic key
     //--------------------------------------------------------------------------
 
-    if((arch&ISA_V) && !riscvVFSupport(riscv, RVVF_VSTART_Z)) {
-        SET_CSR_MASK_V(riscv, vstart, cfg->VLEN-1);
-    }
+    SET_CSR_MASK_V(riscv, vstart, cfg->VLEN-1);
 
     // set initial vector polymorphic key
     riscvRefreshVectorPMKey(riscv);
+
+    //--------------------------------------------------------------------------
+    // dcsr mask and read-only fields
+    //--------------------------------------------------------------------------
+
+    // initialize dcsr writable fields
+    SET_CSR_FIELD_MASK_1(riscv, dcsr, ebreakm);
+    SET_CSR_FIELD_MASK_1(riscv, dcsr, stepie);
+    SET_CSR_FIELD_MASK_1(riscv, dcsr, stopcount);
+    SET_CSR_FIELD_MASK_1(riscv, dcsr, stoptime);
+    SET_CSR_FIELD_MASK_1(riscv, dcsr, cause);
+    SET_CSR_FIELD_MASK_1(riscv, dcsr, mprven);
+    SET_CSR_FIELD_MASK_1(riscv, dcsr, nmip);
+    SET_CSR_FIELD_MASK_1(riscv, dcsr, step);
+    SET_CSR_FIELD_MASK_1(riscv, dcsr, prv);
+
+    // initialize dcsr mask writable fields if Supervisor mode present
+    if(arch&ISA_S) {
+        SET_CSR_FIELD_MASK_1(riscv, dcsr, ebreaks);
+    }
+
+    // initialize dcsr mask writable fields if User mode present
+    if(arch&ISA_U) {
+        SET_CSR_FIELD_MASK_1(riscv, dcsr, ebreaku);
+    }
+
+    // initialize dcsr read-only fields
+    WR_CSR_FIELD(riscv, dcsr, xdebugver, 4);
 }
 
 //
@@ -3177,6 +3350,13 @@ static riscvArchitecture getInaccessibleCSRFeaturesMT(
 }
 
 //
+// Is this an illegal Debug CSR access in Machine mode?
+//
+static Bool invalidDebugCSRAccess(riscvP riscv, Uns32 csrNum) {
+    return IS_DEBUG_CSR(csrNum) && !inDebugMode(riscv);
+}
+
+//
 // Validate CSR with the given index can be accessed for read or write in the
 // current processor mode, and return either a true CSR id or an error code id
 //
@@ -3190,7 +3370,13 @@ riscvCSRAttrsCP riscvValidateCSRAccess(
     riscvCSRAttrsCP   attrs  = getCSRAttrs(riscv, csrNum);
     riscvArchitecture missing;
 
-    if(!attrs || !checkCSRImplemented(attrs, riscv)) {
+    if(invalidDebugCSRAccess(riscv, csrNum)) {
+
+        // CSR is not implemented
+        ILLEGAL_INSTRUCTION_MESSAGE(riscv, "CSR_NA", "Debug CSR not accessible");
+        return 0;
+
+    } else if(!attrs || !checkCSRImplemented(attrs, riscv)) {
 
         // CSR is not implemented
         ILLEGAL_INSTRUCTION_MESSAGE(riscv, "CSR_UNIMP", "Unimplemented CSR");

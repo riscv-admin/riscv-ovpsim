@@ -40,6 +40,7 @@ typedef struct riscvParamValuesS {
     VMI_ENUM_PARAM(fp16_version);
     VMI_ENUM_PARAM(mstatus_fs_mode);
     VMI_BOOL_PARAM(verbose);
+    VMI_BOOL_PARAM(debug_mode);
     VMI_BOOL_PARAM(updatePTEA);
     VMI_BOOL_PARAM(updatePTED);
     VMI_BOOL_PARAM(unaligned);
@@ -87,6 +88,7 @@ typedef struct riscvParamValuesS {
     VMI_UNS32_PARAM(ELEN);
     VMI_UNS32_PARAM(SLEN);
     VMI_UNS32_PARAM(VLEN);
+    VMI_UNS32_PARAM(SEW_min);
     VMI_BOOL_PARAM(Zvlsseg);
     VMI_BOOL_PARAM(Zvamo);
     VMI_BOOL_PARAM(Zvediv);

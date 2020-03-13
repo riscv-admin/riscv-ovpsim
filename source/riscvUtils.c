@@ -26,6 +26,7 @@
 // model header files
 #include "riscvBlockState.h"
 #include "riscvDecode.h"
+#include "riscvExceptions.h"
 #include "riscvFunctions.h"
 #include "riscvMessage.h"
 #include "riscvMode.h"
@@ -79,6 +80,11 @@ void riscvSetCurrentArch(riscvP riscv) {
         if(WM_mstatus_VS && !(RD_CSR(riscv, mstatus) & WM_mstatus_VS)) {
             arch &= ~ISA_V;
         }
+    }
+
+    // handle big endian access if required
+    if(riscv->checkEndian && riscvGetCurrentDataEndian(riscv)) {
+        arch |= ISA_BE;
     }
 
     if(riscv->currentArch != arch) {
@@ -202,6 +208,42 @@ Uns32 riscvGetXlenMode(riscvP riscv) {
 }
 
 //
+// Does the processor support configurable endianness?
+//
+Bool riscvSupportEndian(riscvP riscv) {
+    return (RISCV_PRIV_VERSION(riscv)>RVPV_20190405);
+}
+
+//
+// Return endianness for data access in the given mode
+//
+memEndian riscvGetDataEndian(riscvP riscv, riscvMode mode) {
+
+    memEndian result = riscv->dendian;
+
+    if(!riscvSupportEndian(riscv)) {
+        // no action
+    } else if(mode==RISCV_MODE_USER) {
+        result = RD_CSR_FIELD(riscv, mstatus, UBE);
+    } else if(mode==RISCV_MODE_SUPERVISOR) {
+        result = RD_CSR_FIELD_ALT(riscv, mstatush, mstatus, SBE);
+    } else if(mode==RISCV_MODE_MACHINE) {
+        result = RD_CSR_FIELD_ALT(riscv, mstatush, mstatus, MBE);
+    } else {
+        VMI_ABORT("invalid mode"); // LCOV_EXCL_LINE
+    }
+
+    return result;
+}
+
+//
+// Return endianness for data access in the current mode
+//
+memEndian riscvGetCurrentDataEndian(riscvP riscv) {
+    return riscvGetDataEndian(riscv, riscv->dmode);
+}
+
+//
 // Return endianness of access
 //
 VMI_ENDIAN_FN(riscvGetEndian) {
@@ -211,7 +253,7 @@ VMI_ENDIAN_FN(riscvGetEndian) {
     if(isFetch) {
         return riscv->iendian;
     } else {
-        return riscv->dendian;
+        return riscvGetCurrentDataEndian(riscv);
     }
 }
 
@@ -265,6 +307,12 @@ static const vmiModeInfo modes[] = {
         .description = "Machine mode"
     },
 
+    [RISCV_MODE_DEBUG] = {
+        .name        = "Debug",
+        .code        = RISCV_MODE_DEBUG,
+        .description = "Debug mode"
+    },
+
     // terminator
     {0}
 };
@@ -283,7 +331,7 @@ VMI_GET_MODE_FN(riscvGetMode) {
 
     riscvP riscv = (riscvP)processor;
 
-    return &modes[getCurrentMode(riscv)];
+    return &modes[inDebugMode(riscv) ? RISCV_MODE_DEBUG : getCurrentMode(riscv)];
 }
 
 //
@@ -309,6 +357,9 @@ void riscvSetMode(riscvP riscv, riscvMode mode) {
     // refresh current data domain (may be modified by mstatus.MPRV, and may
     // have changed while taking an exception even if mode has not changed)
     riscvVMRefreshMPRVDomain(riscv);
+
+    // set step breakpoint if required
+    riscvSetStepBreakpoint(riscv);
 }
 
 //
@@ -337,6 +388,8 @@ Bool riscvHasMode(riscvP riscv, riscvMode mode) {
             return riscv->configInfo.arch & ISA_S;
         case RISCV_MODE_MACHINE:
             return True;
+        case RISCV_MODE_DEBUG:
+            return riscv->configInfo.debug_mode;
         default:
             return False;
     }
@@ -510,7 +563,7 @@ const char *riscvGetVRegName(Uns32 index) {
 //
 vmiReg riscvGetVReg(riscvP riscv, Uns32 index) {
 
-    void *value = &riscv->v[index*riscv->configInfo.VLEN/64];
+    void *value = &riscv->v[index*riscv->configInfo.VLEN/32];
 
     return vmimtGetExtReg((vmiProcessorP)riscv, value);
 }

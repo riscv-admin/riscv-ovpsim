@@ -33,6 +33,7 @@
 #define RM_INVALID_CHAR         ('Z'+3)
 #define RISCV_FAND_CHAR         ('Z'+4)
 #define MSTATUS_FS_CHAR         ('Z'+5)
+#define MSTATUS_BE_CHAR         ('Z'+6)
 #define RISCV_FEATURE_INDEX(_C) ((_C)-'A')
 #define RISCV_FEATURE_BIT(_C)   (1<<RISCV_FEATURE_INDEX(_C))
 #define XLEN_SHIFT              RISCV_FEATURE_INDEX(XLEN32_CHAR)
@@ -54,6 +55,7 @@ typedef enum riscvArchitectureE {
 
     // MSTATUS FIELDS
     ISA_FS     = RISCV_FEATURE_BIT(MSTATUS_FS_CHAR),
+    ISA_BE     = RISCV_FEATURE_BIT(MSTATUS_BE_CHAR),
 
     // FEATURES A AND B
     ISA_and    = RISCV_FEATURE_BIT(RISCV_FAND_CHAR),
@@ -155,13 +157,16 @@ typedef enum riscvPrivVerE {
     RVPV_1_10,                          // version 1.10
     RVPV_1_11,                          // version 1.11 (legacy naming)
     RVPV_20190405,                      // version 20190405
+    RVPV_1_12,                          // version 1.12 (placeholder)
+    RVPV_MASTER  = RVPV_1_12,           // master branch
     RVPV_DEFAULT = RVPV_20190405,       // default version
 } riscvPrivVer;
 
 //
-// Tag of master version
+// date and tag of master version
 //
-#define RVVV_MASTER_TAG "f92ae2c"
+#define RVVV_MASTER_DATE    "4 Match 2020"
+#define RVVV_MASTER_TAG     "45da90d"
 
 //
 // Supported Vector Architecture versions
@@ -232,8 +237,7 @@ typedef enum riscvVFeatureE {
     RVVF_VS_STATUS_8,       // is [ms]status.VS field in version 0.8 location?
     RVVF_VS_STATUS_9,       // is [ms]status.VS field in version 0.9 location?
     RVVF_FP_RESTRICT_WHOLE, // whole register load/store/move restricted?
-    RVVF_UNIT_STRIDE_ONLY,  // only unit-stride load/store supported?
-    RVVF_VSTART_Z,          // is vstart forced to zero?
+    RVVF_SEG_ONLY_SEW,      // are segment loads/stores restricted to SEW?
     RVVF_LAST,              // for sizing
 } riscvVFeature;
 

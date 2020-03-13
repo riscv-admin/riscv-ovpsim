@@ -90,8 +90,8 @@ Bool riscvIsClusterMember(riscvP riscv) {
 //
 const char *riscvGetClusterVariant(riscvP cluster, riscvP member) {
 
-    Uns32 i = 0;
-    riscvP  try;
+    Uns32  i = 0;
+    riscvP try;
 
     // get index of next variant string
     for(try=getChild(cluster); try!=member; try=getSibling(try)) {

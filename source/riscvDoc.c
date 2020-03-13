@@ -28,6 +28,7 @@
 #include "vmi/vmiRt.h"
 
 // model header files
+#include "riscvCluster.h"
 #include "riscvDoc.h"
 #include "riscvFunctions.h"
 #include "riscvParameters.h"
@@ -122,8 +123,8 @@ void riscvDoc(riscvP rootProcessor) {
     riscvP           riscv    = rootProcessor;
     riscvP           child    = getChild(rootProcessor);
     riscvConfigCP    cfg      = &riscv->configInfo;
+    Bool             isSMP    = child && !riscvIsCluster(riscv);
     Uns32            numHarts = cfg->numHarts;
-    Bool             isSMP    = numHarts && child && !cfg->members;
     Uns32            extIndex;
     riscvExtConfigCP extCfg;
     char             string[1024];
@@ -707,9 +708,9 @@ void riscvDoc(riscvP rootProcessor) {
         snprintf(
             SNPRINTF_TGT(string),
             "Parameter VLEN is used to specify the number of bits in a vector "
-            "register (a power of two in the range 32 to 2048). By default, "
+            "register (a power of two in the range 32 to %u). By default, "
             "VLEN is set to %u in this variant.",
-            riscv->configInfo.VLEN
+            VLEN_MAX, riscv->configInfo.VLEN
         );
         vmidocAddText(Parameters, string);
 
@@ -717,9 +718,19 @@ void riscvDoc(riscvP rootProcessor) {
         snprintf(
             SNPRINTF_TGT(string),
             "Parameter SLEN is used to specify the striping distance (a power "
-            "of two in the range 32 to 2048). By default, SLEN is set to %u "
+            "of two in the range 32 to %u). By default, SLEN is set to %u "
             "in this variant.",
-            riscv->configInfo.SLEN
+            VLEN_MAX, riscv->configInfo.SLEN
+        );
+        vmidocAddText(Parameters, string);
+
+        // document SEW_min
+        snprintf(
+            SNPRINTF_TGT(string),
+            "Parameter SEW_min is used to specify the minimum supported SEW (a "
+            "power of two in the range 8 to ELEN). By default, SEW_min is set "
+            "to %u in this variant.",
+            riscv->configInfo.SEW_min
         );
         vmidocAddText(Parameters, string);
 
@@ -1073,7 +1084,7 @@ void riscvDoc(riscvP rootProcessor) {
 
             vmidocAddText(
                 Version,
-                "Unstable master version as of 8 February 2020 (commit "
+                "Unstable master version as of "RVVV_MASTER_DATE" (commit "
                 RVVV_MASTER_TAG"), with these changes compared to version 0.8:"
             );
             vmidocAddText(
@@ -1083,7 +1094,12 @@ void riscvDoc(riscvP rootProcessor) {
             vmidocAddText(
                 Version,
                 "- new CSR vcsr has been added and fields VXSAT and VXRM "
-                "fields relocated there from CSR fcsr."
+                "relocated there from CSR fcsr;"
+            );
+            vmidocAddText(
+                Version,
+                "- segment loads and stores have been restricted to SEW "
+                "element size only."
             );
         }
     }
@@ -1116,6 +1132,210 @@ void riscvDoc(riscvP rootProcessor) {
             Ports,
             "All other interrupt ports are active high."
         );
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    // DEBUG MODE
+    ////////////////////////////////////////////////////////////////////////////
+
+    {
+        vmiDocNodeP debugMode = vmidocAddSection(Root, "Debug Mode");
+
+        vmidocAddText(
+            debugMode,
+            "The model can be configured to implement Debug mode using "
+            "parameter \"debug_mode\". This implements features described "
+            "in Chapter 4 of the RISC-V External Debug Support specification "
+            "(see References). Some aspects of this mode are not defined in "
+            "the specification because they are implementation-specific; the "
+            "model provides infrastructure to allow implementation of a "
+            "Debug Module using a custom harness. Features added are described "
+            "below."
+        );
+
+        ////////////////////////////////////////////////////////////////////////
+        // DEBUG STATE ENTRY
+        ////////////////////////////////////////////////////////////////////////
+
+        {
+            vmiDocNodeP StateEntry = vmidocAddSection(
+                debugMode, "Debug State Entry"
+            );
+
+            vmidocAddText(
+                StateEntry,
+                "The specification does not define how Debug mode is "
+                "implemented. In this model, Debug mode is enabled by a "
+                "Boolean pseudo-register, \"DM\". When \"DM\" is True, the "
+                "processor is in Debug mode. When \"DM\" is False, mode is "
+                "defined by \"mstatus\" in the usual way."
+            );
+            vmidocAddText(
+                StateEntry,
+                "Entry to Debug mode can be performed in any of these ways:"
+            );
+            vmidocAddText(
+                StateEntry,
+                "1. By writing True to register \"DM\" (e.g. using "
+                "opProcessorRegWrite) followed by simulation of at least one "
+                "cycle (e.g. using opProcessorSimulate);"
+            );
+            vmidocAddText(
+                StateEntry,
+                "2. By writing a 1 then 0 to net \"haltreq\" (using "
+                "opNetWrite) followed by simulation of at least one  cycle "
+                "(e.g. using opProcessorSimulate);"
+            );
+            vmidocAddText(
+                StateEntry,
+                "3. By writing a 1 to net \"resethaltreq\" (using "
+                "opNetWrite) while the \"reset\" signal undergoes a negedge "
+                "transition, followed by simulation of at least one cycle "
+                "(e.g. using opProcessorSimulate);"
+            );
+            vmidocAddText(
+                StateEntry,
+                "4. By executing an \"ebreak\" instruction when Debug mode "
+                "entry for the current processor mode is enabled by "
+                "dcsr.ebreakm, dcsr.ebreaks or dcsr.ebreaku."
+            );
+            vmidocAddText(
+                StateEntry,
+                "In all cases, the processor will save required state in "
+                "\"dpc\" and \"dcsr\" and then return control immediately "
+                "to the harness, with stopReason of OP_SR_INTERRUPT. The "
+                "harness can then manipulate the processor in Debug state as "
+                "described below."
+            );
+        }
+
+        ////////////////////////////////////////////////////////////////////////
+        // DEBUG STATE EXIT
+        ////////////////////////////////////////////////////////////////////////
+
+        {
+            vmiDocNodeP StateEntry = vmidocAddSection(
+                debugMode, "Debug State Exit"
+            );
+
+            vmidocAddText(
+                StateEntry,
+                "Exit from Debug mode can be performed in any of these ways:"
+            );
+            vmidocAddText(
+                StateEntry,
+                "1. By writing False to register \"DM\" (e.g. using "
+                "opProcessorRegWrite) followed by simulation of at least one "
+                "cycle (e.g. using opProcessorSimulate);"
+            );
+            vmidocAddText(
+                StateEntry,
+                "2. By executing an \"dret\" instruction when Debug mode."
+            );
+            vmidocAddText(
+                StateEntry,
+                "In both cases, the processor will perform the steps described "
+                "in section 4.6 (Resume) of the Debug specification."
+            );
+        }
+
+        ////////////////////////////////////////////////////////////////////////
+        // DEBUG REGISTERS
+        ////////////////////////////////////////////////////////////////////////
+
+        {
+            vmiDocNodeP Registers = vmidocAddSection(
+                debugMode, "Debug Registers"
+            );
+
+            vmidocAddText(
+                Registers,
+                "When Debug mode is enabled, registers \"dcsr\", \"dpc\", "
+                "\"dscratch0\" and \"dscratch1\" are implemented as described "
+                "in the specification. These may be manipulated by the "
+                "Debug Module using opProcessorRegRead or opProcessorRegWrite; "
+                "for example, the Debug Module could write \"dcsr\" to enable "
+                "\"ebreak\" instruction behavior as described above, or read "
+                "and write \"dpc\" to emulate stepping over an \"ebreak\" "
+                "instruction prior to resumption from Debug mode."
+            );
+        }
+
+        ////////////////////////////////////////////////////////////////////////
+        // DEBUG MODE EXECUTION
+        ////////////////////////////////////////////////////////////////////////
+
+        {
+            vmiDocNodeP DebugExecution = vmidocAddSection(
+                debugMode, "Debug Mode Execution"
+            );
+
+            vmidocAddText(
+                DebugExecution,
+                "The specification allows execution of code fragments in Debug "
+                "mode. A Debug Module implementation can cause execution in "
+                "Debug mode by writing the address of a Program Buffer to the "
+                "core program counter using opProcessorPCSet, then calling "
+                "opProcessorSimulate. Control will be returned to the harness "
+                "in any of these cases:"
+            );
+            vmidocAddText(
+                DebugExecution,
+                "1. By execution of an \"ebreak\" instruction; or:"
+            );
+            vmidocAddText(
+                DebugExecution,
+                "2. By execution of an instruction that causes an exception."
+            );
+            vmidocAddText(
+                DebugExecution,
+                "In both cases, the processor returns control immediately "
+                "to the harness, with stopReason of OP_SR_INTERRUPT."
+            );
+        }
+
+        ////////////////////////////////////////////////////////////////////////
+        // DEBUG SINGLE STEP
+        ////////////////////////////////////////////////////////////////////////
+
+        {
+            vmiDocNodeP DebugExecution = vmidocAddSection(
+                debugMode, "Debug Single Step"
+            );
+
+            vmidocAddText(
+                DebugExecution,
+                "When in Debug mode, the harness can cause a single "
+                "instruction to be executed on return from that mode by using "
+                "opProcessorRegWrite to set dcsr.step, writing False to "
+                "register \"DM\" and then simulation of at least one cycle "
+                "(e.g. using opProcessorSimulate). After one instruction "
+                "has been executed, control will be returned to the harness. "
+                "The processor will remain in single-step mode until dcsr.step "
+                "is cleared."
+            );
+        }
+
+        ////////////////////////////////////////////////////////////////////////
+        // DEBUG PORTS
+        ////////////////////////////////////////////////////////////////////////
+
+        {
+            vmiDocNodeP Ports = vmidocAddSection(
+                debugMode, "Debug Ports"
+            );
+
+            vmidocAddText(
+                Ports,
+                "Port \"haltreq\" is a rising-edge-triggered signal that "
+                "triggers entry to Debug mode (see above)."
+            );
+            vmidocAddText(
+                Ports,
+                "Port \"resethaltreq\" is a level-sensitive signal that "
+                "triggers entry to Debug mode after reset (see above)."
+            );
+        }
     }
 
     ////////////////////////////////////////////////////////////////////////////
@@ -1355,6 +1575,11 @@ void riscvDoc(riscvP rootProcessor) {
             );
             vmidocAddText(References, string);
         }
+
+        vmidocAddText(
+            References,
+            "RISC-V External Debug Support Version 0.14.0-DRAFT"
+        );
 
         // add custom references if required
         addOptDocList(References, cfg->specificDocs);

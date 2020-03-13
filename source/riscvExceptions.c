@@ -210,10 +210,41 @@ static Bool handleFF(riscvP riscv) {
     return suppress;
 }
 
+//
+// Halt the passed processor
+//
+static void haltProcessor(riscvP riscv, riscvDisableReason reason) {
+
+    if(!riscv->disable) {
+        vmirtHalt((vmiProcessorP)riscv);
+    }
+
+    riscv->disable |= reason;
+}
+
+//
+// Restart the passed processor
+//
+static void restartProcessor(riscvP riscv, riscvDisableReason reason) {
+
+    riscv->disable &= ~reason;
+
+    // restart if no longer disabled (maybe from blocked state not visible in
+    // disable code)
+    if(!riscv->disable) {
+        vmirtRestartNext((vmiProcessorP)riscv);
+    }
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // TAKING EXCEPTIONS
 ////////////////////////////////////////////////////////////////////////////////
+
+//
+// Forward reference
+//
+static void enterDM(riscvP riscv, dmCause cause);
 
 //
 // Return PC to which to return after taking an exception. For processors with
@@ -386,77 +417,87 @@ void riscvTakeException(
     riscvException exception,
     Uns64          tval
 ) {
-    Bool        isInterrupt = IS_INTERRUPT(exception);
-    Uns32       ecode       = GET_ECODE(exception);
-    Uns64       EPC         = getEPC(riscv);
-    Uns64       handlerPC   = 0;
-    riscvMode   modeY       = getCurrentMode(riscv);
-    riscvMode   modeX;
-    riscvExtCBP extCB;
-    Uns64       base;
-    Uns8        mode;
+    if(inDebugMode(riscv)) {
 
-    // adjust baseInstructions based on the exception code to take into account
-    // whether the previous instruction has retired, unless inhibited
-    if(!retiredCode(exception) && !RD_CSR_FIELD(riscv, mcountinhibit, IR)) {
-        riscv->baseInstructions++;
-    }
-
-    // latch or clear Access Fault detail depending on exception type
-    if(accessFaultCode(exception)) {
-        riscv->AFErrorOut = riscv->AFErrorIn;
-    } else {
-        riscv->AFErrorOut = riscv_AFault_None;
-    }
-
-    // clear any active exclusive access
-    clearEA(riscv);
-
-    // get exception target mode (X)
-    if(isInterrupt) {
-        modeX = getInterruptModeX(riscv, ecode);
-    } else {
-        modeX = getExceptionModeX(riscv, ecode);
-    }
-
-    // update state dependent on target exception level
-    if(modeX==RISCV_MODE_USER) {
-
-        // target user mode
-        TARGET_MODE_X(riscv, U, u, isInterrupt, ecode, EPC, base, mode, tval);
-
-    } else if(modeX==RISCV_MODE_SUPERVISOR) {
-
-        // target supervisor mode
-        TARGET_MODE_X(riscv, S, s, isInterrupt, ecode, EPC, base, mode, tval);
-        WR_CSR_FIELD(riscv, mstatus, SPP, modeY);
+        // terminate execution of program buffer
+        vmirtAbortRepeat((vmiProcessorP)riscv);
+        enterDM(riscv, DMC_NONE);
 
     } else {
 
-        // target machine mode
-        TARGET_MODE_X(riscv, M, m, isInterrupt, ecode, EPC, base, mode, tval);
-        WR_CSR_FIELD(riscv, mstatus, MPP, modeY);
-    }
+        Bool        isInt     = IS_INTERRUPT(exception);
+        Uns32       ecode     = GET_ECODE(exception);
+        Uns64       EPC       = getEPC(riscv);
+        Uns64       handlerPC = 0;
+        riscvMode   modeY     = getCurrentMode(riscv);
+        riscvMode   modeX;
+        riscvExtCBP extCB;
+        Uns64       base;
+        Uns8        mode;
 
-    // handle direct or vectored exception
-    if((mode == 0) || !isInterrupt) {
-        handlerPC = base;
-    } else {
-        handlerPC = base + (4 * ecode);
-    }
+        // adjust baseInstructions based on the exception code to take into
+        // account whether the previous instruction has retired, unless
+        // inhibited by mcountinhibit.IR
+        if(!retiredCode(exception) && !riscvInhibitInstret(riscv)) {
+            riscv->baseInstructions++;
+        }
 
-    // switch to target mode
-    riscvSetMode(riscv, modeX);
+        // latch or clear Access Fault detail depending on exception type
+        if(accessFaultCode(exception)) {
+            riscv->AFErrorOut = riscv->AFErrorIn;
+        } else {
+            riscv->AFErrorOut = riscv_AFault_None;
+        }
 
-    // indicate the taken exception
-    riscv->exception = exception;
+        // clear any active exclusive access
+        clearEA(riscv);
 
-    // set address at which to execute
-    vmirtSetPCException((vmiProcessorP)riscv, handlerPC);
+        // get exception target mode (X)
+        if(isInt) {
+            modeX = getInterruptModeX(riscv, ecode);
+        } else {
+            modeX = getExceptionModeX(riscv, ecode);
+        }
 
-    // notify derived model of exception entry if required
-    for(extCB=riscv->extCBs; extCB; extCB=extCB->next) {
-        notifyTrapDerived(riscv, modeX, extCB->trapNotifier, extCB->clientData);
+        // update state dependent on target exception level
+        if(modeX==RISCV_MODE_USER) {
+
+            // target user mode
+            TARGET_MODE_X(riscv, U, u, isInt, ecode, EPC, base, mode, tval);
+
+        } else if(modeX==RISCV_MODE_SUPERVISOR) {
+
+            // target supervisor mode
+            TARGET_MODE_X(riscv, S, s, isInt, ecode, EPC, base, mode, tval);
+            WR_CSR_FIELD(riscv, mstatus, SPP, modeY);
+
+        } else {
+
+            // target machine mode
+            TARGET_MODE_X(riscv, M, m, isInt, ecode, EPC, base, mode, tval);
+            WR_CSR_FIELD(riscv, mstatus, MPP, modeY);
+        }
+
+        // handle direct or vectored exception
+        if((mode == 0) || !isInt) {
+            handlerPC = base;
+        } else {
+            handlerPC = base + (4 * ecode);
+        }
+
+        // switch to target mode
+        riscvSetMode(riscv, modeX);
+
+        // indicate the taken exception
+        riscv->exception = exception;
+
+        // set address at which to execute
+        vmirtSetPCException((vmiProcessorP)riscv, handlerPC);
+
+        // notify derived model of exception entry if required
+        for(extCB=riscv->extCBs; extCB; extCB=extCB->next) {
+            notifyTrapDerived(riscv, modeX, extCB->trapNotifier, extCB->clientData);
+        }
     }
 }
 
@@ -552,13 +593,6 @@ void riscvECALL(riscvP riscv) {
     riscvTakeException(riscv, exception, 0);
 }
 
-//
-// Take EBREAK exception
-//
-void riscvEBREAK(riscvP riscv) {
-    riscvTakeException(riscv, riscv_E_Breakpoint, getPC(riscv));
-}
-
 
 ////////////////////////////////////////////////////////////////////////////////
 // EXCEPTION RETURN
@@ -574,37 +608,71 @@ static riscvMode getERETMode(riscvP riscv, riscvMode newMode, riscvMode minMode)
 }
 
 //
+// From version 1.12, MRET and SRET clear MPRV when leaving M-mode if new mode
+// is less privileged than M-mode
+//
+static void clearMPRV(riscvP riscv, riscvMode newMode) {
+    if(
+        (RISCV_PRIV_VERSION(riscv)>RVPV_20190405) &&
+        (newMode!=RISCV_MODE_MACHINE)
+    ) {
+        WR_CSR_FIELD(riscv, mstatus, MPRV, 0);
+    }
+}
+
+//
+// Do common actions when returning from an exception
+//
+static void doERETCommon(
+    riscvP    riscv,
+    riscvMode retMode,
+    riscvMode newMode,
+    Uns64     epc
+) {
+    // switch to target mode
+    riscvSetMode(riscv, newMode);
+
+    // jump to return address
+    setPCxRET(riscv, epc);
+
+    // notify derived model of exception return if required
+    notifyERETDerived(riscv, retMode);
+
+    // check for pending interrupts
+    riscvTestInterrupt(riscv);
+}
+
+//
 // Return from M-mode exception
 //
 void riscvMRET(riscvP riscv) {
 
-    Uns32     MPP     = RD_CSR_FIELD(riscv, mstatus, MPP);
-    riscvMode minMode = riscvGetMinMode(riscv);
-    riscvMode newMode = getERETMode(riscv, MPP, minMode);
+    // undefined behavior in Debug mode - NOP in this model
+    if(!inDebugMode(riscv)) {
 
-    // clear any active exclusive access
-    clearEAxRET(riscv);
+        Uns32     MPP     = RD_CSR_FIELD(riscv, mstatus, MPP);
+        riscvMode minMode = riscvGetMinMode(riscv);
+        riscvMode newMode = getERETMode(riscv, MPP, minMode);
+        riscvMode retMode = RISCV_MODE_MACHINE;
 
-    // restore previous MIE
-    WR_CSR_FIELD(riscv, mstatus, MIE, RD_CSR_FIELD(riscv, mstatus, MPIE))
+        // clear any active exclusive access
+        clearEAxRET(riscv);
 
-    // MPIE=1
-    WR_CSR_FIELD(riscv, mstatus, MPIE, 1);
+        // restore previous MIE
+        WR_CSR_FIELD(riscv, mstatus, MIE, RD_CSR_FIELD(riscv, mstatus, MPIE))
 
-    // MPP=<minimum_supported_mode>
-    WR_CSR_FIELD(riscv, mstatus, MPP, minMode);
+        // MPIE=1
+        WR_CSR_FIELD(riscv, mstatus, MPIE, 1);
 
-    // switch to target mode
-    riscvSetMode(riscv, newMode);
+        // MPP=<minimum_supported_mode>
+        WR_CSR_FIELD(riscv, mstatus, MPP, minMode);
 
-    // jump to exception address
-    setPCxRET(riscv, RD_CSR_FIELD(riscv, mepc, value));
+        // clear mstatus.MPRV if required
+        clearMPRV(riscv, newMode);
 
-    // notify derived model of exception return if required
-    notifyERETDerived(riscv, RISCV_MODE_MACHINE);
-
-    // check for pending interrupts
-    riscvTestInterrupt(riscv);
+        // do common return actions
+        doERETCommon(riscv, retMode, newMode, RD_CSR_FIELD(riscv, mepc, value));
+    }
 }
 
 //
@@ -612,33 +680,32 @@ void riscvMRET(riscvP riscv) {
 //
 void riscvSRET(riscvP riscv) {
 
-    Uns32     SPP     = RD_CSR_FIELD(riscv, mstatus, SPP);
-    riscvMode minMode = riscvGetMinMode(riscv);
-    riscvMode newMode = getERETMode(riscv, SPP, minMode);
+    // undefined behavior in Debug mode - NOP in this model
+    if(!inDebugMode(riscv)) {
 
-    // clear any active exclusive access
-    clearEAxRET(riscv);
+        Uns32     SPP     = RD_CSR_FIELD(riscv, mstatus, SPP);
+        riscvMode minMode = riscvGetMinMode(riscv);
+        riscvMode newMode = getERETMode(riscv, SPP, minMode);
+        riscvMode retMode = RISCV_MODE_SUPERVISOR;
 
-    // restore previous SIE
-    WR_CSR_FIELD(riscv, mstatus, SIE, RD_CSR_FIELD(riscv, mstatus, SPIE))
+        // clear any active exclusive access
+        clearEAxRET(riscv);
 
-    // SPIE=1
-    WR_CSR_FIELD(riscv, mstatus, SPIE, 1);
+        // restore previous SIE
+        WR_CSR_FIELD(riscv, mstatus, SIE, RD_CSR_FIELD(riscv, mstatus, SPIE))
 
-    // SPP=<minimum_supported_mode>
-    WR_CSR_FIELD(riscv, mstatus, SPP, minMode);
+        // SPIE=1
+        WR_CSR_FIELD(riscv, mstatus, SPIE, 1);
 
-    // switch to target mode
-    riscvSetMode(riscv, newMode);
+        // SPP=<minimum_supported_mode>
+        WR_CSR_FIELD(riscv, mstatus, SPP, minMode);
 
-    // jump to exception address
-    setPCxRET(riscv, RD_CSR_FIELD(riscv, sepc, value));
+        // clear mstatus.MPRV if required
+        clearMPRV(riscv, newMode);
 
-    // notify derived model of exception return if required
-    notifyERETDerived(riscv, RISCV_MODE_SUPERVISOR);
-
-    // check for pending interrupts
-    riscvTestInterrupt(riscv);
+        // do common return actions
+        doERETCommon(riscv, retMode, newMode, RD_CSR_FIELD(riscv, sepc, value));
+    }
 }
 
 //
@@ -646,28 +713,193 @@ void riscvSRET(riscvP riscv) {
 //
 void riscvURET(riscvP riscv) {
 
-    riscvMode newMode = RISCV_MODE_USER;
+    // undefined behavior in Debug mode - NOP in this model
+    if(!inDebugMode(riscv)) {
 
-    // clear any active exclusive access
-    clearEAxRET(riscv);
+        riscvMode newMode = RISCV_MODE_USER;
+        riscvMode retMode = RISCV_MODE_USER;
 
-    // restore previous UIE
-    WR_CSR_FIELD(riscv, mstatus, UIE, RD_CSR_FIELD(riscv, mstatus, UPIE))
+        // clear any active exclusive access
+        clearEAxRET(riscv);
 
-    // UPIE=1
-    WR_CSR_FIELD(riscv, mstatus, UPIE, 1);
+        // restore previous UIE
+        WR_CSR_FIELD(riscv, mstatus, UIE, RD_CSR_FIELD(riscv, mstatus, UPIE))
 
-    // switch to target mode
-    riscvSetMode(riscv, newMode);
+        // UPIE=1
+        WR_CSR_FIELD(riscv, mstatus, UPIE, 1);
 
-    // jump to exception address
-    setPCxRET(riscv, RD_CSR_FIELD(riscv, uepc, value));
+        // do common return actions
+        doERETCommon(riscv, retMode, newMode, RD_CSR_FIELD(riscv, uepc, value));
+    }
+}
 
-    // notify derived model of exception return if required
-    notifyERETDerived(riscv, RISCV_MODE_USER);
 
-    // check for pending interrupts
-    riscvTestInterrupt(riscv);
+////////////////////////////////////////////////////////////////////////////////
+// DEBUG MODE
+////////////////////////////////////////////////////////////////////////////////
+
+//
+// Enter Debug mode
+//
+static void enterDM(riscvP riscv, dmCause cause) {
+
+    if(!inDebugMode(riscv)) {
+
+        riscvCountState state;
+
+        // get state before possible inhibit update
+        riscvPreInhibit(riscv, &state);
+
+        // update current state
+        riscv->DM = True;
+
+        // save current mode
+        WR_CSR_FIELD(riscv, dcsr, prv, getCurrentMode(riscv));
+
+        // save cause
+        WR_CSR_FIELD(riscv, dcsr, cause, cause);
+
+        // save current instruction address
+        WR_CSR(riscv, dpc, getEPC(riscv));
+
+        // switch to Machine mode
+        riscvSetMode(riscv, RISCV_MODE_MACHINE);
+
+        // refresh state after possible inhibit update
+        riscvPostInhibit(riscv, &state, False);
+    }
+
+    // interrupt the processor
+    vmirtInterrupt((vmiProcessorP)riscv);
+}
+
+//
+// Leave Debug mode
+//
+static void leaveDM(riscvP riscv) {
+
+    riscvMode       newMode = RD_CSR_FIELD(riscv, dcsr, prv);
+    riscvMode       retMode = RISCV_MODE_MACHINE;
+    riscvCountState state;
+
+    // get state before possible inhibit update
+    riscvPreInhibit(riscv, &state);
+
+    // update current state
+    riscv->DM = False;
+
+    // clear mstatus.MPRV if required
+    clearMPRV(riscv, newMode);
+
+    // do common return actions
+    doERETCommon(riscv, retMode, newMode, RD_CSR_FIELD(riscv, dpc, value));
+
+    // refresh state after possible inhibit update
+    riscvPostInhibit(riscv, &state, False);
+}
+
+//
+// Enter or leave Debug mode
+//
+void riscvSetDM(riscvP riscv, Bool DM) {
+
+    Bool oldDM = riscv->DM;
+
+    if((oldDM==DM) || riscv->inSaveRestore) {
+        // no change in state or state restore
+    } else if(DM) {
+        enterDM(riscv, DMC_HALTREQ);
+    } else {
+        leaveDM(riscv);
+    }
+}
+
+//
+// Instruction step breakpoint callback
+//
+VMI_ICOUNT_FN(riscvStepExcept) {
+
+    riscvP riscv = (riscvP)processor;
+
+    if(!inDebugMode(riscv) && RD_CSR_FIELD(riscv, dcsr, step)) {
+        enterDM(riscv, DMC_STEP);
+    }
+}
+
+//
+// Set step breakpoint if required
+//
+void riscvSetStepBreakpoint(riscvP riscv) {
+
+    if(!inDebugMode(riscv) && RD_CSR_FIELD(riscv, dcsr, step)) {
+        vmirtSetICountInterrupt((vmiProcessorP)riscv, 1);
+    }
+}
+
+//
+// Return from Debug mode
+//
+void riscvDRET(riscvP riscv) {
+
+    if(!inDebugMode(riscv)) {
+
+        // report FS state
+        if(riscv->verbose) {
+            vmiMessage("W", CPU_PREFIX "_NDM",
+                SRCREF_FMT "Illegal instruction - not debug mode",
+                SRCREF_ARGS(riscv, getPC(riscv))
+            );
+        }
+
+        // take Illegal Instruction exception
+        riscvIllegalInstruction(riscv);
+
+    } else {
+
+        // leave Debug mode
+        leaveDM(riscv);
+    }
+}
+
+//
+// Take EBREAK exception
+//
+void riscvEBREAK(riscvP riscv) {
+
+    riscvMode mode  = getCurrentMode(riscv);
+    Bool      useDM = False;
+
+    // determine whether ebreak should cause debug module entry
+    if(inDebugMode(riscv)) {
+        useDM = True;
+    } else if(mode==RISCV_MODE_USER) {
+        useDM = RD_CSR_FIELD(riscv, dcsr, ebreaku);
+    } else if(mode==RISCV_MODE_SUPERVISOR) {
+        useDM = RD_CSR_FIELD(riscv, dcsr, ebreaks);
+    } else if(mode==RISCV_MODE_MACHINE) {
+        useDM = RD_CSR_FIELD(riscv, dcsr, ebreakm);
+    }
+
+    if(useDM) {
+
+        // don't count the ebreak instruction if dcsr.stopcount is set
+        if(RD_CSR_FIELD(riscv, dcsr, stopcount)) {
+            if(!riscvInhibitCycle(riscv)) {
+                riscv->baseCycles++;
+            }
+            if(!riscvInhibitInstret(riscv)) {
+                riscv->baseInstructions++;
+            }
+        }
+
+        // handle EBREAK as Debug module action
+        enterDM(riscv, DMC_EBREAK);
+
+    } else {
+
+        // handle EBREAK as normal exception
+        riscvTakeException(riscv, riscv_E_Breakpoint, getPC(riscv));
+    }
 }
 
 
@@ -860,7 +1092,8 @@ inline static Uns64 getPendingInterrupts(riscvP riscv) {
 //
 static Uns64 getPendingAndEnabledInterrupts(riscvP riscv) {
 
-    Uns64 result = getPendingInterrupts(riscv);
+    // NOTE: all interrupts are disabled in Debug mode
+    Uns64 result = inDebugMode(riscv) ? 0 : getPendingInterrupts(riscv);
 
     if(result) {
 
@@ -969,11 +1202,24 @@ VMI_IFETCH_FN(riscvIFetchExcept) {
     Bool   fetchOK = False;
     Uns64  intMask = getPendingAndEnabledInterrupts(riscv);
 
-    if(intMask) {
+    if(riscv->netValue.resethaltreqS) {
+
+        // enter Debug mode out of reset
+        if(complete) {
+            riscv->netValue.resethaltreqS = False;
+            enterDM(riscv, DMC_RESETHALTREQ);
+        }
+
+    } else if(riscv->netValue.haltreq && !inDebugMode(riscv)) {
+
+        // enter Debug mode
+        if(complete) {
+            enterDM(riscv, DMC_HALTREQ);
+        }
+
+    } else if(intMask) {
 
         // handle pending interrupt
-        fetchOK = False;
-
         if(complete) {
             doInterrupt(riscv, intMask);
         }
@@ -981,7 +1227,6 @@ VMI_IFETCH_FN(riscvIFetchExcept) {
     } else if(!validateFetchAddress(riscv, domain, thisPC, complete)) {
 
         // fetch exception (handled in validateFetchAddress)
-        fetchOK = False;
 
     } else {
 
@@ -1170,37 +1415,11 @@ inline static Bool negedge(Uns32 old, Uns32 new) {
 }
 
 //
-// Halt the passed processor
-//
-static void haltProcessor(riscvP riscv, riscvDisableReason reason) {
-
-    if(!riscv->disable) {
-        vmirtHalt((vmiProcessorP)riscv);
-    }
-
-    riscv->disable |= reason;
-}
-
-//
-// Restart the passed processor
-//
-static void restartProcessor(riscvP riscv, riscvDisableReason reason) {
-
-    riscv->disable &= ~reason;
-
-    // restart if no longer disabled (maybe from blocked state not visible in
-    // disable code)
-    if(!riscv->disable) {
-        vmirtRestartNext((vmiProcessorP)riscv);
-    }
-}
-
-//
 // Halt the processor in WFI state if required
 //
 void riscvWFI(riscvP riscv) {
 
-    if(!getPendingInterrupts(riscv)) {
+    if(!(inDebugMode(riscv) || getPendingInterrupts(riscv))) {
         haltProcessor(riscv, RVD_WFI);
     }
 }
@@ -1276,6 +1495,9 @@ void riscvReset(riscvP riscv) {
     // restart the processor from any halted state
     restartProcessor(riscv, RVD_RESTART_RESET);
 
+    // exit Debug mode
+    riscvSetDM(riscv, False);
+
     // switch to Machine mode
     riscvSetMode(riscv, RISCV_MODE_MACHINE);
 
@@ -1294,6 +1516,9 @@ void riscvReset(riscvP riscv) {
 
     // set address at which to execute
     vmirtSetPCException((vmiProcessorP)riscv, riscv->configInfo.reset_address);
+
+    // enter Debug mode out of reset if required
+    riscv->netValue.resethaltreqS = riscv->netValue.resethaltreq;
 }
 
 //
@@ -1375,18 +1600,43 @@ static VMI_NET_CHANGE_FN(nmiPortCB) {
     riscvP              riscv    = ii->hart;
     Bool                oldValue = riscv->netValue.nmi;
 
-    if(posedge(oldValue, newValue)) {
-
-        // halt the processor while signal goes high
-        haltProcessor(riscv, RVD_NMI);
-
-    } else if(negedge(oldValue, newValue)) {
-
-        // do NMI actions when signal goes low
+    // do NMI actions when signal goes low unless in Debug mode
+    if(!inDebugMode(riscv) && negedge(oldValue, newValue)) {
         doNMI(riscv);
     }
 
+    // mirror value in dcsr.nmip
+    WR_CSR_FIELD(riscv, dcsr, nmip, newValue);
+
     riscv->netValue.nmi = newValue;
+}
+
+//
+// haltreq signal (edge triggered)
+//
+static VMI_NET_CHANGE_FN(haltreqPortCB) {
+
+    riscvInterruptInfoP ii       = userData;
+    riscvP              riscv    = ii->hart;
+    Bool                oldValue = riscv->netValue.haltreq;
+
+    // do halt actions when signal goes high unless in Debug mode
+    if(!inDebugMode(riscv) && posedge(oldValue, newValue)) {
+        vmirtDoSynchronousInterrupt((vmiProcessorP)riscv);
+    }
+
+    riscv->netValue.haltreq = newValue;
+}
+
+//
+// resethaltreq signal (sampled at reset)
+//
+static VMI_NET_CHANGE_FN(resethaltreqPortCB) {
+
+    riscvInterruptInfoP ii    = userData;
+    riscvP              riscv = ii->hart;
+
+    riscv->netValue.resethaltreq = newValue;
 }
 
 //
@@ -1460,12 +1710,23 @@ void riscvNewNetPorts(riscvP riscv) {
 
     // allocate reset port
     tail = newNetPort(
-        riscv, tail, "reset", vmi_NP_INPUT, resetPortCB, "Reset", 0
+        riscv,
+        tail,
+        "reset",
+        vmi_NP_INPUT,
+        resetPortCB,
+        "Reset", 0
     );
 
     // allocate nmi port
     tail = newNetPort(
-        riscv, tail, "nmi",   vmi_NP_INPUT, nmiPortCB,   "NMI",   0
+        riscv,
+        tail,
+        "nmi",
+        vmi_NP_INPUT,
+        nmiPortCB,
+        "NMI",
+        0
     );
 
     // allocate implemented interrupt ports
@@ -1488,6 +1749,32 @@ void riscvNewNetPorts(riscvP riscv) {
                 code - riscv_E_Interrupt
             );
         }
+    }
+
+    // add Debug mode ports
+    if(riscv->configInfo.debug_mode) {
+
+        // allocate haltreq port
+        tail = newNetPort(
+            riscv,
+            tail,
+            "haltreq",
+            vmi_NP_INPUT,
+            haltreqPortCB,
+            "haltreq (Debug halt request)",
+            0
+        );
+
+        // allocate resethaltreq port
+        tail = newNetPort(
+            riscv,
+            tail,
+            "resethaltreq",
+            vmi_NP_INPUT,
+            resethaltreqPortCB,
+            "resethaltreq (Debug halt request after reset)",
+            0
+        );
     }
 }
 

@@ -37,6 +37,11 @@
 typedef RV_DOC_FN((*riscvDocFn));
 
 //
+// value indicating numHarts is 0 but configurable
+//
+#define RV_NUMHARTS_0 -1
+
+//
 // This is used to specify documentation and configuration for mandatory
 // extensions
 //
@@ -78,6 +83,8 @@ typedef struct riscvConfigS {
     Uns32             ELEN;             // ELEN (vector extension)
     Uns32             SLEN;             // SLEN (vector extension)
     Uns32             VLEN;             // VLEN (vector extension)
+    Uns32             SEW_min;          // minimum SEW (vector extension)
+    Bool              debug_mode;       // is Debug mode implemented?
     Bool              Zvlsseg;          // Zvlsseg implemented?
     Bool              Zvamo;            // Zvamo implemented?
     Bool              Zvediv;           // Zvediv implemented?

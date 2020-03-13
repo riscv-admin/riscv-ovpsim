@@ -81,6 +81,11 @@ static vmiEnumParameter privVariants[] = {
         .value       = RVPV_20190405,
         .description = "Privileged Architecture Version 20190405-Priv-MSU-Ratification",
     },
+    [RVPV_MASTER] = {
+        .name        = "master",
+        .value       = RVPV_MASTER,
+        .description = "Privileged Architecture Master Branch (1.12 draft)",
+    },
     // KEEP LAST: terminator
     {0}
 };
@@ -304,6 +309,7 @@ static RISCV_ENUM_PDEFAULT_CFG_FN(mstatus_fs_mode);
 //
 // Set default value of raw Bool parameters
 //
+static RISCV_BOOL_PDEFAULT_CFG_FN(debug_mode);
 static RISCV_BOOL_PDEFAULT_CFG_FN(updatePTEA);
 static RISCV_BOOL_PDEFAULT_CFG_FN(updatePTED);
 static RISCV_BOOL_PDEFAULT_CFG_FN(unaligned);
@@ -322,7 +328,6 @@ static RISCV_BOOL_PDEFAULT_CFG_FN(require_vstart0);
 //
 // Set default value of raw Uns32 parameters
 //
-static RISCV_UNS32_PDEFAULT_CFG_FN(numHarts);
 static RISCV_UNS32_PDEFAULT_CFG_FN(tvec_align);
 static RISCV_UNS32_PDEFAULT_CFG_FN(ASID_bits);
 static RISCV_UNS32_PDEFAULT_CFG_FN(PMP_grain)
@@ -334,6 +339,16 @@ static RISCV_UNS32_PDEFAULT_CFG_FN(local_int_num);
 //
 static RISCV_UNS64_PDEFAULT_CFG_FN(reset_address)
 static RISCV_UNS64_PDEFAULT_CFG_FN(nmi_address)
+
+//
+// Set default value of numHarts
+//
+static RISCV_PDEFAULT_FN(default_numHarts) {
+
+    Uns32 numHarts = cfg->numHarts;
+
+    setUns32ParamDefault(param, numHarts==RV_NUMHARTS_0 ? 0 : numHarts);
+}
 
 //
 // Set default value of Sv_modes
@@ -422,7 +437,7 @@ static RISCV_CSR_PMDEFAULT_CFG_FN(stvec)
 static RISCV_CSR_PMDEFAULT_CFG_FN(utvec)
 
 //
-// Set default values of ELEN, SLEN and VLEN (vector extensions)
+// Set default values of ELEN, SLEN, VLEN and SEW_min (Vector Extension)
 //
 static RISCV_PDEFAULT_FN(default_ELEN) {
     setUns32ParamDefault(param, cfg->ELEN ? cfg->ELEN : ELEN_DEFAULT);
@@ -432,6 +447,9 @@ static RISCV_PDEFAULT_FN(default_SLEN) {
 }
 static RISCV_PDEFAULT_FN(default_VLEN) {
     setUns32ParamDefault(param, cfg->VLEN ? cfg->VLEN : VLEN_DEFAULT);
+}
+static RISCV_PDEFAULT_FN(default_SEW_min) {
+    setUns32ParamDefault(param, cfg->SEW_min ? cfg->SEW_min : SEW_MIN);
 }
 
 //
@@ -456,6 +474,7 @@ static riscvParameter parameters[] = {
     {  RVPV_FP,      default_mstatus_fs_mode,      VMI_ENUM_PARAM_SPEC  (riscvParamValues, mstatus_fs_mode,      FSModes,                   "Specify conditions causing update of mstatus.FS to dirty")},
     {  RVPV_ALL,     0,                            VMI_BOOL_PARAM_SPEC  (riscvParamValues, verbose,              False,                     "Specify verbose output messages")},
     {  RVPV_MPCORE,  default_numHarts,             VMI_UNS32_PARAM_SPEC (riscvParamValues, numHarts,             0, 0,          32,         "Specify the number of hart contexts in a multiprocessor")},
+    {  RVPV_ALL,     default_debug_mode,           VMI_BOOL_PARAM_SPEC  (riscvParamValues, debug_mode,           False,                     "Specify whether Debug mode is implemented")},
     {  RVPV_S,       default_updatePTEA,           VMI_BOOL_PARAM_SPEC  (riscvParamValues, updatePTEA,           False,                     "Specify whether hardware update of PTE A bit is supported")},
     {  RVPV_S,       default_updatePTED,           VMI_BOOL_PARAM_SPEC  (riscvParamValues, updatePTED,           False,                     "Specify whether hardware update of PTE D bit is supported")},
     {  RVPV_ALL,     default_unaligned,            VMI_BOOL_PARAM_SPEC  (riscvParamValues, unaligned,            False,                     "Specify whether the processor supports unaligned memory accesses")},
@@ -496,12 +515,13 @@ static riscvParameter parameters[] = {
     {  RVPV_ALL,     default_mvendorid,            VMI_UNS64_PARAM_SPEC (riscvParamValues, mvendorid,            0, 0,          -1,         "Override mvendorid register")},
     {  RVPV_ALL,     default_marchid,              VMI_UNS64_PARAM_SPEC (riscvParamValues, marchid,              0, 0,          -1,         "Override marchid register")},
     {  RVPV_ALL,     default_mimpid,               VMI_UNS64_PARAM_SPEC (riscvParamValues, mimpid,               0, 0,          -1,         "Override mimpid register")},
-    {  RVPV_ALL,     default_mhartid,              VMI_UNS64_PARAM_SPEC (riscvParamValues, mhartid,              0, 0,          -1,         "Override mhartid register")},
+    {  RVPV_ALL,     default_mhartid,              VMI_UNS64_PARAM_SPEC (riscvParamValues, mhartid,              0, 0,          -1,         "Override mhartid register (or first mhartid of an incrementing sequence if this is an SMP variant)")},
     {  RVPV_ALL,     default_mtvec,                VMI_UNS64_PARAM_SPEC (riscvParamValues, mtvec,                0, 0,          -1,         "Override mtvec register")},
     {  RVPV_FP,      0,                            VMI_UNS32_PARAM_SPEC (riscvParamValues, mstatus_FS,           0, 0,          3,          "Override default value of mstatus.FS (initial state of floating point unit)")},
     {  RVPV_V,       default_ELEN,                 VMI_UNS32_PARAM_SPEC (riscvParamValues, ELEN,                 0, ELEN_MIN,   ELEN_MAX,   "Override ELEN (vector extension)")},
     {  RVPV_V,       default_SLEN,                 VMI_UNS32_PARAM_SPEC (riscvParamValues, SLEN,                 0, SLEN_MIN,   VLEN_MAX,   "Override SLEN (vector extension)")},
     {  RVPV_V,       default_VLEN,                 VMI_UNS32_PARAM_SPEC (riscvParamValues, VLEN,                 0, SLEN_MIN,   VLEN_MAX,   "Override VLEN (vector extension)")},
+    {  RVPV_V,       default_SEW_min,              VMI_UNS32_PARAM_SPEC (riscvParamValues, SEW_min,              0, SEW_MIN,    ELEN_MAX,   "Override minimum supported SEW (vector extension)")},
     {  RVPV_V,       default_Zvlsseg,              VMI_BOOL_PARAM_SPEC  (riscvParamValues, Zvlsseg,              False,                     "Specify that Zvlsseg is implemented (vector extension)")},
     {  RVPV_V,       default_Zvamo,                VMI_BOOL_PARAM_SPEC  (riscvParamValues, Zvamo,                False,                     "Specify that Zvamo is implemented (vector extension)")},
     {  RVPV_V,       default_Zvediv,               VMI_BOOL_PARAM_SPEC  (riscvParamValues, Zvediv,               False,                     "Specify that Zvediv is implemented (vector extension)")},
@@ -515,7 +535,17 @@ static riscvParameter parameters[] = {
 // Return any parent of the passed processor
 //
 inline static riscvP getParent(riscvP riscv) {
-    return (riscvP)vmirtGetSMPParent((vmiProcessorP)riscv);
+    return riscv ? (riscvP)vmirtGetSMPParent((vmiProcessorP)riscv) : 0;
+}
+
+//
+// Is the processor a member of an SMP?
+//
+static Bool isSMPMember(riscvP riscv) {
+
+    riscvP parent = getParent(riscv);
+
+    return (parent && !riscvIsCluster(parent));
 }
 
 //
@@ -538,15 +568,26 @@ static Bool selectPreParameter(riscvParameterP param) {
 //
 // Should this parameter be presented as a public one for the selected variant?
 //
-static Bool selectParameter(riscvConfigCP cfg, riscvParameterP param) {
-
+static Bool selectParameter(
+    riscvP          riscv,
+    riscvConfigCP   cfg,
+    riscvParameterP param
+) {
     if(cfg) {
 
         Bool isCluster = cfg->members;
+        Bool isVariant = param->variant & RVPV_VARIANT;
 
-        // cluster exposes only variant parameter
-        if(!(param->variant & RVPV_VARIANT) && isCluster) {
+        // cluster exposes only variant parameter; SMP member has no variant
+        if(!isVariant && isCluster) {
             return False;
+        } else if(isVariant && isSMPMember(riscv)) {
+            return False;
+        }
+
+        // include parameters that are only required for multicore variants
+        if(param->variant & RVPV_MPCORE) {
+            return cfg->numHarts;
         }
 
         // include parameters that are only required when floating-point is
@@ -576,11 +617,6 @@ static Bool selectParameter(riscvConfigCP cfg, riscvParameterP param) {
         // include parameters that are only required when Vector extension is
         // implemented
         if((param->variant & RVPV_V) && !(cfg->arch&ISA_V)) {
-            return False;
-        }
-
-        // include parameters that are only required for multicore variants
-        if((param->variant & RVPV_MPCORE) && !cfg->numHarts) {
             return False;
         }
     }
@@ -625,13 +661,16 @@ static Uns32 countPreParameters(riscvParameterP param) {
 //
 // Count the number of visible parameters
 //
-static Uns32 countParameters(riscvConfigCP cfg, riscvParameterP param) {
-
+static Uns32 countParameters(
+    riscvP          riscv,
+    riscvConfigCP   cfg,
+    riscvParameterP param
+) {
     Uns32 i = 0;
 
     while(param->parameter.name) {
 
-        if(selectParameter(cfg, param)) {
+        if(selectParameter(riscv, cfg, param)) {
             i++;
         }
 
@@ -748,14 +787,14 @@ static vmiParameterP createParameterList(
     Uns32           i;
 
     // count the number of entries in the parameter list
-    Uns32 entries = countParameters(cfg, src);
+    Uns32 entries = countParameters(riscv, cfg, src);
 
     // allocate the parameter list, including NULL terminator
     result = STYPE_CALLOC_N(vmiParameter, entries+1);
 
     for(i=0, dst=result; src->parameter.name; i++, src++) {
 
-        if(selectParameter(cfg, src)) {
+        if(selectParameter(riscv, cfg, src)) {
 
             *dst = src->parameter;
 
@@ -805,10 +844,9 @@ static const char *refineVariant(riscvP riscv, const char *variant) {
 //
 VMI_PROC_PARAM_SPECS_FN(riscvGetPreParamSpec) {
 
-    riscvP riscv  = (riscvP)processor;
-    riscvP parent = riscv ? getParent(riscv) : 0;
+    riscvP riscv = (riscvP)processor;
 
-    if(parent && !riscvIsCluster(parent)) {
+    if(isSMPMember(riscv)) {
 
         // allow parameterization of multiclusters and root level objects only
         return 0;
@@ -816,6 +854,16 @@ VMI_PROC_PARAM_SPECS_FN(riscvGetPreParamSpec) {
     } else if(!prev) {
 
         riscvConfigCP cfgList = riscvGetConfigList(riscv);
+
+        // if this is a cluster member, use the member configuration to fill
+        // parameters
+        if(riscvIsClusterMember(riscv)) {
+
+            riscvP      parent  = getParent(riscv);
+            const char *variant = riscvGetClusterVariant(parent, riscv);
+
+            cfgList = getSelectedConfig(cfgList, variant);
+        }
 
         // fill variants and create pre-parameter list
         riscv->variantList = createVariantList(riscv);
@@ -837,17 +885,18 @@ VMI_PROC_PARAM_SPECS_FN(riscvGetPreParamSpec) {
 //
 VMI_SET_PARAM_VALUES_FN(riscvGetPreParamValues) {
 
-    riscvP riscv  = (riscvP)processor;
-    riscvP parent = riscv ? getParent(riscv) : 0;
+    riscvP        riscv   = (riscvP)processor;
+    riscvConfigCP cfgList = riscvGetConfigList(riscv);
 
-    if(parent && !riscvIsCluster(parent)) {
+    if(isSMPMember(riscv)) {
 
-        // no action
+        // no action - all parameters for SMP processors are specified at the
+        // SMP level, and the hart-specific mhartid parameter specifies the
+        // *first* index of an incrementing sequence in this case
 
     } else {
 
         // get raw variant
-        riscvConfigCP     cfgList = riscvGetConfigList(riscv);
         riscvParamValuesP params  = (riscvParamValuesP)parameterValues;
         riscvConfigCP     match   = cfgList + params->variant;
 
@@ -861,7 +910,7 @@ VMI_SET_PARAM_VALUES_FN(riscvGetPreParamValues) {
         // apply misa_Extensions override if required
         if(SETBIT(params->misa_Extensions)) {
             riscvArchitecture keep = riscv->configInfo.arch & (-1 << XLEN_SHIFT);
-            riscv->configInfo.arch  = params->misa_Extensions | keep;
+            riscv->configInfo.arch = params->misa_Extensions | keep;
         }
 
         // apply add_Extensions override if required
@@ -888,19 +937,7 @@ VMI_SET_PARAM_VALUES_FN(riscvGetPreParamValues) {
 //
 VMI_PROC_PARAM_TABLE_SIZE_FN(riscvParamValueSize) {
 
-    riscvP riscv  = (riscvP)processor;
-    riscvP parent = riscv ? getParent(riscv) : 0;
-
-    if(parent && !riscvIsCluster(parent)) {
-
-        // allow parameterization of multiclusters and root level objects only
-        return 0;
-
-    } else {
-
-        // return structure size
-        return sizeof(riscvParamValues);
-    }
+    return sizeof(riscvParamValues);
 }
 
 //

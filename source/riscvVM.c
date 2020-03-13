@@ -261,8 +261,16 @@ inline static Bool getSUM(riscvP riscv) {
 //
 // Get effective value of MSTATUS.MPRV
 //
-inline static Bool getMPRV(riscvP riscv) {
-    return RD_CSR_FIELD(riscv, mstatus, MPRV);
+static Bool getMPRV(riscvP riscv) {
+
+    Bool MPRV = RD_CSR_FIELD(riscv, mstatus, MPRV);
+
+    // in debug mode, MPRV requires dcsr.mprven to be set
+    if(inDebugMode(riscv)) {
+        MPRV &= RD_CSR_FIELD(riscv, dcsr, mprven);
+    }
+
+    return MPRV;
 }
 
 //
@@ -273,7 +281,7 @@ inline static riscvMode getMPP(riscvP riscv) {
 }
 
 //
-// Get effective value of MSTATUS.SUM
+// Get effective value of SATP.ASID
 //
 static Uns32 getActiveASID(riscvP riscv) {
     return RD_CSR_FIELD(riscv, satp, ASID);
@@ -402,7 +410,7 @@ static Uns64 readPageTableEntry(
     Uns32          entryBytes,
     memAccessAttrs attrs
 ) {
-    memEndian endian = riscv->dendian;
+    memEndian endian = riscvGetDataEndian(riscv, RISCV_MODE_SUPERVISOR);
     Uns64     result;
 
     // enter PTW context
@@ -433,7 +441,7 @@ static void writePageTableEntry(
     memAccessAttrs attrs,
     Uns64          value
 ) {
-    memEndian endian = riscv->dendian;
+    memEndian endian = riscvGetDataEndian(riscv, RISCV_MODE_SUPERVISOR);
 
     // enter PTW context
     riscv->PTWActive  = True;
@@ -1876,14 +1884,14 @@ static tlbEntryP validateTLBEntryPriv(
     } else if(!(priv=checkEntryPermission(riscv, mode, entry, requiredPriv))) {
 
         // specified permissions are inadequate
-        entry = NULL;
+        entry = 0;
 
     } else if((requiredPriv&MEM_PRIV_W) && !entry->D) {
 
         // writing using an entry not marked as dirty: discard the entry and
         // reload it (will write the entry marked as dirty)
         deleteTLBEntry(riscv, riscv->tlb, entry);
-        entry = NULL;
+        entry = 0;
 
     } else {
 
@@ -2804,6 +2812,9 @@ void riscvVMRefreshMPRVDomain(riscvP riscv) {
 
         mode = modeMPP;
     }
+
+    // record data access mode (affects endianness)
+    riscv->dmode = mode;
 
     // look for virtual domain for this mode if required
     if(VM) {

@@ -24,6 +24,7 @@
 #include "riscvRegisterTypes.h"
 #include "riscvTypeRefs.h"
 #include "riscvVectorTypes.h"
+#include "riscvVariant.h"
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -108,6 +109,11 @@ void riscvWriteRegSize(
 //
 void riscvWriteReg(riscvP riscv, riscvRegDesc r, Bool signExtend);
 
+//
+// Return endian for data accesses in the current mode
+//
+memEndian riscvGetCurrentDataEndianMT(riscvP riscv);
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // FPU
@@ -162,6 +168,11 @@ Bool riscvEmitCheckLegalRM(riscvP riscv, riscvRMDesc rm);
 // Configure vector extension
 //
 void riscvConfigureVector(riscvP riscv);
+
+//
+// Free vector extension data structures
+//
+void riscvFreeVector(riscvP riscv);
 
 //
 // Adjust JIT code generator state after write of vstart CSR

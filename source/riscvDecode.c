@@ -501,6 +501,7 @@ typedef enum riscvIType32E {
     IT32_MRET_I,
     IT32_SRET_I,
     IT32_URET_I,
+    IT32_DRET_I,
     IT32_WFI_I,
 
     // system fence I-type instruction
@@ -1094,6 +1095,7 @@ const static decodeEntry32 decodeCommon32[] = {
     DECODE32_ENTRY(         MRET_I, "|001100000010|00000|000|00000|1110011|"),
     DECODE32_ENTRY(         SRET_I, "|000100000010|00000|000|00000|1110011|"),
     DECODE32_ENTRY(         URET_I, "|000000000010|00000|000|00000|1110011|"),
+    DECODE32_ENTRY(         DRET_I, "|011110110010|00000|000|00000|1110011|"),
     DECODE32_ENTRY(          WFI_I, "|000100000101|00000|000|00000|1110011|"),
 
     // system fence I-type instruction
@@ -1878,6 +1880,7 @@ const static opAttrs attrsArray32[] = {
     ATTR32_NOP       (        MRET_I,         MRET_I, RVANY,   "mret"   ),
     ATTR32_NOP       (        SRET_I,         SRET_I, RVANY,   "sret"   ),
     ATTR32_NOP       (        URET_I,         URET_I, RVANYN,  "uret"   ),
+    ATTR32_NOP       (        DRET_I,         DRET_I, RVANY,   "dret"   ),
     ATTR32_NOP       (         WFI_I,          WFI_I, RVANY,   "wfi"    ),
 
     // system fence I-type instruction

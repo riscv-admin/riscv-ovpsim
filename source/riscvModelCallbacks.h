@@ -89,6 +89,15 @@ typedef RISCV_GET_REG_NAME_FN((*riscvGetRegNameFn));
 typedef RISCV_GET_TMODE_FN((*riscvGetTModeFn));
 
 //
+// Return data endianness in the given processor mode
+//
+#define RISCV_GET_DATA_ENDIAN_FN(_NAME) memEndian _NAME( \
+    riscvP    riscv,    \
+    riscvMode mode      \
+)
+typedef RISCV_GET_DATA_ENDIAN_FN((*riscvGetDataEndianFn));
+
+//
 // Enable or disable transaction mode
 //
 #define RISCV_SET_TMODE_FN(_NAME) void _NAME(riscvP riscv, Bool enable)
@@ -165,6 +174,12 @@ typedef RISCV_WRITE_REG_FN((*riscvWriteRegFn));
 //
 #define RISCV_GET_FP_FLAGS_MT_FN(_NAME) vmiReg _NAME(riscvP riscv)
 typedef RISCV_GET_FP_FLAGS_MT_FN((*riscvGetFPFlagsMtFn));
+
+//
+// Return data endianness in the current processor mode at morph time
+//
+#define RISCV_GET_DATA_ENDIAN_MT_FN(_NAME) memEndian _NAME(riscvP riscv)
+typedef RISCV_GET_DATA_ENDIAN_MT_FN((*riscvGetDataEndianMtFn));
 
 //
 // Validate the given rounding mode is legal and emit an Illegal Instruction
@@ -296,6 +311,7 @@ typedef struct riscvModelCBS {
     riscvGetRegNameFn         getVRegName;
     riscvSetTModeFn           setTMode;
     riscvGetTModeFn           getTMode;
+    riscvGetDataEndianFn      getDataEndian;
 
     // from riscvExceptions.h
     riscvIllegalInstructionFn illegalInstruction;
@@ -308,6 +324,7 @@ typedef struct riscvModelCBS {
     riscvWriteRegSizeFn       writeRegSize;
     riscvWriteRegFn           writeReg;
     riscvGetFPFlagsMtFn       getFPFlagsMt;
+    riscvGetDataEndianMtFn    getDataEndianMt;
     riscvCheckLegalRMMtFn     checkLegalRMMt;
     riscvMorphVOpFn           morphVOp;
 

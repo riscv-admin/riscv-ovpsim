@@ -17,6 +17,9 @@
  *
  */
 
+// Imperas header files
+#include "hostapi/impAlloc.h"
+
 // VMI header files
 #include "vmi/vmiMessage.h"
 #include "vmi/vmiMt.h"
@@ -173,10 +176,17 @@ inline static Uns64 getPC(riscvP riscv) {
 }
 
 //
-// Return endian for data accesses
+// Return endian for data accesses in the current mode
 //
-inline static memEndian getDataEndian(riscvP riscv) {
-    return riscv->dendian;
+memEndian riscvGetCurrentDataEndianMT(riscvP riscv) {
+
+    // validate endianness blockMask if required
+    if(riscv->checkEndian) {
+        vmimtValidateBlockMask(ISA_BE);
+    }
+
+    // return current data endianness
+    return riscvGetCurrentDataEndian(riscv);
 }
 
 //
@@ -205,13 +215,6 @@ inline static riscvArchitecture getCurrentArch(riscvP riscv) {
 //
 inline static void emitCheckPolymorphic(void) {
     vmimtPolymorphicBlock(16, RISCV_PM_KEY);
-}
-
-//
-// Are only unit stride load/store instructions supported?
-//
-inline static Bool unitStrideOnly(riscvP riscv) {
-    return riscvVFSupport(riscv, RVVF_UNIT_STRIDE_ONLY);
 }
 
 //
@@ -247,6 +250,13 @@ inline static Bool vectorRestrictWhole(riscvP riscv) {
 //
 inline static Bool vectorSignExtVMVXS(riscvP riscv) {
     return riscvVFSupport(riscv, RVVF_SEXT_VMV_X_S);
+}
+
+//
+// Are segmented load/store instructions restricted to SEW size?
+//
+inline static Bool vectorSegOnlySEW(riscvP riscv) {
+    return riscvVFSupport(riscv, RVVF_SEG_ONLY_SEW);
 }
 
 
@@ -1044,7 +1054,7 @@ static void emitLoadTModeMBO(
     memConstraint    constraint
 ) {
     Bool      sExtend = !state->info.unsExt;
-    memEndian endian  = getDataEndian(state->riscv);
+    memEndian endian  = riscvGetCurrentDataEndianMT(state->riscv);
     vmiCallFn cb      = (vmiCallFn)doLoadTMode;
 
     // extend address to 64 bits if required
@@ -1077,7 +1087,7 @@ static void emitStoreTModeMBO(
     vmiReg           rs,
     memConstraint    constraint
 ) {
-    memEndian endian = getDataEndian(state->riscv);
+    memEndian endian = riscvGetCurrentDataEndianMT(state->riscv);
     vmiCallFn cb     = (vmiCallFn)doStoreTMode;
 
     // extend address to 64 bits if required
@@ -1117,7 +1127,7 @@ static void emitLoadNormalMBO(
     memConstraint    constraint
 ) {
     Bool      sExtend = !state->info.unsExt;
-    memEndian endian  = getDataEndian(state->riscv);
+    memEndian endian  = riscvGetCurrentDataEndianMT(state->riscv);
 
     vmimtLoadRRO(rdBits, memBits, offset, rd, ra, endian, sExtend, constraint);
 }
@@ -1133,7 +1143,7 @@ static void emitStoreNormalMBO(
     vmiReg           rs,
     memConstraint    constraint
 ) {
-    memEndian endian = getDataEndian(state->riscv);
+    memEndian endian = riscvGetCurrentDataEndianMT(state->riscv);
 
     vmimtStoreRRO(memBits, offset, ra, rs, endian, constraint);
 }
@@ -1940,6 +1950,19 @@ static RISCV_MORPH_FN(emitMRET) {
     requireModeMT(riscv, RISCV_MODE_MACHINE);
 
     emitException(riscvMRET);
+}
+
+//
+// Implement DRET instruction
+//
+static RISCV_MORPH_FN(emitDRET) {
+
+    riscvP riscv = state->riscv;
+
+    // this instruction must be executed in Machine mode
+    requireModeMT(riscv, RISCV_MODE_MACHINE);
+
+    emitException(riscvDRET);
 }
 
 //
@@ -3574,6 +3597,14 @@ void riscvConfigureVector(riscvP riscv) {
         Uns32 byte;
         Uns32 i;
 
+        // allocate vector registers
+        riscv->v = STYPE_CALLOC_N(Uns32, (vRegBytes/4)*VREG_NUM);
+
+        // allocate LMULx2, LMULx4 and LMULx8 index tables
+        riscv->offsetsLMULx2 = STYPE_ALLOC_N(riscvStrideOffset, vRegBytes*2);
+        riscv->offsetsLMULx4 = STYPE_ALLOC_N(riscvStrideOffset, vRegBytes*4);
+        riscv->offsetsLMULx8 = STYPE_ALLOC_N(riscvStrideOffset, vRegBytes*8);
+
         // iterate over stripes
         for(stripe=0; stripe<stripes; stripe++) {
 
@@ -3644,6 +3675,20 @@ void riscvConfigureVector(riscvP riscv) {
 
             vmiPrintf("\n");
         }
+    }
+}
+
+//
+// Free vector extension data structures
+//
+void riscvFreeVector(riscvP riscv) {
+
+    // exclude artifact vector index registers
+    if(riscv->configInfo.arch & ISA_V) {
+    	STYPE_FREE(riscv->v);
+        STYPE_FREE(riscv->offsetsLMULx2);
+        STYPE_FREE(riscv->offsetsLMULx4);
+        STYPE_FREE(riscv->offsetsLMULx8);
     }
 }
 
@@ -3853,25 +3898,31 @@ static void getIndexedRegisterInt(vmiReg *r, vmiReg *base, Uns32 bytes) {
 // Return offset index table register for the current operation
 //
 static vmiReg getOffsetIndexTable(
-    iterDescP id,
-    vmiReg   *offsetBaseP,
-    Uns32     eBytes
+	riscvMorphStateP state,
+    iterDescP        id,
+    vmiReg          *offsetBaseP,
+    Uns32            eBytes
 ) {
-    Uns32        eScale     = eBytes*8/id->SEW;
-    riscvVLMULMt VLMUL      = id->VLMUL*eScale;
-    vmiReg       offsetIdx  = VMI_NOREG;
-    Uns32        tableBytes = id->vBytesMax*eScale * sizeof(riscvStrideOffset);
+	riscvP             riscv      = state->riscv;
+    Uns32              eScale     = eBytes*8/id->SEW;
+    riscvVLMULMt       VLMUL      = id->VLMUL*eScale;
+    vmiReg             offsetIdx  = VMI_NOREG;
+    riscvStrideOffset *base       = 0;
+    Uns32              tableBytes = id->vBytesMax*eScale * sizeof(*base);
 
     // get table for the given VLMUL
     if(VLMUL==VLMULMT_2) {
-        offsetIdx = RISCV_OFFSETS_LMULx2;
+    	base = riscv->offsetsLMULx2;
     } else if(VLMUL==VLMULMT_4) {
-        offsetIdx = RISCV_OFFSETS_LMULx4;
+    	base = riscv->offsetsLMULx4;
     } else if(VLMUL==VLMULMT_8) {
-        offsetIdx = RISCV_OFFSETS_LMULx8;
+    	base = riscv->offsetsLMULx8;
     } else {
         VMI_ABORT("Unexpected VLMUL %u", VLMUL); // LCOV_EXCL_LINE
     }
+
+    // get vmiReg for the given VLMUL base
+    offsetIdx = vmimtGetExtReg((vmiProcessorP)riscv, base);
 
     // convert to indexed register
     getIndexedRegisterInt(&offsetIdx, offsetBaseP, tableBytes);
@@ -3902,7 +3953,8 @@ static void initializeBase(
         vmiReg offsetBase = base->reg;
         Uns32  scale      = elemBytes*lutEBytes;
         Uns32  eScale     = elemBytes*8/id->SEW;
-        Uns32  lutBytes   = VBYTES_MAX * lutEBytes * id->VLMUL * eScale;
+        Uns32  vRegBytes  = state->riscv->configInfo.VLEN/8;
+        Uns32  lutBytes   = vRegBytes * lutEBytes * id->VLMUL * eScale;
 
         // handle table offset scale > 8
         if(scale>8) {
@@ -3913,7 +3965,9 @@ static void initializeBase(
         }
 
         // adjust table base using scaled index
-        vmiReg offsetIdx = getOffsetIndexTable(id, &offsetBase, elemBytes);
+        vmiReg offsetIdx = getOffsetIndexTable(
+            state, id, &offsetBase, elemBytes
+        );
         vmimtAddBaseR(offsetBase, index, scale, lutBytes, False, False);
 
         // get offset from table
@@ -5770,7 +5824,11 @@ riscvSEWMt riscvValidSEW(riscvP riscv, Uns8 vsew) {
 
     Uns32 SEW = vsewToSEW(vsew);
 
-    return (SEW<=riscv->configInfo.ELEN) ? SEW : SEWMT_UNKNOWN;
+    if((SEW<riscv->configInfo.SEW_min) || (SEW>riscv->configInfo.ELEN)) {
+        SEW = SEWMT_UNKNOWN;
+    }
+
+    return SEW;
 }
 
 //
@@ -6092,13 +6150,20 @@ static RISCV_MORPH_FN(emitVSetVLRRC) {
 ////////////////////////////////////////////////////////////////////////////////
 
 //
+// Is this an SEW width load/store?
+//
+inline static Bool isMemBitsSEW(Uns32 memBits) {
+    return memBits==-1;
+}
+
+//
 // Return the memory element size in bits
 //
 static Uns32 getVMemBits(riscvMorphStateP state, iterDescP id) {
 
     Uns32 memBits = state->info.memBits;
 
-    if(memBits==-1) {
+    if(isMemBitsSEW(memBits)) {
         memBits = id->SEW;
     }
 
@@ -6120,6 +6185,56 @@ static Bool legalVMVRRegNum(Uns32 regNum) {
 }
 
 //
+// Emit checks specific to segment loads/stores
+//
+static Bool emitVLdStCheckSeg(riscvMorphStateP state, iterDescP id) {
+
+    riscvP riscv = state->riscv;
+    Bool   ok    = True;
+
+    if(state->info.isWhole) {
+
+        // no action for whole register loads and stores
+
+    } else if(!riscv->configInfo.Zvlsseg) {
+
+        // Zvlsseg extension not configured
+        ILLEGAL_INSTRUCTION_MESSAGE(riscv, "IVLSEG", "Zvlsseg extension not configured");
+        ok = False;
+
+    } else if(!isMemBitsSEW(state->info.memBits) && vectorSegOnlySEW(riscv)) {
+
+        // only SEW-byte element segment loads/stores supported
+        ILLEGAL_INSTRUCTION_MESSAGE(riscv, "IVSEGMB", "Illegal non-SEW segment load/store");
+        ok = False;
+    }
+
+    return ok;
+}
+
+//
+// Emit checks specific to whole register loads/stores
+//
+static Bool emitVLdStCheckWhole(riscvMorphStateP state, iterDescP id) {
+
+    riscvP riscv = state->riscv;
+    Bool   ok    = True;
+
+    if(!state->info.isWhole) {
+
+        // no action unless whole register load or  store
+
+    } else if(state->info.nf && vectorRestrictWhole(riscv)) {
+
+        // nf!=1 is not supported
+        ILLEGAL_INSTRUCTION_MESSAGE(riscv, "IVNF", "Illegal register count (must be 1)");
+        ok = False;
+     }
+
+    return ok;
+}
+
+//
 // Operation-specific argument checks for loads and stores
 //
 static RISCV_CHECKV_FN(emitVLdStCheckCB) {
@@ -6136,12 +6251,16 @@ static RISCV_CHECKV_FN(emitVLdStCheckCB) {
 
     } else if(!state->info.nf) {
 
-        // not Zvlsseg extension instruction
+        // no action if only one field
 
-    } else if(!(riscv->configInfo.Zvlsseg || state->info.isWhole)) {
+    } else if(!emitVLdStCheckSeg(state, id)) {
 
-        // VLMUL must be 1 for load/store segment instructions
-        ILLEGAL_INSTRUCTION_MESSAGE(riscv, "IVLSEG", "Zvlsseg extension not configured");
+        // segment loads/store check failed
+        ok = False;
+
+    } else if(!emitVLdStCheckWhole(state, id)) {
+
+        // whole register loads/store check failed
         ok = False;
 
     } else if(getVRegNum(state, id)>8) {
@@ -6155,34 +6274,6 @@ static RISCV_CHECKV_FN(emitVLdStCheckCB) {
         // register indices must not wrap
         ILLEGAL_INSTRUCTION_MESSAGE(riscv, "IVWRAP", "Illegal vector index wrap-around");
         ok = False;
-
-    } else if(!state->info.isWhole) {
-
-        // not whole-register operation
-
-    } else if(!vectorRestrictWhole(riscv)) {
-
-        // registers not constrained
-
-    } else if(state->info.nf) {
-
-        // nf!=1 is not currently supported in base specification
-        ILLEGAL_INSTRUCTION_MESSAGE(riscv, "IVNF", "Illegal register count (must be 1)");
-        ok = False;
-    }
-
-    return ok;
-}
-
-//
-// Disable non-unit-stride load/store instructions if required
-//
-static Bool nonUnitStrideVLdStOk(riscvP riscv) {
-
-    Bool ok = !unitStrideOnly(riscv);
-
-    if(!ok) {
-        ILLEGAL_INSTRUCTION_MESSAGE(riscv, "UVI", "Unimplemented instruction");
     }
 
     return ok;
@@ -6199,14 +6290,14 @@ static RISCV_CHECKV_FN(emitVLdStCheckUCB) {
 // Operation-specific argument checks for strided loads and stores
 //
 static RISCV_CHECKV_FN(emitVLdStCheckSCB) {
-    return nonUnitStrideVLdStOk(state->riscv) && emitVLdStCheckCB(state, id);
+    return emitVLdStCheckCB(state, id);
 }
 
 //
 // Operation-specific argument checks for indexed loads and stores
 //
 static RISCV_CHECKV_FN(emitVLdStCheckXCB) {
-    return nonUnitStrideVLdStOk(state->riscv) && emitVLdStCheckCB(state, id);
+    return emitVLdStCheckCB(state, id);
 }
 
 //
@@ -8019,13 +8110,14 @@ static void emitVRSLIDEDOWNInt(
     vmiReg           index,
     Uns32            xBits
 ) {
-    vmiLabelP skip = vmimtNewLabel();
+    Uns32     vlMax = getVLMAXOp(id);
+    vmiLabelP skip  = vmimtNewLabel();
 
     // assume zero result is required
     vmimtMoveRC(id->SEW, id->r[0], 0);
 
-    // skip move from vector if index>=vl
-    vmimtCompareRRJumpLabel(xBits, vmi_COND_NB, index, CSR_REG_MT(vl), skip);
+    // skip move from vector if index>=vlmax
+    vmimtCompareRCJumpLabel(xBits, vmi_COND_NB, index, vlMax, skip);
 
     // do indexed move (if not skipped)
     moveIndexedVd0Vs1(state, id, index, skip);
@@ -8036,6 +8128,7 @@ static void emitVRSLIDEDOWNInt(
 //
 static RISCV_MORPHV_FN(emitVRSLIDEDOWNCB) {
 
+    Uns32  vlMax      = getVLMAXOp(id);
     Uns32  offsetBits = IMPERAS_POINTER_BITS;
     vmiReg offset     = id->r[2];
     vmiReg vstart     = CSR_REG_MT(vstart);
@@ -8043,9 +8136,9 @@ static RISCV_MORPHV_FN(emitVRSLIDEDOWNCB) {
     Uns32  sBits      = (xBits<offsetBits) ? xBits : offsetBits;
     vmiReg index      = newTmp(state);
 
-    // move offset clamped to vl to temporary
-    vmimtCompareRR(xBits, vmi_COND_B, offset, CSR_REG_MT(vl), index);
-    vmimtCondMoveRRR(xBits, index, True, index, offset, CSR_REG_MT(vl));
+    // move offset clamped to vlmax to temporary
+    vmimtCompareRC(xBits, vmi_COND_B, offset, vlMax, index);
+    vmimtCondMoveRRC(xBits, index, True, index, offset, vlMax);
 
     // calculate source index
     vmimtMoveExtendRR(offsetBits, index, sBits, index, False);
@@ -8373,6 +8466,7 @@ const static riscvMorphAttr dispatchTable[] = {
     [RV_IT_MRET_I]           = {morph:emitMRET,   iClass:OCL_IC_SYSTEM  },
     [RV_IT_SRET_I]           = {morph:emitSRET,   iClass:OCL_IC_SYSTEM  },
     [RV_IT_URET_I]           = {morph:emitURET,   iClass:OCL_IC_SYSTEM  },
+    [RV_IT_DRET_I]           = {morph:emitDRET,   iClass:OCL_IC_SYSTEM  },
     [RV_IT_WFI_I]            = {morph:emitWFI,    iClass:OCL_IC_SYSTEM  },
 
     // system fence I-type instruction
