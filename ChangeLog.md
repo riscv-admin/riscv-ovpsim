@@ -6,10 +6,36 @@ This CHANGELOG contains information for the riscvOVPsim fixed platform which inc
 
 ---
 
-NOTE: X-commit messages below refer to git commits in the following 
-      Risc-V specification document repositories:                                  
-  I-commit: https://github.com/riscv/riscv-isa-manual                        
-  V-commit: https://github.com/riscv/riscv-v-spec                            
+NOTE: X-commit messages below refer to git commits in the following
+      Risc-V specification document repositories:
+  I-commit: https://github.com/riscv/riscv-isa-manual
+  V-commit: https://github.com/riscv/riscv-v-spec
+
+- Support for Debug mode has been added; see RISCV processor documentation for
+  more details.
+- The priv_version parameter now includes a choice of 'master', which specifies
+  that the evolving 1.12 Privileged Architecture Specification should be used.
+  This has the following changes compared to the ratified 1.11 version:
+  - MRET and SRET instruction clear mstatus.MPRV when leaving M-mode;
+  - For RV32, a new mstatush CSR has been added;
+  - Data endian is now configurable using UBE, SBE and MBE fields in mstatus
+    and the new mstatush CSR.
+- New parameter SEW_min has been added to specify the minimum SEW supported when
+  the Vector Extension is implemented; the default is 8 bits.
+- When the Vector Extension is implemented, the maximum VLEN value supported
+  has increased from 2048 to 65536 bits.
+- Some Vector Extension issues have been corrected:
+  - Behavior of vslidedown has been corrected in cases when vl<vlmax. Previously
+    elements where source element i satisfied vl<=i+offset were being zeroed;
+    now, elements where source element i satisfies vlmax<=i+offset are zeroed.
+- Some Vector Extension specification changes have been implemented:
+  - V-commit 951b64f: Mirrors of fcsr fields have been removed from vcsr.
+  - V-commit 45da90d: segment loads and stores have been restricted to SEW
+    element size only.
+
+Date 2020-February-19
+Release 20200218.0
+===
 
 ---
 

@@ -101,6 +101,7 @@ const vmiIASAttr modelAttrs = {
     .wrAbortExceptCB    = riscvWrAbortExcept,
     .ifetchExceptCB     = riscvIFetchExcept,
     .arithResultCB      = riscvArithResult,
+    .icountExceptCB     = riscvStepExcept,
 
     ////////////////////////////////////////////////////////////////////////
     // PARAMETER SUPPORT ROUTINES

@@ -89,6 +89,7 @@ typedef enum riscvITypeE {
     RV_IT_MRET_I,
     RV_IT_SRET_I,
     RV_IT_URET_I,
+    RV_IT_DRET_I,
     RV_IT_WFI_I,
 
     // system fence I-type instruction

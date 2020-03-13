@@ -67,10 +67,13 @@
 // Container for net values
 //
 typedef struct riscvNetValueS {
-    Uns64 ip;       // bitmask of driven interrupt signals
-    Bool  reset;    // level of reset signal
-    Bool  nmi;      // level of NMI signal
-    Bool  _u1[6];   // (for alignment)
+    Uns64 ip;               // bitmask of driven interrupt signals
+    Bool  reset;            // level of reset signal
+    Bool  nmi;              // level of NMI signal
+    Bool  haltreq;          // haltreq (Debug mode)
+    Bool  resethaltreq;     // resethaltreq (Debug mode)
+    Bool  resethaltreqS;    // resethaltreq (Debug mode, sampled at reset)
+    Bool  _u1[3];           // (for alignment)
 } riscvNetValue;
 
 //
@@ -124,9 +127,7 @@ typedef struct riscvNetPortS {
 // Maximum supported value of VLEN and number of vector registers (vector
 // extension)
 //
-#define VLEN_MAX        2048
-#define VBYTES_MAX      (VLEN_MAX/8)
-#define VDWORDS_MAX     (VLEN_MAX/64)
+#define VLEN_MAX        65536
 #define VREG_NUM        32
 #define ELEN_MIN        32
 #define ELEN_MAX        64
@@ -137,13 +138,6 @@ typedef struct riscvNetPortS {
 #define SEW_MIN         8
 #define LMUL_MAX        8
 #define NUM_BASE_REGS   4
-
-//
-// This defines sufficient 64-bit aligned space for VREG_NUM vector registers
-// of up to VLEN_MAX bits. The assignment of the storage depends on the
-// configured VLEN
-//
-typedef Uns64 riscvVRegBank[VDWORDS_MAX*VREG_NUM];
 
 //
 // This defines the type of elements of the stride tables used to handle
@@ -175,15 +169,18 @@ typedef struct riscvS {
     Bool               inSaveRestore :1;// is save/restore active?
     Bool               useTMode      :1;// has transaction mode been enabled?
     Bool               rmCheckValid  :1;// whether RM valid check required
+    Bool               checkEndian   :1;// whether endian check required
     Uns16              pmKey;           // polymorphic key
     Uns8               fpFlagsMT;       // flags set by JIT instructions
     Uns8               fpFlagsCSR;      // flags set by CSR write
     Uns8               SFMT;            // SF set by JIT instructions
     Uns8               SFCSR;           // SF set by CSR write
     Uns8               SF;              // operation saturation flag
+    Bool               DM;              // whether in Debug mode
     Uns32              flags;           // model control flags
     Uns32              flagsRestore;    // saved flags during restore
     riscvConfig        configInfo;      // model configuration
+    riscvMode          dmode;           // mode in which to access data
     memEndian          dendian;         // data endianness
     memEndian          iendian;         // instruction endianness
     Uns64              jumpBase;        // address of jump instruction
@@ -248,19 +245,19 @@ typedef struct riscvS {
     riscvBlockStateP   blockState;      // active block state
 
     // Enhanced model support callbacks
-    riscvModelCB       cb;                          // implemented by base model
-    riscvExtCBP        extCBs;                      // implemented in extension
+    riscvModelCB       cb;				// implemented by base model
+    riscvExtCBP        extCBs;   		// implemented in extension
 
     // Vector extension
-    Uns8               vFieldMask;                  // vector field mask
-    Uns8               vActiveMask;                 // vector active element mask
-    Bool               vFirstFault;                 // vector first fault active?
-    Uns64              vTmp;                        // vector operation temporary
-    riscvVRegBank      v;                           // vector registers (configurable size)
-    UnsPS              vBase[NUM_BASE_REGS];        // indexed base registers
-    riscvStrideOffset  offsetsLMULx2[VBYTES_MAX*2]; // LMULx2 stride offsets
-    riscvStrideOffset  offsetsLMULx4[VBYTES_MAX*4]; // LMULx4 stride offsets
-    riscvStrideOffset  offsetsLMULx8[VBYTES_MAX*8]; // LMULx8 stride offsets
+    Uns8               vFieldMask;          	// vector field mask
+    Uns8               vActiveMask;         	// vector active element mask
+    Bool               vFirstFault;          	// vector first fault active?
+    Uns64              vTmp;                 	// vector operation temporary
+    UnsPS              vBase[NUM_BASE_REGS];  	// indexed base registers
+    Uns32             *v;                     	// vector registers (configurable size)
+    riscvStrideOffset *offsetsLMULx2;			// LMULx2 stride offsets
+    riscvStrideOffset *offsetsLMULx4; 			// LMULx4 stride offsets
+    riscvStrideOffset *offsetsLMULx8; 			// LMULx8 stride offsets
 
 } riscv;
 
@@ -281,6 +278,13 @@ inline static riscvMode getCurrentMode(riscvP riscv) {
 //
 inline static Uns32 getASIDMask(riscvP riscv) {
     return (1<<riscv->configInfo.ASID_bits)-1;
+}
+
+//
+// Is the processor in Debug mode?
+//
+inline static Bool inDebugMode(riscvP riscv) {
+    return riscv->DM;
 }
 
 

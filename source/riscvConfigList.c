@@ -37,7 +37,8 @@
     .Zvqmac        = 1,                         \
     .PMP_registers = _PMP_REGS,                 \
     .tval_ii_code  = True,                      \
-    .ASID_bits     = ((_ARCH)&RV64) ? 16 : 9    \
+    .ASID_bits     = ((_ARCH)&RV64) ? 16 : 9,   \
+    .numHarts      = RV_NUMHARTS_0              \
 }
 
 //

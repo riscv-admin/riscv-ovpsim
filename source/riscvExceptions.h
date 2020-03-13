@@ -87,6 +87,21 @@ void riscvSRET(riscvP riscv);
 void riscvURET(riscvP riscv);
 
 //
+// Return from Debug mode
+//
+void riscvDRET(riscvP riscv);
+
+//
+// Enter or leave debug mode
+//
+void riscvSetDM(riscvP riscv, Bool DM);
+
+//
+// Set step breakpoint if required
+//
+void riscvSetStepBreakpoint(riscvP riscv);
+
+//
 // Halt the processor in WFI state if required
 //
 void riscvWFI(riscvP riscv);

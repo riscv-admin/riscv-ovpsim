@@ -66,8 +66,9 @@ static void initLeafModelCBs(riscvP riscv) {
     riscv->cb.getXRegName        = riscvGetXRegName;
     riscv->cb.getFRegName        = riscvGetFRegName;
     riscv->cb.getVRegName        = riscvGetVRegName;
-    riscv->cb.getTMode           = riscvGetTMode;
     riscv->cb.setTMode           = riscvSetTMode;
+    riscv->cb.getTMode           = riscvGetTMode;
+    riscv->cb.getDataEndian      = riscvGetDataEndian;
 
     // from riscvExceptions.h
     riscv->cb.illegalInstruction = riscvIllegalInstruction;
@@ -80,6 +81,7 @@ static void initLeafModelCBs(riscvP riscv) {
     riscv->cb.writeRegSize       = riscvWriteRegSize;
     riscv->cb.writeReg           = riscvWriteReg;
     riscv->cb.getFPFlagsMt       = riscvGetFPFlagsMT;
+    riscv->cb.getDataEndianMt    = riscvGetCurrentDataEndianMT;
     riscv->cb.checkLegalRMMt     = riscvEmitCheckLegalRM;
     riscv->cb.morphVOp           = riscvMorphVOp;
 
@@ -121,24 +123,17 @@ static riscvConfigCP getConfigVariantArg(riscvP riscv, riscvParamValuesP params)
 }
 
 //
-// Return the number of child processors of he give processor
+// Return the number of child processors of the given processor
 //
 inline static riscvP getParent(riscvP riscv) {
     return (riscvP)vmirtGetSMPParent((vmiProcessorP)riscv);
 }
 
 //
-// Return the number of child processors of he give processor
+// Return the number of child processors of the given processor
 //
 inline static Uns32 getNumChildren(riscvP riscv) {
-    return riscv->parent ? 0 : riscv->configInfo.numHarts;
-}
-
-//
-// Is the processor a cluster container?
-//
-inline static Bool isCluster(riscvP riscv) {
-    return getNumChildren(riscv) && riscv->configInfo.members;
+    return riscv->configInfo.numHarts;
 }
 
 //
@@ -245,7 +240,7 @@ static void applyParamsSMP(riscvP riscv, riscvParamValuesP params) {
     cfg->Sv_modes          = params->Sv_modes | RISCV_VMM_BARE;
     cfg->local_int_num     = params->local_int_num;
     cfg->lr_sc_grain       = powerOfTwo(params->lr_sc_grain, "lr_sc_grain");
-    cfg->numHarts          = params->numHarts;
+    cfg->debug_mode        = params->debug_mode;
     cfg->updatePTEA        = params->updatePTEA;
     cfg->updatePTED        = params->updatePTED;
     cfg->unaligned         = params->unaligned;
@@ -264,9 +259,14 @@ static void applyParamsSMP(riscvP riscv, riscvParamValuesP params) {
     cfg->ELEN              = powerOfTwo(params->ELEN, "ELEN");
     cfg->SLEN              = powerOfTwo(params->SLEN, "SLEN");
     cfg->VLEN              = powerOfTwo(params->VLEN, "VLEN");
+    cfg->SEW_min           = powerOfTwo(params->SEW_min, "SEW_min");
     cfg->Zvlsseg           = params->Zvlsseg;
     cfg->Zvamo             = params->Zvamo;
     cfg->Zvediv            = params->Zvediv;
+
+    // set number of children
+    Bool isSMPMember = riscv->parent && !riscvIsCluster(riscv->parent);
+    cfg->numHarts = isSMPMember ? 0 : params->numHarts;
 
     // Zvqmac extension is only available after version RVVV_0_8_20191004
     cfg->Zvqmac = params->Zvqmac && (params->vector_version>RVVV_0_8_20191004);
@@ -287,6 +287,15 @@ static void applyParamsSMP(riscvP riscv, riscvParamValuesP params) {
             cfg->SLEN, cfg->VLEN, cfg->VLEN
         );
         cfg->SLEN = cfg->VLEN;
+    }
+
+    // force SEW_min <= ELEN
+    if(cfg->SEW_min>cfg->ELEN) {
+        vmiMessage("W", CPU_PREFIX"_ISEW",
+            "'SEW_min' (%u) exceeds 'ELEN' (%u) - forcing SEW_min=%u",
+            cfg->SEW_min, cfg->ELEN, cfg->ELEN
+        );
+        cfg->SEW_min = cfg->ELEN;
     }
 
     if(misa_MXL==1) {
@@ -493,6 +502,9 @@ VMI_DESTRUCTOR_FN(riscvDestructor) {
 
     // free exception state
     riscvExceptFree(riscv);
+
+    // free vector extension data structures
+    riscvFreeVector(riscv);
 }
 
 
