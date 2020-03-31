@@ -56,9 +56,15 @@ typedef enum riscvParamVariantE {
     RVPV_N       = (1<<5),      // requires User mode interrupts
     RVPV_V       = (1<<6),      // requires Vector extension
     RVPV_MPCORE  = (1<<7),      // present for multicore variants
+    RVPV_CLIC    = (1<<9),      // present if CLIC enabled
+    RVPV_NMBITS  = (1<<10),     // present if CLICCFGMBITS can be > 0
 
                                 // COMPOSITE PARAMETER IDENTIFIERS
+    RVPV_INT_CFG = RVPV_PRE,
     RVPV_FPV     = RVPV_FP|RVPV_V,
+    RVPV_CLIC_NM = RVPV_CLIC|RVPV_NMBITS,
+    RVPV_CLIC_S  = RVPV_CLIC|RVPV_S,
+    RVPV_CLIC_N  = RVPV_CLIC|RVPV_N,
 
 } riscvParamVariant;
 
@@ -210,6 +216,36 @@ static vmiEnumParameter FSModes[] = {
 };
 
 //
+// Specify Debug mode operation
+//
+static vmiEnumParameter DMModes[] = {
+    [RVDM_NONE] = {
+        .name        = "none",
+        .value       = RVDM_NONE,
+        .description = "Debug mode not implemented",
+    },
+    [RVDM_INTERRUPT] = {
+        .name        = "interrupt",
+        .value       = RVDM_INTERRUPT,
+        .description = "Debug mode implemented by interrupt",
+    },
+    [RVDM_HALT] = {
+        .name        = "halt",
+        .value       = RVDM_HALT,
+        .description = "Debug mode implemented by halt",
+    },
+    // KEEP LAST: terminator
+    {0}
+};
+
+//
+// Return the maximum number of bits that can be specified for CLICCFGMBITS
+//
+static Uns32 getCLICCFGMBITSMax(riscvConfigCP cfg) {
+    return (cfg->arch&ISA_S) ? 2 : (cfg->arch&ISA_N) ? 1 : 0;
+}
+
+//
 // This function type is used to specify the default value for a parameter
 //
 #define RISCV_PDEFAULT_FN(_NAME) void _NAME(riscvConfigCP cfg, vmiParameterP param)
@@ -266,6 +302,14 @@ static void setUns64ParamDefault(vmiParameterP param, Uns64 value) {
 }
 
 //
+// Set Uns32 parameter maximum value
+//
+static void setUns32ParamMax(vmiParameterP param, Uns32 value) {
+    CHECK_PARAM_TYPE(param, vmi_PT_UNS32, "Uns32");
+    param->u.uns32Param.max = value;
+}
+
+//
 // Macro to define a function to set a raw enum parameter value from the
 // configuration
 //
@@ -305,11 +349,11 @@ static RISCV_ENUM_PDEFAULT_CFG_FN(priv_version);
 static RISCV_ENUM_PDEFAULT_CFG_FN(vect_version);
 static RISCV_ENUM_PDEFAULT_CFG_FN(fp16_version);
 static RISCV_ENUM_PDEFAULT_CFG_FN(mstatus_fs_mode);
+static RISCV_ENUM_PDEFAULT_CFG_FN(debug_mode);
 
 //
 // Set default value of raw Bool parameters
 //
-static RISCV_BOOL_PDEFAULT_CFG_FN(debug_mode);
 static RISCV_BOOL_PDEFAULT_CFG_FN(updatePTEA);
 static RISCV_BOOL_PDEFAULT_CFG_FN(updatePTED);
 static RISCV_BOOL_PDEFAULT_CFG_FN(unaligned);
@@ -324,21 +368,29 @@ static RISCV_BOOL_PDEFAULT_CFG_FN(enable_CSR_bus);
 static RISCV_BOOL_PDEFAULT_CFG_FN(d_requires_f);
 static RISCV_BOOL_PDEFAULT_CFG_FN(xret_preserves_lr);
 static RISCV_BOOL_PDEFAULT_CFG_FN(require_vstart0);
+static RISCV_BOOL_PDEFAULT_CFG_FN(external_int_id);
+static RISCV_BOOL_PDEFAULT_CFG_FN(CLICANDBASIC);
+static RISCV_BOOL_PDEFAULT_CFG_FN(CLICSELHVEC);
+static RISCV_BOOL_PDEFAULT_CFG_FN(CLICMNXTI);
+static RISCV_BOOL_PDEFAULT_CFG_FN(CLICMCSW);
 
 //
 // Set default value of raw Uns32 parameters
 //
 static RISCV_UNS32_PDEFAULT_CFG_FN(tvec_align);
-static RISCV_UNS32_PDEFAULT_CFG_FN(ASID_bits);
 static RISCV_UNS32_PDEFAULT_CFG_FN(PMP_grain)
 static RISCV_UNS32_PDEFAULT_CFG_FN(PMP_registers);
-static RISCV_UNS32_PDEFAULT_CFG_FN(local_int_num);
+static RISCV_UNS32_PDEFAULT_CFG_FN(CLICLEVELS);
+static RISCV_UNS32_PDEFAULT_CFG_FN(CLICCFGLBITS);
 
 //
 // Set default value of raw Uns64 parameters
 //
 static RISCV_UNS64_PDEFAULT_CFG_FN(reset_address)
 static RISCV_UNS64_PDEFAULT_CFG_FN(nmi_address)
+static RISCV_UNS64_PDEFAULT_CFG_FN(unimp_int_mask)
+static RISCV_UNS64_PDEFAULT_CFG_FN(no_ideleg)
+static RISCV_UNS64_PDEFAULT_CFG_FN(no_edeleg)
 
 //
 // Set default value of numHarts
@@ -405,6 +457,51 @@ static RISCV_PDEFAULT_FN(default_misa_Extensions_mask) {
 }
 
 //
+// Set default and maximum value of local_int_num
+//
+static RISCV_PDEFAULT_FN(default_local_int_num) {
+
+    Uns32 maxLocal;
+
+    if(cfg->CLICLEVELS) {
+        maxLocal = 4096-16;
+    } else if(cfg->arch & ISA_XLEN_64) {
+        maxLocal = 48;
+    } else {
+        maxLocal = 16;
+    }
+
+    setUns32ParamDefault(param, cfg->local_int_num);
+    setUns32ParamMax(param, maxLocal);
+}
+
+//
+// Set default and maximum value of ASID_bits
+//
+static RISCV_PDEFAULT_FN(default_ASID_bits) {
+
+    setUns32ParamDefault(param, cfg->ASID_bits);
+    setUns32ParamMax(param, (cfg->arch&ISA_XLEN_64) ? 16 : 9);
+}
+
+//
+// Set default and maximum value of CLICCFGMBITS
+//
+static RISCV_PDEFAULT_FN(default_CLICINTCTLBITS) {
+
+    setUns32ParamDefault(param, cfg->CLICINTCTLBITS ? : 2);
+}
+
+//
+// Set default and maximum value of CLICCFGMBITS
+//
+static RISCV_PDEFAULT_FN(default_CLICCFGMBITS) {
+
+    setUns32ParamDefault(param, cfg->CLICCFGMBITS);
+    setUns32ParamMax(param, getCLICCFGMBITSMax(cfg));
+}
+
+//
 // Macro to define a function to set an Uns64 CSR parameter value from the
 // configuration
 //
@@ -435,6 +532,9 @@ static RISCV_CSR_PDEFAULT_CFG_FN(mtvec)
 static RISCV_CSR_PMDEFAULT_CFG_FN(mtvec)
 static RISCV_CSR_PMDEFAULT_CFG_FN(stvec)
 static RISCV_CSR_PMDEFAULT_CFG_FN(utvec)
+static RISCV_CSR_PMDEFAULT_CFG_FN(mtvt)
+static RISCV_CSR_PMDEFAULT_CFG_FN(stvt)
+static RISCV_CSR_PMDEFAULT_CFG_FN(utvt)
 
 //
 // Set default values of ELEN, SLEN, VLEN and SEW_min (Vector Extension)
@@ -472,9 +572,9 @@ static riscvParameter parameters[] = {
     {  RVPV_V,       default_vect_version,         VMI_ENUM_PARAM_SPEC  (riscvParamValues, vector_version,       vectorVariants,            "Specify required Vector Architecture version")},
     {  RVPV_FPV,     default_fp16_version,         VMI_ENUM_PARAM_SPEC  (riscvParamValues, fp16_version,         fp16Variants,              "Specify required 16-bit floating point format")},
     {  RVPV_FP,      default_mstatus_fs_mode,      VMI_ENUM_PARAM_SPEC  (riscvParamValues, mstatus_fs_mode,      FSModes,                   "Specify conditions causing update of mstatus.FS to dirty")},
+    {  RVPV_ALL,     default_debug_mode,           VMI_ENUM_PARAM_SPEC  (riscvParamValues, debug_mode,           DMModes,                   "Specify how Debug mode is implemented")},
     {  RVPV_ALL,     0,                            VMI_BOOL_PARAM_SPEC  (riscvParamValues, verbose,              False,                     "Specify verbose output messages")},
     {  RVPV_MPCORE,  default_numHarts,             VMI_UNS32_PARAM_SPEC (riscvParamValues, numHarts,             0, 0,          32,         "Specify the number of hart contexts in a multiprocessor")},
-    {  RVPV_ALL,     default_debug_mode,           VMI_BOOL_PARAM_SPEC  (riscvParamValues, debug_mode,           False,                     "Specify whether Debug mode is implemented")},
     {  RVPV_S,       default_updatePTEA,           VMI_BOOL_PARAM_SPEC  (riscvParamValues, updatePTEA,           False,                     "Specify whether hardware update of PTE A bit is supported")},
     {  RVPV_S,       default_updatePTED,           VMI_BOOL_PARAM_SPEC  (riscvParamValues, updatePTED,           False,                     "Specify whether hardware update of PTE D bit is supported")},
     {  RVPV_ALL,     default_unaligned,            VMI_BOOL_PARAM_SPEC  (riscvParamValues, unaligned,            False,                     "Specify whether the processor supports unaligned memory accesses")},
@@ -485,6 +585,9 @@ static riscvParameter parameters[] = {
     {  RVPV_ALL,     default_mtvec_mask,           VMI_UNS64_PARAM_SPEC (riscvParamValues, mtvec_mask,           0, 0,          -1,         "Specify hardware-enforced mask of writable bits in mtvec register")},
     {  RVPV_S,       default_stvec_mask,           VMI_UNS64_PARAM_SPEC (riscvParamValues, stvec_mask,           0, 0,          -1,         "Specify hardware-enforced mask of writable bits in stvec register")},
     {  RVPV_N,       default_utvec_mask,           VMI_UNS64_PARAM_SPEC (riscvParamValues, utvec_mask,           0, 0,          -1,         "Specify hardware-enforced mask of writable bits in utvec register")},
+    {  RVPV_CLIC,    default_mtvt_mask,            VMI_UNS64_PARAM_SPEC (riscvParamValues, mtvt_mask,            0, 0,          -1,         "Specify hardware-enforced mask of writable bits in CLIC mtvt register")},
+    {  RVPV_CLIC_S,  default_stvt_mask,            VMI_UNS64_PARAM_SPEC (riscvParamValues, stvt_mask,            0, 0,          -1,         "Specify hardware-enforced mask of writable bits in CLIC stvt register")},
+    {  RVPV_CLIC_N,  default_utvt_mask,            VMI_UNS64_PARAM_SPEC (riscvParamValues, utvt_mask,            0, 0,          -1,         "Specify hardware-enforced mask of writable bits in CLIC utvt register")},
     {  RVPV_ALL,     default_tval_ii_code,         VMI_BOOL_PARAM_SPEC  (riscvParamValues, tval_ii_code,         False,                     "Specify whether mtval/stval contain faulting instruction bits on illegal instruction exception")},
     {  RVPV_ALL,     default_cycle_undefined,      VMI_BOOL_PARAM_SPEC  (riscvParamValues, cycle_undefined,      False,                     "Specify that the cycle CSR is undefined (reads to it are emulated by a Machine mode trap)")},
     {  RVPV_ALL,     default_time_undefined,       VMI_BOOL_PARAM_SPEC  (riscvParamValues, time_undefined,       False,                     "Specify that the time CSR is undefined (reads to it are emulated by a Machine mode trap)")},
@@ -493,14 +596,18 @@ static riscvParameter parameters[] = {
     {  RVPV_FP,      default_d_requires_f,         VMI_BOOL_PARAM_SPEC  (riscvParamValues, d_requires_f,         False,                     "If D and F extensions are separately enabled in the misa CSR, whether D is enabled only if F is enabled")},
     {  RVPV_A,       default_xret_preserves_lr,    VMI_BOOL_PARAM_SPEC  (riscvParamValues, xret_preserves_lr,    False,                     "Whether an xRET instruction preserves the value of LR")},
     {  RVPV_V,       default_require_vstart0,      VMI_BOOL_PARAM_SPEC  (riscvParamValues, require_vstart0,      False,                     "Whether CSR vstart must be 0 for non-interruptible vector instructions")},
-    {  RVPV_S,       default_ASID_bits,            VMI_UNS32_PARAM_SPEC (riscvParamValues, ASID_bits,            0, 0,          16,         "Specify the number of implemented ASID bits")},
+    {  RVPV_S,       default_ASID_bits,            VMI_UNS32_PARAM_SPEC (riscvParamValues, ASID_bits,            0, 0,          0,          "Specify the number of implemented ASID bits")},
     {  RVPV_A,       default_lr_sc_grain,          VMI_UNS32_PARAM_SPEC (riscvParamValues, lr_sc_grain,          1, 1,          (1<<16),    "Specify byte granularity of ll/sc lock region (constrained to a power of two)")},
     {  RVPV_ALL,     default_reset_address,        VMI_UNS64_PARAM_SPEC (riscvParamValues, reset_address,        0, 0,          -1,         "Override reset vector address")},
     {  RVPV_ALL,     default_nmi_address,          VMI_UNS64_PARAM_SPEC (riscvParamValues, nmi_address,          0, 0,          -1,         "Override NMI vector address")},
     {  RVPV_ALL,     default_PMP_grain,            VMI_UNS32_PARAM_SPEC (riscvParamValues, PMP_grain,            0, 0,          29,         "Specify PMP region granularity, G (0 => 4 bytes, 1 => 8 bytes, etc)")},
     {  RVPV_ALL,     default_PMP_registers,        VMI_UNS32_PARAM_SPEC (riscvParamValues, PMP_registers,        0, 0,          16,         "Specify the number of implemented PMP address registers")},
     {  RVPV_S,       default_Sv_modes,             VMI_UNS32_PARAM_SPEC (riscvParamValues, Sv_modes,             0, 0,          (1<<16)-1,  "Specify bit mask of implemented Sv modes (e.g. 1<<8 is Sv39)")},
-    {  RVPV_ALL,     default_local_int_num,        VMI_UNS32_PARAM_SPEC (riscvParamValues, local_int_num,        0, 0,          48,         "Specify number of supplemental local interrupts")},
+    {  RVPV_ALL,     default_local_int_num,        VMI_UNS32_PARAM_SPEC (riscvParamValues, local_int_num,        0, 0,          0,          "Specify number of supplemental local interrupts")},
+    {  RVPV_ALL,     default_unimp_int_mask,       VMI_UNS64_PARAM_SPEC (riscvParamValues, unimp_int_mask,       0, 0,          -1,         "Specify mask of unimplemented interrupts (e.g. 1<<9 indicates Supervisor external interrupt unimplemented)")},
+    {  RVPV_ALL,     default_no_ideleg,            VMI_UNS64_PARAM_SPEC (riscvParamValues, no_ideleg,            0, 0,          -1,         "Specify mask of interrupts that cannot be delegated to lower-priority execution levels")},
+    {  RVPV_ALL,     default_no_edeleg,            VMI_UNS64_PARAM_SPEC (riscvParamValues, no_edeleg,            0, 0,          -1,         "Specify mask of exceptions that cannot be delegated to lower-priority execution levels")},
+    {  RVPV_ALL,     default_external_int_id,      VMI_BOOL_PARAM_SPEC  (riscvParamValues, external_int_id,      False,                     "Whether to add nets allowing External Interrupt ID codes to be forced")},
 
     // fundamental configuration
     {  RVPV_ALL,     0,                            VMI_ENDIAN_PARAM_SPEC(riscvParamValues, endian,                                          "Model endian")},
@@ -526,6 +633,16 @@ static riscvParameter parameters[] = {
     {  RVPV_V,       default_Zvamo,                VMI_BOOL_PARAM_SPEC  (riscvParamValues, Zvamo,                False,                     "Specify that Zvamo is implemented (vector extension)")},
     {  RVPV_V,       default_Zvediv,               VMI_BOOL_PARAM_SPEC  (riscvParamValues, Zvediv,               False,                     "Specify that Zvediv is implemented (vector extension)")},
     {  RVPV_V,       default_Zvqmac,               VMI_BOOL_PARAM_SPEC  (riscvParamValues, Zvqmac,               False,                     "Specify that Zvqmac is implemented (vector extension)")},
+
+    // CLIC configuration
+    {  RVPV_INT_CFG, default_CLICLEVELS,           VMI_UNS32_PARAM_SPEC (riscvParamValues, CLICLEVELS,           0, 0,          256,        "Specify number of interrupt levels implemented by CLIC, or 0 if CLIC absent (NOTE: do not use, feature under development)")},
+    {  RVPV_CLIC,    default_CLICANDBASIC,         VMI_BOOL_PARAM_SPEC  (riscvParamValues, CLICANDBASIC,         False,                     "Whether original basic mode is also implemented")},
+    {  RVPV_CLIC,    default_CLICINTCTLBITS,       VMI_UNS32_PARAM_SPEC (riscvParamValues, CLICINTCTLBITS,       2, 2,          8,          "Specify number of bits implemented in clicintctl[i]")},
+    {  RVPV_CLIC_NM, default_CLICCFGMBITS,         VMI_UNS32_PARAM_SPEC (riscvParamValues, CLICCFGMBITS,         0, 0,          0,          "Specify number of bits implemented for cliccfg.nmbits (also defines CLICPRIVMODES)")},
+    {  RVPV_CLIC,    default_CLICCFGLBITS,         VMI_UNS32_PARAM_SPEC (riscvParamValues, CLICCFGLBITS,         0, 0,          8,          "Specify number of bits implemented for cliccfg.nlbits")},
+    {  RVPV_CLIC,    default_CLICSELHVEC,          VMI_BOOL_PARAM_SPEC  (riscvParamValues, CLICSELHVEC,          False,                     "Whether selective hardware vectoring supported")},
+    {  RVPV_CLIC,    default_CLICMNXTI,            VMI_BOOL_PARAM_SPEC  (riscvParamValues, CLICMNXTI,            False,                     "Whether mnxti CSR implemented")},
+    {  RVPV_CLIC,    default_CLICMCSW,             VMI_BOOL_PARAM_SPEC  (riscvParamValues, CLICMCSW,             False,                     "Whether mscratchcsw/mscratchcswl CSRs implemented")},
 
     // KEEP LAST
     {  RVPV_ALL,     0,                            VMI_END_PARAM}
@@ -575,13 +692,8 @@ static Bool selectParameter(
 ) {
     if(cfg) {
 
-        Bool isCluster = cfg->members;
-        Bool isVariant = param->variant & RVPV_VARIANT;
-
-        // cluster exposes only variant parameter; SMP member has no variant
-        if(!isVariant && isCluster) {
-            return False;
-        } else if(isVariant && isSMPMember(riscv)) {
+        // cluster exposes only variant parameter
+        if(!(param->variant & RVPV_VARIANT) && cfg->members) {
             return False;
         }
 
@@ -617,6 +729,17 @@ static Bool selectParameter(
         // include parameters that are only required when Vector extension is
         // implemented
         if((param->variant & RVPV_V) && !(cfg->arch&ISA_V)) {
+            return False;
+        }
+
+        // include parameters that are only required when CLIC is implemented
+        if((param->variant & RVPV_CLIC) && !cfg->CLICLEVELS) {
+            return False;
+        }
+
+        // include parameters that are only required when CLICCFGMBITS can be
+        // non-zero
+        if((param->variant & RVPV_NMBITS) && !getCLICCFGMBITSMax(cfg)) {
             return False;
         }
     }
@@ -776,11 +899,8 @@ static vmiParameterP createPreParameterList(riscvP riscv, riscvConfigCP first) {
 //
 // Create parameter list applicable to the indicated variant
 //
-static vmiParameterP createParameterList(
-    riscvP        riscv,
-    riscvConfigCP first,
-    riscvConfigCP cfg
-) {
+static vmiParameterP createParameterList(riscvP riscv, riscvConfigCP cfg) {
+
     riscvParameterP src = parameters;
     vmiParameterP   dst;
     vmiParameterP   result;
@@ -805,7 +925,7 @@ static vmiParameterP createParameterList(
 
             // override default if required
             if(src->defaultCB) {
-                src->defaultCB(cfg ? : first, dst);
+                src->defaultCB(cfg, dst);
             }
 
             dst++;
@@ -817,23 +937,12 @@ static vmiParameterP createParameterList(
 }
 
 //
-// Given a variant for the cluster root, infer the variant at a sublevel
+// Refine variant if this is a cluster member
 //
 static const char *refineVariant(riscvP riscv, const char *variant) {
 
-    if(riscv) {
-
-        riscvP parent;
-
-        while((parent=getParent(riscv))) {
-
-            if(riscvIsCluster(parent)) {
-                variant = riscvGetClusterVariant(parent, riscv);
-                break;
-            } else {
-                riscv = parent;
-            }
-        }
+    if(riscv && riscvIsClusterMember(riscv)) {
+        variant = riscvGetClusterVariant(riscv);
     }
 
     return variant;
@@ -858,11 +967,7 @@ VMI_PROC_PARAM_SPECS_FN(riscvGetPreParamSpec) {
         // if this is a cluster member, use the member configuration to fill
         // parameters
         if(riscvIsClusterMember(riscv)) {
-
-            riscvP      parent  = getParent(riscv);
-            const char *variant = riscvGetClusterVariant(parent, riscv);
-
-            cfgList = getSelectedConfig(cfgList, variant);
+            cfgList = getSelectedConfig(cfgList, riscvGetClusterVariant(riscv));
         }
 
         // fill variants and create pre-parameter list
@@ -918,6 +1023,11 @@ VMI_SET_PARAM_VALUES_FN(riscvGetPreParamValues) {
         riscvArchitecture addArch        = riscvParseExtensions(add_Extensions);
         riscv->configInfo.arch |= addArch;
 
+        // N extension requires U extension
+        if(!(riscv->configInfo.arch&ISA_U)) {
+            riscv->configInfo.arch &= ~ISA_N;
+        }
+
         // modify variant to show added extensions if required
         if(addArch) {
             char tmp[strlen(variant)+strlen(add_Extensions)+2];
@@ -925,10 +1035,12 @@ VMI_SET_PARAM_VALUES_FN(riscvGetPreParamValues) {
             vmirtSetProcessorVariant(processor, tmp);
         }
 
+        // apply CLICLEVELS override if required
+        Uns32 CLICLEVELS = params->CLICLEVELS;
+        riscv->configInfo.CLICLEVELS = (CLICLEVELS==1) ? 2 : CLICLEVELS;
+
         // create full parameter list
-        riscv->parameters = createParameterList(
-            riscv, cfgList, &riscv->configInfo
-        );
+        riscv->parameters = createParameterList(riscv, &riscv->configInfo);
     }
 }
 

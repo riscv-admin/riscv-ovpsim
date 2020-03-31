@@ -754,6 +754,13 @@ static RISCV_CSR_READFN(uepcR) {
 ////////////////////////////////////////////////////////////////////////////////
 
 //
+// Are CLIC registers present?
+//
+inline static RISCV_CSR_PRESENTFN(clicP) {
+    return CLICPresent(riscv);
+}
+
+//
 // Return mask of interrupts visible in Supervisor mode
 //
 inline static Uns32 getSIRMask(riscvP riscv) {
@@ -771,13 +778,17 @@ inline static Uns32 getUIRMask(riscvP riscv) {
 // Common routine to read ip using mip, sip or uip alias (NOTE: if this is a
 // read/write operation, only software-writable bits are seen)
 //
-static Uns64 ipR(riscvP riscv, Uns64 rMask, Bool isWrite) {
+static Uns64 ipR(riscvP riscv, Uns64 rMask, Bool isWrite, Bool useCLIC) {
 
     Uns64 result = riscv->swip;
 
     // in save/restore mode, return raw software-writable value
-    if(!riscv->inSaveRestore) {
+    if(riscv->inSaveRestore) {
+        // no action
+    } else if(!useCLIC) {
         result = (isWrite ? result : RD_CSR(riscv, mip)) & rMask;
+    } else {
+        result = 0;
     }
 
     return result;
@@ -786,17 +797,24 @@ static Uns64 ipR(riscvP riscv, Uns64 rMask, Bool isWrite) {
 //
 // Common routine to write ip using mip, sip or uip alias
 //
-static Uns64 ipW(riscvP riscv, Uns64 newValue, Uns64 rMask) {
+static Uns64 ipW(riscvP riscv, Uns64 newValue, Uns64 rMask, Bool useCLIC) {
 
     Uns32 oldValue = riscv->swip;
 
-    // in save/restore mode, update value unmasked
-    if(!riscv->inSaveRestore) {
+    if(riscv->inSaveRestore) {
 
-        Uns32 wMask = RD_CSR_MASK(riscv, mie) & rMask;
+        // in save/restore mode, update value unmasked
+
+    } else if(!useCLIC) {
 
         // update value using writable bit mask
+        Uns32 wMask = RD_CSR_MASK(riscv, mie) & rMask;
         newValue = ((newValue & wMask) | (oldValue & ~wMask));
+
+    } else {
+
+        // in CLIC mode, preserve original value
+        newValue = oldValue;
     }
 
     riscv->swip = newValue;
@@ -807,89 +825,112 @@ static Uns64 ipW(riscvP riscv, Uns64 newValue, Uns64 rMask) {
     }
 
     // return readable bits
-    return ipR(riscv, rMask, True);
+    return ipR(riscv, rMask, True, useCLIC);
 }
 
 //
 // Read mip (read/write context)
 //
 static RISCV_CSR_READFN(mipRW) {
-    return ipR(riscv, WM32_mip, True);
+    return ipR(riscv, WM32_mip, True, useCLICM(riscv));
 }
 
 //
 // Write mip
 //
 static RISCV_CSR_WRITEFN(mipW) {
-    return ipW(riscv, newValue, WM32_mip);
+    return ipW(riscv, newValue, WM32_mip, useCLICM(riscv));
 }
 
 //
 // Read mip
 //
 static RISCV_CSR_READFN(mipR) {
-    return ipR(riscv, -1, False);
+    return ipR(riscv, -1, False, useCLICM(riscv));
 }
 
 //
 // Read sip
 //
 static RISCV_CSR_READFN(sipR) {
-    return ipR(riscv, getSIRMask(riscv), False);
+    return ipR(riscv, getSIRMask(riscv), False, useCLICS(riscv));
 }
 
 //
 // Read sip (read/write context)
 //
 static RISCV_CSR_READFN(sipRW) {
-    return ipR(riscv, getSIRMask(riscv) & WM32_sip, True);
+    return ipR(riscv, getSIRMask(riscv) & WM32_sip, True, useCLICS(riscv));
 }
 
 //
 // Write sip
 //
 static RISCV_CSR_WRITEFN(sipW) {
-    return ipW(riscv, newValue, getSIRMask(riscv) & WM32_sip);
+    return ipW(riscv, newValue, getSIRMask(riscv) & WM32_sip, useCLICS(riscv));
 }
 
 //
 // Read uip
 //
 static RISCV_CSR_READFN(uipR) {
-    return ipR(riscv, getUIRMask(riscv), False);
+    return ipR(riscv, getUIRMask(riscv), False, useCLICU(riscv));
 }
 
 //
 // Read uip (read/write context)
 //
 static RISCV_CSR_READFN(uipRW) {
-    return ipR(riscv, getUIRMask(riscv) & WM32_uip, True);
+    return ipR(riscv, getUIRMask(riscv) & WM32_uip, True, useCLICU(riscv));
 }
 
 //
 // Write uip
 //
 static RISCV_CSR_WRITEFN(uipW) {
-    return ipW(riscv, newValue, getUIRMask(riscv) & WM32_uip);
+    return ipW(riscv, newValue, getUIRMask(riscv) & WM32_uip, useCLICU(riscv));
 }
 
 //
 // Common routine to read ie using mie, sie or uie alias
 //
-inline static Uns32 ieR(riscvP riscv, Uns32 rMask) {
-    return RD_CSR(riscv, mie) & rMask;
+static Uns32 ieR(riscvP riscv, Uns32 rMask, Bool useCLIC) {
+
+    Uns32 result = RD_CSR(riscv, mie);
+
+    if(riscv->inSaveRestore) {
+        // no action
+    } else if(!useCLIC) {
+        result &= rMask;
+    } else {
+        result = 0;
+    }
+
+    return result;
 }
 
 //
 // Common routine to write ie using mie, sie or uie alias
 //
-static Uns32 ieW(riscvP riscv, Uns32 newValue, Uns32 rMask) {
+static Uns32 ieW(riscvP riscv, Uns32 newValue, Uns32 rMask, Bool useCLIC) {
 
     Uns32 oldValue = RD_CSR(riscv, mie);
     Uns32 wMask    = RD_CSR_MASK(riscv, mie) & rMask;
 
-    // get new value using writable bit mask
-    newValue = ((newValue & wMask) | (oldValue & ~wMask));
+    if(riscv->inSaveRestore) {
+
+        // in save/restore mode, update value unmasked
+
+    } else if(!useCLIC) {
+
+        // get new value using writable bit mask
+        newValue = ((newValue & wMask) | (oldValue & ~wMask));
+
+    } else {
+
+        // in CLIC mode, preserve original value
+        newValue = oldValue;
+    }
 
     // update the CSR
     WR_CSR(riscv, mie, newValue);
@@ -900,42 +941,49 @@ static Uns32 ieW(riscvP riscv, Uns32 newValue, Uns32 rMask) {
     }
 
     // return readable bits
-    return ieR(riscv, rMask);
+    return ieR(riscv, rMask, useCLIC);
+}
+
+//
+// Read mie
+//
+static RISCV_CSR_READFN(mieR) {
+    return ieR(riscv, -1, useCLICM(riscv));
 }
 
 //
 // Write mie
 //
 static RISCV_CSR_WRITEFN(mieW) {
-    return ieW(riscv, newValue, -1);
+    return ieW(riscv, newValue, -1, useCLICM(riscv));
 }
 
 //
 // Read sie
 //
 static RISCV_CSR_READFN(sieR) {
-    return ieR(riscv, getSIRMask(riscv));
+    return ieR(riscv, getSIRMask(riscv), useCLICS(riscv));
 }
 
 //
 // Write sie
 //
 static RISCV_CSR_WRITEFN(sieW) {
-    return ieW(riscv, newValue, getSIRMask(riscv));
+    return ieW(riscv, newValue, getSIRMask(riscv), useCLICS(riscv));
 }
 
 //
 // Read uie
 //
 static RISCV_CSR_READFN(uieR) {
-    return ieR(riscv, getUIRMask(riscv));
+    return ieR(riscv, getUIRMask(riscv), useCLICU(riscv));
 }
 
 //
 // Write uie
 //
 static RISCV_CSR_WRITEFN(uieW) {
-    return ieW(riscv, newValue, getUIRMask(riscv));
+    return ieW(riscv, newValue, getUIRMask(riscv), useCLICU(riscv));
 }
 
 //
@@ -991,23 +1039,59 @@ static RISCV_CSR_WRITEFN(sidelegW) {
 
 //
 // Derive new value for trap vector register based on given value, rounding to
-// configured alignment if vector format is specified
+// configured alignment if vectored or CLIC mode is specified
 //
 static Uns64 tvecW(riscvP riscv, Uns64 newValue, Uns64 oldValue, Uns64 mask) {
 
-    Int32 tvec_align = riscv->configInfo.tvec_align;
-
     // mask new value
+    riscvICMode oldMode = oldValue&3;
     newValue = ((newValue & mask) | (oldValue & ~mask));
+    riscvICMode newMode = newValue&3;
 
-    // apply any additional alignment constraint in vectored mode
-    if(tvec_align && (newValue&1)) {
-        newValue &= -tvec_align;
-        newValue |= 1;
+    // constrain newMode to legal value
+    if(!basicICPresent(riscv)) {
+        newMode = riscv_int_CLIC;
+    } else if(newMode==riscv_int_Reserved) {
+        newMode = oldMode;
     }
+
+    // apply fixed alignment constraint in CLIC mode
+    if(newMode==riscv_int_CLIC) {
+        newValue &= -0x40;
+    }
+
+    // apply any additional alignment constraint in vectored or CLIC mode
+    Int32 tvec_align = riscv->configInfo.tvec_align;
+    if(tvec_align && (newMode!=riscv_int_Direct)) {
+        newValue &= -tvec_align;
+    }
+
+    // insert final mode
+    newValue &= -4;
+    newValue |= newMode;
 
     // return written value
     return newValue;
+}
+
+//
+// Perform common actions when updating *tvec CSR
+//
+#define UPDATE_TVEC(_P, _TVEC, _VALUE) { \
+                                                            \
+    /* update the CSR, observing mode change */             \
+    riscvICMode oldMode = RD_CSR_FIELD(_P, _TVEC, MODE);    \
+    WR_CSR(_P, _TVEC, _VALUE);                              \
+    riscvICMode newMode = RD_CSR_FIELD(_P, _TVEC, MODE);    \
+                                                            \
+    /* get old and new CLIC mode */                         \
+    Bool oldCLIC = (oldMode==riscv_int_CLIC);               \
+    Bool newCLIC = (newMode==riscv_int_CLIC);               \
+                                                            \
+    /* handle possible CLIC mode change */                  \
+    if(oldCLIC!=newCLIC) {                                  \
+        riscvUpdatePending(_P);                             \
+    }                                                       \
 }
 
 //
@@ -1020,7 +1104,7 @@ static RISCV_CSR_WRITEFN(mtvecW) {
     newValue = tvecW(riscv, newValue, oldValue, RD_CSR_MASK(riscv, mtvec));
 
     // update the CSR
-    WR_CSR(riscv, mtvec, newValue);
+    UPDATE_TVEC(riscv, mtvec, newValue);
 
     // return written value
     return newValue;
@@ -1036,7 +1120,7 @@ static RISCV_CSR_WRITEFN(stvecW) {
     newValue = tvecW(riscv, newValue, oldValue, RD_CSR_MASK(riscv, stvec));
 
     // update the CSR
-    WR_CSR(riscv, stvec, newValue);
+    UPDATE_TVEC(riscv, stvec, newValue);
 
     // return written value
     return newValue;
@@ -1052,7 +1136,7 @@ static RISCV_CSR_WRITEFN(utvecW) {
     newValue = tvecW(riscv, newValue, oldValue, RD_CSR_MASK(riscv, utvec));
 
     // update the CSR
-    WR_CSR(riscv, utvec, newValue);
+    UPDATE_TVEC(riscv, utvec, newValue);
 
     // return written value
     return newValue;
@@ -1497,7 +1581,7 @@ static RISCV_CSR_WRITEFN(satpW) {
     WR_CSR_FIELD(riscv, satp, ASID, ASID);
 
     // mask PPN value to implemented width
-    Uns64 PPNMask = ((1ULL<<riscv->extBits)-1) >> RISCV_PAGE_SHIFT;
+    Uns64 PPNMask = getAddressMask(riscv->extBits) >> RISCV_PAGE_SHIFT;
     Uns64 PPN     = RD_CSR_FIELD(riscv, satp, PPN) & PPNMask;
     WR_CSR_FIELD(riscv, satp, PPN, PPN);
 
@@ -2007,6 +2091,7 @@ static const riscvCSRAttrs csrs[CSR_ID(LAST)] = {
     CSR_ATTR_P__     (fcsr,         0x003, ISA_DFV,     ISA_FS,     1_10,   1,0,0,  "Floating-Point Control and Status",             0,      riscvWFS,    fcsrR,      0,     fcsrW         ),
     CSR_ATTR_P__     (uie,          0x004, ISA_N,       0,          1_10,   1,0,0,  "User Interrupt Enable",                         0,      0,           uieR,       0,     uieW          ),
     CSR_ATTR_T__     (utvec,        0x005, ISA_N,       0,          1_10,   0,0,0,  "User Trap-Vector Base-Address",                 0,      0,           0,          0,     utvecW        ),
+    CSR_ATTR_TV_     (utvt,         0x007, ISA_N,       0,          1_10,   0,0,0,  "User CLIC Trap-Vector Base-Address",            clicP,  0,           0,          0,     0             ),
     CSR_ATTR_TV_     (vstart,       0x008, ISA_V,       0,          1_10,   0,0,0,  "Vector Start Index",                            0,      riscvWVStart,0,          0,     0             ),
     CSR_ATTR_TC_     (vxsat,        0x009, ISA_V,       ISA_FSandV, 1_10,   0,0,0,  "Fixed-Point Saturate Flag",                     0,      riscvWFSVS,  vxsatR,     0,     vxsatW        ),
     CSR_ATTR_TC_     (vxrm,         0x00A, ISA_V,       ISA_FSandV, 1_10,   0,0,0,  "Fixed-Point Rounding Mode",                     0,      riscvWFSVS,  0,          0,     vxrmW         ),
@@ -2035,6 +2120,7 @@ static const riscvCSRAttrs csrs[CSR_ID(LAST)] = {
     CSR_ATTR_P__     (sie,          0x104, ISA_S,       0,          1_10,   1,0,0,  "Supervisor Interrupt Enable",                   0,      0,           sieR,       0,     sieW          ),
     CSR_ATTR_T__     (stvec,        0x105, ISA_S,       0,          1_10,   0,0,0,  "Supervisor Trap-Vector Base-Address",           0,      0,           0,          0,     stvecW        ),
     CSR_ATTR_TV_     (scounteren,   0x106, ISA_S,       0,          1_10,   0,0,0,  "Supervisor Counter Enable",                     0,      0,           0,          0,     0             ),
+    CSR_ATTR_TV_     (stvt,         0x107, ISA_S,       0,          1_10,   0,0,0,  "Supervisor CLIC Trap-Vector Base-Address",      clicP,  0,           0,          0,     0             ),
     CSR_ATTR_T__     (sscratch,     0x140, ISA_S,       0,          1_10,   0,0,0,  "Supervisor Scratch",                            0,      0,           0,          0,     0             ),
     CSR_ATTR_TV_     (sepc,         0x141, ISA_S,       0,          1_10,   0,0,0,  "Supervisor Exception Program Counter",          0,      0,           sepcR,      0,     0             ),
     CSR_ATTR_TV_     (scause,       0x142, ISA_S,       0,          1_10,   0,0,0,  "Supervisor Cause",                              0,      0,           0,          0,     0             ),
@@ -2051,9 +2137,10 @@ static const riscvCSRAttrs csrs[CSR_ID(LAST)] = {
     CSR_ATTR_T__     (misa,         0x301, 0,           0,          1_10,   1,0,0,  "ISA and Extensions",                            0,      0,           0,          0,     misaW         ),
     CSR_ATTR_TV_     (medeleg,      0x302, ISA_SorN,    0,          1_10,   0,0,0,  "Machine Exception Delegation",                  0,      0,           0,          0,     0             ),
     CSR_ATTR_T__     (mideleg,      0x303, ISA_SorN,    0,          1_10,   1,0,0,  "Machine Interrupt Delegation",                  0,      0,           0,          0,     midelegW      ),
-    CSR_ATTR_T__     (mie,          0x304, 0,           0,          1_10,   1,0,0,  "Machine Interrupt Enable",                      0,      0,           0,          0,     mieW          ),
+    CSR_ATTR_T__     (mie,          0x304, 0,           0,          1_10,   1,0,0,  "Machine Interrupt Enable",                      0,      0,           mieR,       0,     mieW          ),
     CSR_ATTR_T__     (mtvec,        0x305, 0,           0,          1_10,   0,0,0,  "Machine Trap-Vector Base-Address",              0,      0,           0,          0,     mtvecW        ),
     CSR_ATTR_TV_     (mcounteren,   0x306, ISA_SorU,    0,          1_10,   0,0,0,  "Machine Counter Enable",                        0,      0,           0,          0,     0             ),
+    CSR_ATTR_TV_     (mtvt,         0x307, 0,           0,          1_10,   0,0,0,  "Machine CLIC Trap-Vector Base-Address",         clicP,  0,           0,          0,     0             ),
     CSR_ATTR_TV_     (mstatush,     0x310, ISA_XLEN_32, 0,          1_12,   0,0,0,  "Machine Status High",                           0,      0,           0,          0,     mstatushW     ),
     CSR_ATTR_TV_     (mcountinhibit,0x320, 0,           0,          1_11,   0,0,0,  "Machine Counter Inhibit",                       0,      0,           0,          0,     mcountinhibitW),
     CSR_ATTR_T__     (mscratch,     0x340, 0,           0,          1_10,   0,0,0,  "Machine Scratch",                               0,      0,           0,          0,     0             ),
@@ -2751,9 +2838,10 @@ static Uns64 getInterruptMask(riscvException code) {
 //
 void riscvCSRInit(riscvP riscv, Uns32 index) {
 
-    riscvConfigCP     cfg      = &riscv->configInfo;
-    riscvArchitecture arch     = cfg->arch;
-    riscvArchitecture archMask = cfg->archMask;
+    riscvConfigCP     cfg         = &riscv->configInfo;
+    riscvArchitecture arch        = cfg->arch;
+    riscvArchitecture archMask    = cfg->archMask;
+    Bool              haveBasicIC = basicICPresent(riscv);
     riscvCSRId        id;
 
     //--------------------------------------------------------------------------
@@ -2972,11 +3060,15 @@ void riscvCSRInit(riscvP riscv, Uns32 index) {
     // override enable masks
     SET_CSR_MASK_V(riscv, mie, mInterrupts);
 
-    // override delegation masks
-    SET_CSR_MASK_V(riscv, medeleg, sExceptions);
-    SET_CSR_MASK_V(riscv, sedeleg, uExceptions);
-    SET_CSR_MASK_V(riscv, mideleg, sInterrupts);
-    SET_CSR_MASK_V(riscv, sideleg, uInterrupts);
+    // override exception delegation masks
+    SET_CSR_MASK_V(riscv, medeleg, sExceptions & ~cfg->no_edeleg);
+    SET_CSR_MASK_V(riscv, sedeleg, uExceptions & ~cfg->no_edeleg);
+
+    // override interrupt delegation masks
+    if(haveBasicIC) {
+        SET_CSR_MASK_V(riscv, mideleg, sInterrupts & ~cfg->no_ideleg);
+        SET_CSR_MASK_V(riscv, sideleg, uInterrupts & ~cfg->no_ideleg);
+    }
 
     //--------------------------------------------------------------------------
     // sedeleg, sideleg initial values (N extension and no Supervisor mode)
@@ -2987,14 +3079,25 @@ void riscvCSRInit(riscvP riscv, Uns32 index) {
         WR_CSR(riscv, sideleg, -1);
     }
 
-     //--------------------------------------------------------------------------
+    //--------------------------------------------------------------------------
     // mtvec, stvec, utvec masks and initial value
     //--------------------------------------------------------------------------
 
+    Uns64 WM64_tvec = 0;
+
+    // write masks for xtvec registers depend on whether original mode, clic
+    // mode or both are supported
+    if(haveBasicIC) {
+        WM64_tvec |= WM64_tvec_orig;
+    }
+    if(CLICPresent(riscv)) {
+        WM64_tvec |= WM64_tvec_clic;
+    }
+
     // use defined masks from configuration
-    Uns64 mtvecMask = (cfg->csrMask.mtvec.u64.bits ? : -1) & WM64_mtvec;
-    Uns64 stvecMask = (cfg->csrMask.stvec.u64.bits ? : -1) & WM64_stvec;
-    Uns64 utvecMask = (cfg->csrMask.utvec.u64.bits ? : -1) & WM64_utvec;
+    Uns64 mtvecMask = (cfg->csrMask.mtvec.u64.bits ? : -1) & WM64_tvec;
+    Uns64 stvecMask = (cfg->csrMask.stvec.u64.bits ? : -1) & WM64_tvec;
+    Uns64 utvecMask = (cfg->csrMask.utvec.u64.bits ? : -1) & WM64_tvec;
 
     // mtvec may be read only, if mtvec_is_ro parameter is set
     if(cfg->mtvec_is_ro) {mtvecMask = 0;}
@@ -3006,6 +3109,27 @@ void riscvCSRInit(riscvP riscv, Uns32 index) {
 
     // set mtvec initial value
     WR_CSR(riscv, mtvec, cfg->csr.mtvec.u64.bits);
+
+    // force exception mode if only CLIC is present
+    if(!haveBasicIC) {
+        WR_CSR_FIELD(riscv, mtvec, MODE, riscv_int_CLIC);
+        WR_CSR_FIELD(riscv, stvec, MODE, riscv_int_CLIC);
+        WR_CSR_FIELD(riscv, utvec, MODE, riscv_int_CLIC);
+    }
+
+    //--------------------------------------------------------------------------
+    // mtvt, stvt, utvt masks
+    //--------------------------------------------------------------------------
+
+    // use defined masks from configuration
+    Uns64 mtvtMask = (cfg->csrMask.mtvt.u64.bits ? : -1) & WM64_tvt;
+    Uns64 stvtMask = (cfg->csrMask.stvt.u64.bits ? : -1) & WM64_tvt;
+    Uns64 utvtMask = (cfg->csrMask.utvt.u64.bits ? : -1) & WM64_tvt;
+
+    // set mtvt, stvt, utvt masks
+    SET_CSR_MASK_V(riscv, mtvt, mtvtMask);
+    SET_CSR_MASK_V(riscv, stvt, stvtMask);
+    SET_CSR_MASK_V(riscv, utvt, utvtMask);
 
     //--------------------------------------------------------------------------
     // mcause, scause, ucause masks

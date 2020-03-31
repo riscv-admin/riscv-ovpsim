@@ -64,7 +64,6 @@ VMI_RD_ABORT_EXCEPT_FN(riscvRdAbortExcept);
 VMI_WR_ABORT_EXCEPT_FN(riscvWrAbortExcept);
 VMI_IFETCH_FN(riscvIFetchExcept);
 VMI_ARITH_RESULT_FN(riscvArithResult);
-VMI_ICOUNT_FN(riscvStepExcept);
 
 // parameter support functions
 VMI_PROC_PARAM_SPECS_FN(riscvGetPreParamSpec);

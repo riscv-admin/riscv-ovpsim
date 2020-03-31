@@ -102,6 +102,7 @@ typedef enum riscvCSRIdE {
     CSR_ID      (fcsr),         // 0x003
     CSR_ID      (uie),          // 0x004
     CSR_ID      (utvec),        // 0x005
+    CSR_ID      (utvt),         // 0x007
     CSR_ID      (vstart),       // 0x008
     CSR_ID      (vxsat),        // 0x009
     CSR_ID      (vxrm),         // 0x00A
@@ -129,6 +130,7 @@ typedef enum riscvCSRIdE {
     CSR_ID      (sie),          // 0x104
     CSR_ID      (stvec),        // 0x105
     CSR_ID      (scounteren),   // 0x106
+    CSR_ID      (stvt),         // 0x107
     CSR_ID      (sscratch),     // 0x140
     CSR_ID      (sepc),         // 0x141
     CSR_ID      (scause),       // 0x142
@@ -147,6 +149,7 @@ typedef enum riscvCSRIdE {
     CSR_ID      (mie),          // 0x304
     CSR_ID      (mtvec),        // 0x305
     CSR_ID      (mcounteren),   // 0x306
+    CSR_ID      (mtvt),         // 0x307
     CSR_ID      (mstatush),     // 0x310
     CSR_ID      (mcountinhibit),// 0x320
     CSR_ID      (mscratch),     // 0x340
@@ -761,12 +764,8 @@ typedef CSR_REG_TYPE(tvec) CSR_REG_TYPE(stvec);
 typedef CSR_REG_TYPE(tvec) CSR_REG_TYPE(mtvec);
 
 // define write masks
-#define WM32_utvec -3
-#define WM32_stvec -3
-#define WM32_mtvec -3
-#define WM64_utvec -3
-#define WM64_stvec -3
-#define WM64_mtvec -3
+#define WM64_tvec_orig -3
+#define WM64_tvec_clic -2
 
 // -----------------------------------------------------------------------------
 // scounteren   (id 0x106)
@@ -793,6 +792,19 @@ typedef CSR_REG_TYPE(counteren) CSR_REG_TYPE(mcounteren);
 #define WM32_counteren_TM  0x00000002
 #define WM32_counteren_IR  0x00000004
 #define WM32_counteren_HPM 0xfffffff8
+
+// -----------------------------------------------------------------------------
+// utvt         (id 0x007)
+// stvt         (id 0x107)
+// mtvt         (id 0x307)
+// -----------------------------------------------------------------------------
+
+typedef CSR_REG_TYPE(genericXLEN) CSR_REG_TYPE(utvt);
+typedef CSR_REG_TYPE(genericXLEN) CSR_REG_TYPE(stvt);
+typedef CSR_REG_TYPE(genericXLEN) CSR_REG_TYPE(mtvt);
+
+// define write masks
+#define WM64_tvt -0x40
 
 // -----------------------------------------------------------------------------
 // mcountinhibit (id 0x320)
@@ -1280,6 +1292,7 @@ typedef struct riscvCSRsS {
     // USER MODE CSRS
     CSR_REG_DECL(fcsr);         // 0x003
     CSR_REG_DECL(utvec);        // 0x005
+    CSR_REG_DECL(utvt);         // 0x007
     CSR_REG_DECL(vstart);       // 0x008
     CSR_REG_DECL(vxsat);        // 0x009
     CSR_REG_DECL(vxrm);         // 0x00A
@@ -1297,6 +1310,7 @@ typedef struct riscvCSRsS {
     CSR_REG_DECL(sideleg);      // 0x103
     CSR_REG_DECL(stvec);        // 0x105
     CSR_REG_DECL(scounteren);   // 0x106
+    CSR_REG_DECL(stvt);         // 0x107
     CSR_REG_DECL(sscratch);     // 0x140
     CSR_REG_DECL(sepc);         // 0x141
     CSR_REG_DECL(scause);       // 0x142
@@ -1315,6 +1329,7 @@ typedef struct riscvCSRsS {
     CSR_REG_DECL(mie);          // 0x304
     CSR_REG_DECL(mtvec);        // 0x305
     CSR_REG_DECL(mcounteren);   // 0x306
+    CSR_REG_DECL(mtvt);         // 0x307
     CSR_REG_DECL(mstatush);     // 0x310
     CSR_REG_DECL(mcountinhibit);// 0x320
     CSR_REG_DECL(mscratch);     // 0x340
@@ -1344,6 +1359,7 @@ typedef struct riscvCSRMasksS {
     // USER MODE CSRS
     CSR_REG_DECL(fcsr);         // 0x003
     CSR_REG_DECL(utvec);        // 0x005
+    CSR_REG_DECL(utvt);         // 0x007
     CSR_REG_DECL(vstart);       // 0x008
     CSR_REG_DECL(uepc);         // 0x041
     CSR_REG_DECL(ucause);       // 0x042
@@ -1352,6 +1368,7 @@ typedef struct riscvCSRMasksS {
     CSR_REG_DECL(sedeleg);      // 0x102
     CSR_REG_DECL(sideleg);      // 0x103
     CSR_REG_DECL(stvec);        // 0x105
+    CSR_REG_DECL(stvt);         // 0x107
     CSR_REG_DECL(scounteren);   // 0x106
     CSR_REG_DECL(sepc);         // 0x141
     CSR_REG_DECL(scause);       // 0x142
@@ -1363,6 +1380,7 @@ typedef struct riscvCSRMasksS {
     CSR_REG_DECL(mideleg);      // 0x303
     CSR_REG_DECL(mie);          // 0x304
     CSR_REG_DECL(mtvec);        // 0x305
+    CSR_REG_DECL(mtvt);         // 0x307
     CSR_REG_DECL(mcounteren);   // 0x306
     CSR_REG_DECL(mstatush);     // 0x310
     CSR_REG_DECL(mcountinhibit);// 0x320
@@ -1438,6 +1456,10 @@ typedef struct riscvCSRMasksS {
     (RISCV_XLEN_IS_32(_CPU) ?                           \
         (_CPU)->csrMask._RNAME.u32.fields._FIELD :      \
         (_CPU)->csrMask._RNAME.u64.fields._FIELD)       \
+
+// mask CSR using variable mask
+#define MASK_CSR(_CPU, _RNAME) \
+    (_CPU)->csr._RNAME.u64.bits &= (_CPU)->csrMask._RNAME.u64.bits
 
 
 ////////////////////////////////////////////////////////////////////////////////

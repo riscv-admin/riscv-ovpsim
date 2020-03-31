@@ -28,6 +28,7 @@
 #include "vmi/vmiRt.h"
 
 // model header files
+#include "riscvCluster.h"
 #include "riscvCSR.h"
 #include "riscvCSRTypes.h"
 #include "riscvDebug.h"
@@ -119,7 +120,7 @@ typedef struct isrDetailsS {
     vmiRegWriteFn     writeCB;
     vmiRegAccess      access;
     Bool              noTraceChange;
-    Bool              DM;
+    riscvDMMode       DM;
 } isrDetails;
 
 //
@@ -136,12 +137,26 @@ static VMI_REG_WRITE_FN(writeDM) {
 }
 
 //
+// Write processor DM stall bit (indicates stalled in Debug mode)
+//
+static VMI_REG_WRITE_FN(writeDMStall) {
+
+    riscvP riscv   = (riscvP)processor;
+    Uns8   DMStall = *(Uns8*)buffer;
+
+    riscvSetDMStall(riscv, DMStall&1);
+
+    return True;
+}
+
+//
 // List of integration support registers
 //
 static const isrDetails isRegs[] = {
 
-    {"LRSCAddress", "LR/SC active lock address", ISA_A, 0, 0, RISCV_EA_TAG, 0, 0,       vmi_RA_RW, 0, 0},
-    {"DM",          "Debug mode active",         0,     1, 8, RISCV_DM,     0, writeDM, vmi_RA_RW, 0, 1},
+    {"LRSCAddress", "LR/SC active lock address", ISA_A, 0, 0, RISCV_EA_TAG,   0, 0,            vmi_RA_RW, 0, 0             },
+    {"DM",          "Debug mode active",         0,     1, 8, RISCV_DM,       0, writeDM,      vmi_RA_RW, 0, RVDM_INTERRUPT},
+    {"DMStall",     "Debug mode stalled",        0,     1, 8, RISCV_DM_STALL, 0, writeDMStall, vmi_RA_RW, 0, RVDM_HALT     },
 
     // KEEP LAST
     {0}
@@ -167,7 +182,7 @@ static isrDetailsCP getNextISRDetails(
                 // exclude registers not applicable to this architecture
                 ((this->arch&arch)!=this->arch) ||
                 // exclude debug mode registers if that mode is absent
-                (this->DM && !riscv->configInfo.debug_mode)
+                (riscv->configInfo.debug_mode<this->DM)
             )
         ) {
             this++;
@@ -586,7 +601,7 @@ VMI_REG_IMPL_FN(riscvRegImpl) {
     RISCV_FIELD_IMPL_IGNORE(jumpBase);
 
     // exclude artifact vector index registers
-    if(riscv->configInfo.arch & ISA_V) {
+    if(riscv->offsetsLMULx2) {
     	offsetRegIgnore(riscv, riscv->offsetsLMULx2, 2);
     	offsetRegIgnore(riscv, riscv->offsetsLMULx4, 4);
     	offsetRegIgnore(riscv, riscv->offsetsLMULx8, 8);
@@ -603,9 +618,15 @@ VMI_REG_IMPL_FN(riscvRegImpl) {
 //
 VMI_PROC_DESC_FN(riscvProcessorDescription) {
 
-    riscvP riscv = (riscvP)processor;
-    riscvP child = getChild(riscv);
+    riscvP      riscv  = (riscvP)processor;
+    const char *result = "Hart";
 
-    return child ? "Cluster" : "Hart";
+    if(riscvIsCluster(riscv)) {
+        result = "Cluster";
+    } else if(getChild(riscv)) {
+        result = "SMP";
+    }
+
+    return result;
 }
 

@@ -59,6 +59,7 @@ typedef enum riscvDisableReasonE {
     RVD_ACTIVE = 0x0,   // processor running
     RVD_WFI    = 0x1,   // processor halted in WFI
     RVD_RESET  = 0x2,   // processor halted in reset
+    RVD_DEBUG  = 0x4,   // processor halted for debug
 
     // states from which to restart
     RVD_RESTART_WFI   = (RVD_WFI),

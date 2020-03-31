@@ -218,6 +218,13 @@ inline static void emitCheckPolymorphic(void) {
 }
 
 //
+// Are only unit stride load/store instructions supported?
+//
+inline static Bool unitStrideOnly(riscvP riscv) {
+    return riscv->configInfo.unitStrideOnly;
+}
+
+//
 // Should vxsat and vxrm be treated as members of fcsr for dirty state update?
 //
 inline static Bool vxSatRMSetFSDirty(riscvP riscv) {
@@ -257,6 +264,13 @@ inline static Bool vectorSignExtVMVXS(riscvP riscv) {
 //
 inline static Bool vectorSegOnlySEW(riscvP riscv) {
     return riscvVFSupport(riscv, RVVF_SEG_ONLY_SEW);
+}
+
+//
+// Are fault-only-first instructions absent?
+//
+inline static Bool vectorNoFaultOnlyFirst(riscvP riscv) {
+    return riscv->configInfo.noFaultOnlyFirst;
 }
 
 
@@ -3588,17 +3602,21 @@ static RISCV_MORPH_FN(emitFClass) {
 //
 void riscvConfigureVector(riscvP riscv) {
 
-    if(riscv->configInfo.arch & ISA_V) {
+    Uns32 vRegBytes   = riscv->configInfo.VLEN/8;
+    Uns32 stripeBytes = riscv->configInfo.SLEN/8;
 
-        Uns32 vRegBytes   = riscv->configInfo.VLEN/8;
-        Uns32 stripeBytes = riscv->configInfo.SLEN/8;
-        Uns32 stripes     = vRegBytes/stripeBytes;
+    // allocate vector registers if required
+    if(riscv->configInfo.arch & ISA_V) {
+        riscv->v = STYPE_CALLOC_N(Uns32, (vRegBytes/4)*VREG_NUM);
+    }
+
+    // allocate LMULx2, LMULx4 and LMULx8 index tables if required
+    if((riscv->configInfo.arch & ISA_V) && (vRegBytes!=stripeBytes)) {
+
+        Uns32 stripes = vRegBytes/stripeBytes;
         Uns32 stripe;
         Uns32 byte;
         Uns32 i;
-
-        // allocate vector registers
-        riscv->v = STYPE_CALLOC_N(Uns32, (vRegBytes/4)*VREG_NUM);
 
         // allocate LMULx2, LMULx4 and LMULx8 index tables
         riscv->offsetsLMULx2 = STYPE_ALLOC_N(riscvStrideOffset, vRegBytes*2);
@@ -3683,9 +3701,13 @@ void riscvConfigureVector(riscvP riscv) {
 //
 void riscvFreeVector(riscvP riscv) {
 
-    // exclude artifact vector index registers
-    if(riscv->configInfo.arch & ISA_V) {
+    // free vector registers if required
+    if(riscv->v) {
     	STYPE_FREE(riscv->v);
+    }
+
+    // free LMULx2, LMULx4 and LMULx8 index tables if required
+    if(riscv->offsetsLMULx2) {
         STYPE_FREE(riscv->offsetsLMULx2);
         STYPE_FREE(riscv->offsetsLMULx4);
         STYPE_FREE(riscv->offsetsLMULx8);
@@ -5158,13 +5180,28 @@ static vmiLabelP handleNonZeroVStart(
 }
 
 //
+// If the instruction is a vector floating point instruction, validate that the
+// current rounding mode is valid. Note that this test is performed whether or
+// not the instruction actually uses the current rounding mode (unlike the
+// scalar floating point extension)
+//
+static Bool validVFPRM(riscvMorphStateP state) {
+    return (
+        // ok if not a floating point instruction
+        (!(state->info.arch&(ISA_FS|ISA_DF))) ||
+        // ok if current rounding mode is valid
+        riscvEmitCheckLegalRM(state->riscv, RV_RM_CURRENT)
+    );
+}
+
+//
 // Do argument checks at the start of a vector operation
 //
 static Bool checkVectorOp(riscvMorphStateP state, iterDescP id) {
 
     // call operation-specific argument check if required
     riscvCheckVFn checkCB = state->attrs->checkCB;
-    return !checkCB || checkCB(state, id);
+    return validVFPRM(state) && (!checkCB || checkCB(state, id));
 }
 
 //
@@ -6249,6 +6286,12 @@ static RISCV_CHECKV_FN(emitVLdStCheckCB) {
         ILLEGAL_INSTRUCTION_MESSAGE(riscv, "IMB", "SEW < memory element bits");
         ok = False;
 
+    } else if(state->info.isFF && vectorNoFaultOnlyFirst(riscv)) {
+
+        // Illegal Instruction if fault-only-first not implemented
+        ILLEGAL_INSTRUCTION_MESSAGE(riscv, "IFF", "Fault-only-first not implemented");
+        ok = False;
+
     } else if(!state->info.nf) {
 
         // no action if only one field
@@ -6280,6 +6323,20 @@ static RISCV_CHECKV_FN(emitVLdStCheckCB) {
 }
 
 //
+// Disable non-unit-stride load/store instructions if required
+//
+static Bool nonUnitStrideVLdStOk(riscvP riscv) {
+
+    Bool ok = !unitStrideOnly(riscv);
+
+    if(!ok) {
+        ILLEGAL_INSTRUCTION_MESSAGE(riscv, "UVI", "Unimplemented instruction");
+    }
+
+    return ok;
+}
+
+//
 // Operation-specific argument checks for unit stride loads and stores
 //
 static RISCV_CHECKV_FN(emitVLdStCheckUCB) {
@@ -6290,14 +6347,14 @@ static RISCV_CHECKV_FN(emitVLdStCheckUCB) {
 // Operation-specific argument checks for strided loads and stores
 //
 static RISCV_CHECKV_FN(emitVLdStCheckSCB) {
-    return emitVLdStCheckCB(state, id);
+    return nonUnitStrideVLdStOk(state->riscv) && emitVLdStCheckCB(state, id);
 }
 
 //
 // Operation-specific argument checks for indexed loads and stores
 //
 static RISCV_CHECKV_FN(emitVLdStCheckXCB) {
-    return emitVLdStCheckCB(state, id);
+    return nonUnitStrideVLdStOk(state->riscv) && emitVLdStCheckCB(state, id);
 }
 
 //
@@ -7865,11 +7922,9 @@ static RISCV_MORPHV_FN(emitVRConvertFltCB) {
     vmiFType      typeS = getVConvertType(state, id, 1);
     vmiFPRC       rc    = mapRMDescToRC(state->info.rm);
     vmiFPConfigCP ctrl  = getFPControl(state);
+    vmiReg        flags = riscvGetFPFlagsMT(riscv);
 
-    if(riscvEmitCheckLegalRM(riscv, state->info.rm)) {
-        vmiReg flags = riscvGetFPFlagsMT(riscv);
-        vmimtFConvertRR(typeD, fd, typeS, fs, rc, flags, ctrl);
-    }
+    vmimtFConvertRR(typeD, fd, typeS, fs, rc, flags, ctrl);
 }
 
 
@@ -8538,8 +8593,8 @@ const static riscvMorphAttr dispatchTable[] = {
     [RV_IT_VSETVL_I]         = {morph:emitVSetVLRRC},
 
     // V-extension load/store instructions
-    [RV_IT_VL_I]             = {morph:emitVectorOp, opTCB:emitVLdUCB, checkCB:emitVLdStCheckUCB, initCB:emitVLdStInitCB, vstart0:RVVS_ANY, vShape:RVVW_111_II   },
-    [RV_IT_VLS_I]            = {morph:emitVectorOp, opTCB:emitVLdSCB, checkCB:emitVLdStCheckSCB, initCB:emitVLdStInitCB, vstart0:RVVS_ANY, vShape:RVVW_111_II   },
+    [RV_IT_VL_I]             = {morph:emitVectorOp, opTCB:emitVLdUCB, checkCB:emitVLdStCheckUCB, initCB:emitVLdStInitCB, vstart0:RVVS_ANY, vShape:RVVW_111_IIXSM},
+    [RV_IT_VLS_I]            = {morph:emitVectorOp, opTCB:emitVLdSCB, checkCB:emitVLdStCheckSCB, initCB:emitVLdStInitCB, vstart0:RVVS_ANY, vShape:RVVW_111_IIXSM},
     [RV_IT_VLX_I]            = {morph:emitVectorOp, opTCB:emitVLdICB, checkCB:emitVLdStCheckXCB, initCB:emitVLdStInitCB, vstart0:RVVS_ANY, vShape:RVVW_111_IIXSM},
     [RV_IT_VS_I]             = {morph:emitVectorOp, opTCB:emitVStUCB, checkCB:emitVLdStCheckUCB, initCB:emitVLdStInitCB, vstart0:RVVS_ANY, vShape:RVVW_111_II   },
     [RV_IT_VSS_I]            = {morph:emitVectorOp, opTCB:emitVStSCB, checkCB:emitVLdStCheckSCB, initCB:emitVLdStInitCB, vstart0:RVVS_ANY, vShape:RVVW_111_II   },
