@@ -288,13 +288,6 @@ static Uns32 getActiveASID(riscvP riscv) {
 }
 
 //
-// Return address mask for the given number of bits
-//
-inline static Uns64 getAddressMask(Uns32 bits) {
-    return (bits==64) ? -1 : ((1ULL<<bits)-1);
-}
-
-//
 // Is code demain required for the passed privilege?
 //
 inline static Bool isFetch(memPriv priv) {

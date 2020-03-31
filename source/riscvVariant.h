@@ -197,10 +197,28 @@ typedef enum riscvFP16VerE {
 // Supported mstatus.FS update behavior
 //
 typedef enum riscvFSModeE {
-    RVFS_WRITE_NZ,                  // dirty set if exception only (default)
-    RVFS_WRITE_ANY,                 // any fflags write sets dirty
-    RVFS_ALWAYS_DIRTY,              // mstatus.FS is always off or dirty
+    RVFS_WRITE_NZ,                      // dirty set if exception only (default)
+    RVFS_WRITE_ANY,                     // any fflags write sets dirty
+    RVFS_ALWAYS_DIRTY,                  // mstatus.FS is always off or dirty
 } riscvFSMode;
+
+//
+// Supported interrupt configuration
+//
+typedef enum riscvIntCfgE {
+    RVCP_ORIG,                          // original (CLIC absent)
+    RVCP_CLIC,                          // CLIC present
+    RVCP_BOTH                           // both originl and CLIC present
+} riscvIntCfg;
+
+//
+// Supported Debug mode implementation options
+//
+typedef enum riscvDMModeE {
+    RVDM_NONE,                          // Debug mode not implemented
+    RVDM_INTERRUPT,                     // Debug mode implemented as interrupt
+    RVDM_HALT,                          // Debug mode implemented as halt
+} riscvDMMode;
 
 // macro returning User Architecture version
 #define RISCV_USER_VERSION(_P)  ((_P)->configInfo.user_version)

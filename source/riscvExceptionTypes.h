@@ -90,61 +90,11 @@ typedef enum riscvExceptionS {
     riscv_E_HExternalInterrupt = riscv_E_ExternalInterrupt | RISCV_MODE_HYPERVISOR,
     riscv_E_MExternalInterrupt = riscv_E_ExternalInterrupt | RISCV_MODE_MACHINE,
 
-    // additional local interrupts
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt,  0),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt,  1),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt,  2),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt,  3),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt,  4),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt,  5),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt,  6),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt,  7),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt,  8),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt,  9),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt, 10),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt, 11),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt, 12),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt, 13),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt, 14),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt, 15),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt, 16),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt, 17),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt, 18),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt, 19),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt, 20),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt, 21),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt, 22),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt, 23),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt, 24),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt, 25),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt, 26),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt, 27),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt, 28),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt, 29),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt, 30),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt, 31),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt, 32),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt, 33),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt, 34),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt, 35),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt, 36),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt, 37),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt, 38),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt, 39),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt, 40),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt, 41),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt, 42),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt, 43),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt, 44),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt, 45),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt, 46),
-    RISCV_EXCEPTION_TYPE_N(LocalInterrupt, 47),
-
     ////////////////////////////////////////////////////////////////////
-    // KEEP LAST: for sizing
+    // KEEP LAST: for sizing (local interrupts follow)
     ////////////////////////////////////////////////////////////////////
 
-    riscv_E_Last
+    riscv_E_Last = riscv_E_LocalInterrupt
 
 } riscvException;
 
@@ -159,3 +109,14 @@ typedef enum riscvAccessFaultS {
     riscv_AFault_PMA_Data,  // access fault because of PMA load/store error
     riscv_AFault_Explicit,  // explicit Access Fault value
 } riscvAccessFault;
+
+//
+// Specify enabled interrupt mode
+//
+typedef enum riscvICModeE {
+    riscv_int_Direct   = 0, // direct interrupt mode
+    riscv_int_Vectored = 1, // vectored interrupt mode
+    riscv_int_Reserved = 2, // (reserved interrupt mode)
+    riscv_int_CLIC     = 3, // CLIC interrupt mode
+} riscvICMode;
+

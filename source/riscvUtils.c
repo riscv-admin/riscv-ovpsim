@@ -37,13 +37,6 @@
 
 
 //
-// Return any chld of the passed processor
-//
-inline static riscvP getChild(riscvP riscv) {
-    return (riscvP)vmirtGetSMPChild((vmiProcessorP)riscv);
-}
-
-//
 // Update the currently-enabled architecture settings
 //
 void riscvSetCurrentArch(riscvP riscv) {
@@ -107,14 +100,11 @@ Uns32 riscvGetXlenArch(riscvP riscv) {
 
     riscvArchitecture arch   = riscv->configInfo.arch;
     Uns32             result = 0;
-    riscvP            child;
 
     if(arch & ISA_XLEN_64) {
         result = 64;
     } else if(arch & ISA_XLEN_32) {
         result = 32;
-    } else if((child=getChild(riscv))) {
-        return riscvGetXlenArch(child);
     } else {
         VMI_ABORT("invalid XLEN"); // LCOV_EXCL_LINE
     }

@@ -1130,7 +1130,30 @@ void riscvDoc(riscvP rootProcessor) {
 
         vmidocAddText(
             Ports,
-            "All other interrupt ports are active high."
+            "All other interrupt ports are active high. For each implemented "
+            "privileged execution level, there are by default input ports for "
+            "software interrupt, timer interrupt and external interrupt; for "
+            "example, for Machine mode, these are called \"MSWInterrupt\", "
+            "\"MTimerInterrupt\" and \"MExternalInterrupt\", respectively. "
+            "When the N extension is implemented, ports are also present for "
+            "User mode. Parameter \"unimp_int_mask\" allows the default "
+            "behavior to be changed to exclude certain interrupt ports. The "
+            "parameter value is a mask in the same format as the \"mip\" "
+            "CSR; any interrupt corresponding to a non-zero bit in this mask "
+            "will be removed from the processor and read as zero in \"mip\", "
+            "\"mie\" and \"mideleg\" CSRs (and Supervisor and User mode "
+            "equivalents if implemented)."
+        );
+
+        vmidocAddText(
+            Ports,
+            "Parameter \"external_int_id\" can be used to enable extra "
+            "interrupt ID input ports on each hart. If the parameter is True "
+            "then when an external interrupt is applied the value on the "
+            "ID port is sampled and used to fill the Exception Code field "
+            "in the \"mcause\" CSR (or the equivalent CSR for other execution "
+            "levels). For Machine mode, the extra interrupt ID port is called "
+            "\"MExternalInterruptID\"."
         );
     }
 
@@ -1151,6 +1174,23 @@ void riscvDoc(riscvP rootProcessor) {
             "model provides infrastructure to allow implementation of a "
             "Debug Module using a custom harness. Features added are described "
             "below."
+        );
+
+        vmidocAddText(
+            debugMode,
+            "Parameter \"debug_mode\" can be used to specify two different "
+            "behaviors. If set to value \"interrupt\", then operations that "
+            "would cause entry to Debug mode result in the processor "
+            "simulation call (e.g. opProcessorSimulate) returning, with a "
+            "stop reason of OP_SR_INTERRUPT. In this usage scenario, the "
+            "Debug Module is implemented in the simulation harness. If "
+            "parameter \"debug_mode\" is set to value \"halt\", then "
+            "operations that would cause entry to Debug mode result in the "
+            "processor halting. Depending on the simulation environment, "
+            "this might cause a return from the simulation call with a stop "
+            "reason of OP_SR_HALT, or debug mode might be implemented by "
+            "another platform component which then restarts the debugged "
+            "processor again."
         );
 
         ////////////////////////////////////////////////////////////////////////
@@ -1202,10 +1242,11 @@ void riscvDoc(riscvP rootProcessor) {
             vmidocAddText(
                 StateEntry,
                 "In all cases, the processor will save required state in "
-                "\"dpc\" and \"dcsr\" and then return control immediately "
-                "to the harness, with stopReason of OP_SR_INTERRUPT. The "
-                "harness can then manipulate the processor in Debug state as "
-                "described below."
+                "\"dpc\" and \"dcsr\" and then either return control "
+                "immediately to the harness, with stopReason of "
+                "OP_SR_INTERRUPT, or perform a halt, depending on the value "
+                "of the \"debug_mode\" parameter. The Debug Module can then "
+                "manipulate the processor in Debug state as described below."
             );
         }
 
@@ -1214,26 +1255,26 @@ void riscvDoc(riscvP rootProcessor) {
         ////////////////////////////////////////////////////////////////////////
 
         {
-            vmiDocNodeP StateEntry = vmidocAddSection(
+            vmiDocNodeP StateExit = vmidocAddSection(
                 debugMode, "Debug State Exit"
             );
 
             vmidocAddText(
-                StateEntry,
+                StateExit,
                 "Exit from Debug mode can be performed in any of these ways:"
             );
             vmidocAddText(
-                StateEntry,
+                StateExit,
                 "1. By writing False to register \"DM\" (e.g. using "
                 "opProcessorRegWrite) followed by simulation of at least one "
                 "cycle (e.g. using opProcessorSimulate);"
             );
             vmidocAddText(
-                StateEntry,
+                StateExit,
                 "2. By executing an \"dret\" instruction when Debug mode."
             );
             vmidocAddText(
-                StateEntry,
+                StateExit,
                 "In both cases, the processor will perform the steps described "
                 "in section 4.6 (Resume) of the Debug specification."
             );
@@ -1274,10 +1315,27 @@ void riscvDoc(riscvP rootProcessor) {
                 DebugExecution,
                 "The specification allows execution of code fragments in Debug "
                 "mode. A Debug Module implementation can cause execution in "
-                "Debug mode by writing the address of a Program Buffer to the "
-                "core program counter using opProcessorPCSet, then calling "
-                "opProcessorSimulate. Control will be returned to the harness "
-                "in any of these cases:"
+                "Debug mode by the following steps:"
+            );
+            vmidocAddText(
+                DebugExecution,
+                "1. Write the address of a Program Buffer to the program "
+                "counter using opProcessorPCSet;"
+            );
+            vmidocAddText(
+                DebugExecution,
+                "2. If \"debug_mode\" is set to \"halt\", write 0 to "
+                "pseudo-register \"DMStall\" (to leave halted state);"
+            );
+            vmidocAddText(
+                DebugExecution,
+                "3. If entry to Debug mode was handled by exiting the "
+                "simulation callback, call opProcessorSimulate or "
+                "opRootModuleSimulate to resume simulation."
+            );
+            vmidocAddText(
+                DebugExecution,
+                "Debug mode will be re-entered in these cases:"
             );
             vmidocAddText(
                 DebugExecution,
@@ -1289,8 +1347,10 @@ void riscvDoc(riscvP rootProcessor) {
             );
             vmidocAddText(
                 DebugExecution,
-                "In both cases, the processor returns control immediately "
-                "to the harness, with stopReason of OP_SR_INTERRUPT."
+                "In both cases, the processor will either return control "
+                "immediately to the harness, with stopReason of "
+                "OP_SR_INTERRUPT, or perform a halt, depending on the value "
+                "of the \"debug_mode\" parameter."
             );
         }
 
@@ -1325,6 +1385,11 @@ void riscvDoc(riscvP rootProcessor) {
                 debugMode, "Debug Ports"
             );
 
+            vmidocAddText(
+                Ports,
+                "Port \"DM\" is an output signal that indicates whether the "
+                "processor is in Debug mode"
+            );
             vmidocAddText(
                 Ports,
                 "Port \"haltreq\" is a rising-edge-triggered signal that "

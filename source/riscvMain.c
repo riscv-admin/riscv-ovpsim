@@ -94,15 +94,12 @@ static void initLeafModelCBs(riscvP riscv) {
 //
 static riscvConfigCP getConfigVariantArg(riscvP riscv, riscvParamValuesP params) {
 
-    riscvP        parent  = riscv->parent;
     riscvConfigCP cfgList = riscvGetConfigList(riscv);
     riscvConfigCP match;
 
-    if(parent && riscvIsCluster(parent)) {
+    if(riscvIsClusterMember(riscv)) {
 
-        match = riscvGetNamedConfig(
-            cfgList, riscvGetClusterVariant(parent, riscv)
-        );
+        match = riscvGetNamedConfig(cfgList, riscvGetClusterVariant(riscv));
 
     } else {
 
@@ -225,6 +222,9 @@ static void applyParamsSMP(riscvP riscv, riscvParamValuesP params) {
     cfg->csrMask.mtvec.u64.bits = params->mtvec_mask;
     cfg->csrMask.stvec.u64.bits = params->stvec_mask;
     cfg->csrMask.utvec.u64.bits = params->utvec_mask;
+    cfg->csrMask.mtvt.u64.bits  = params->mtvt_mask;
+    cfg->csrMask.stvt.u64.bits  = params->stvt_mask;
+    cfg->csrMask.utvt.u64.bits  = params->utvt_mask;
 
     // get uninterpreted architectural configuration parameters
     cfg->user_version      = params->user_version;
@@ -239,6 +239,10 @@ static void applyParamsSMP(riscvP riscv, riscvParamValuesP params) {
     cfg->PMP_registers     = params->PMP_registers;
     cfg->Sv_modes          = params->Sv_modes | RISCV_VMM_BARE;
     cfg->local_int_num     = params->local_int_num;
+    cfg->unimp_int_mask    = params->unimp_int_mask;
+    cfg->external_int_id   = params->external_int_id;
+    cfg->no_ideleg         = params->no_ideleg;
+    cfg->no_edeleg         = params->no_edeleg;
     cfg->lr_sc_grain       = powerOfTwo(params->lr_sc_grain, "lr_sc_grain");
     cfg->debug_mode        = params->debug_mode;
     cfg->updatePTEA        = params->updatePTEA;
@@ -263,6 +267,14 @@ static void applyParamsSMP(riscvP riscv, riscvParamValuesP params) {
     cfg->Zvlsseg           = params->Zvlsseg;
     cfg->Zvamo             = params->Zvamo;
     cfg->Zvediv            = params->Zvediv;
+    cfg->CLICLEVELS        = params->CLICLEVELS;
+    cfg->CLICANDBASIC      = params->CLICANDBASIC;
+    cfg->CLICINTCTLBITS    = params->CLICINTCTLBITS;
+    cfg->CLICCFGMBITS      = params->CLICCFGMBITS;
+    cfg->CLICCFGLBITS      = params->CLICCFGLBITS;
+    cfg->CLICSELHVEC       = params->CLICSELHVEC;
+    cfg->CLICMNXTI         = params->CLICMNXTI;
+    cfg->CLICMCSW          = params->CLICMCSW;
 
     // set number of children
     Bool isSMPMember = riscv->parent && !riscvIsCluster(riscv->parent);
@@ -300,30 +312,8 @@ static void applyParamsSMP(riscvP riscv, riscvParamValuesP params) {
 
     if(misa_MXL==1) {
 
-        // modify configuration for 32-bit cores
-        Uns32 max_ASID_bits     =  9;
-        Uns32 max_local_int_num = 16;
-
-        // misa_MXL is not writable
+        // modify configuration for 32-bit cores - misa_MXL is not writable
         misa_MXL_mask = 0;
-
-        // clamp ASID_bits to maximum
-        if(cfg->ASID_bits>max_ASID_bits) {
-            vmiMessage("W", CPU_PREFIX"_IASB",
-                "'ASID_bits' (%u) exceeds maximum %u - using %u",
-                cfg->ASID_bits, max_ASID_bits, max_ASID_bits
-            );
-            cfg->ASID_bits = max_ASID_bits;
-        }
-
-        // clamp max_local_int_num to maximum
-        if(cfg->local_int_num>max_local_int_num) {
-            vmiMessage("W", CPU_PREFIX"_ILIN",
-                "'local_int_num' (%u) exceeds maximum %u - using %u",
-                cfg->local_int_num, max_local_int_num, max_local_int_num
-            );
-            cfg->local_int_num = max_local_int_num;
-        }
 
         // mask valid VM modes
         cfg->Sv_modes &= RISCV_VMM_32;
@@ -447,6 +437,9 @@ VMI_CONSTRUCTOR_FN(riscvConstructor) {
         // create root level bus port specifications for leaf level ports
         riscvNewLeafBusPorts(riscv);
 
+        // allocate timers
+        riscvNewTimers(riscv);
+
         // do initial reset
         riscvReset(riscv);
     }
@@ -505,6 +498,9 @@ VMI_DESTRUCTOR_FN(riscvDestructor) {
 
     // free vector extension data structures
     riscvFreeVector(riscv);
+
+    // free timers
+    riscvFreeTimers(riscv);
 }
 
 

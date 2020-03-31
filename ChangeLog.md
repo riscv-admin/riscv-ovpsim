@@ -11,6 +11,18 @@ NOTE: X-commit messages below refer to git commits in the following
   I-commit: https://github.com/riscv/riscv-isa-manual
   V-commit: https://github.com/riscv/riscv-v-spec
 
+- The priority order for handling simultaneous interrupts destined for the
+  same privilege level has been corrected (previously, these were handled so
+  that higher interrupt numbers were higher priority).
+- Some Vector Extension issues have been corrected:
+  - All vector floating point instructions now generate Illegal Instruction
+    exceptions if the current rounding mode is invalid, even if those
+    instructions do not use the rounding mode.
+
+Date 2020-March-13
+Release 20200312.0
+===
+
 - Support for Debug mode has been added; see RISCV processor documentation for
   more details.
 - The priv_version parameter now includes a choice of 'master', which specifies
