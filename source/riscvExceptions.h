@@ -158,6 +158,26 @@ void riscvNewTimers(riscvP riscv);
 void riscvFreeTimers(riscvP riscv);
 
 //
+// Acknowledge CLIC-sourced interrupt
+//
+void riscvAcknowledgeCLICInt(riscvP hart, Uns32 intIndex);
+
+//
+// Create CLIC memory-mapped block and data structures
+//
+void riscvMapCLICDomain(riscvP root, memDomainP CLICDomain);
+
+//
+// Allocate CLIC data structures
+//
+void riscvNewCLIC(riscvP riscv, Uns32 index);
+
+//
+// Free CLIC data structures
+//
+void riscvFreeCLIC(riscvP riscv);
+
+//
 // Save net state not covered by register read/write API
 //
 void riscvNetSave(

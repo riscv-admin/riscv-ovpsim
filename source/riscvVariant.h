@@ -62,6 +62,7 @@ typedef enum riscvArchitectureE {
 
     // BASE ISA FEATURES
     ISA_A      = RISCV_FEATURE_BIT('A'),    // atomic instructions
+    ISA_B      = RISCV_FEATURE_BIT('B'),    // bit manipulation instructions
     ISA_C      = RISCV_FEATURE_BIT('C'),    // compressed instructions
     ISA_E      = RISCV_FEATURE_BIT('E'),    // embedded instructions
     ISA_D      = RISCV_FEATURE_BIT('D'),    // double-precision floating point
@@ -75,7 +76,6 @@ typedef enum riscvArchitectureE {
     ISA_X      = RISCV_FEATURE_BIT('X'),    // non-standard extensions present
     ISA_DF     = (ISA_D|ISA_F),             // either single or double precision
     ISA_DFV    = (ISA_D|ISA_F|ISA_V),       // either floating point or vector
-    ISA_SorU   = (ISA_S|ISA_U),             // either supervisor or user mode
     ISA_SorN   = (ISA_S|ISA_N),             // either supervisor or user interrupts
     ISA_SandN  = (ISA_S|ISA_N|ISA_and),     // both supervisor and user interrupts
     ISA_FSandV = (ISA_FS|ISA_V|ISA_and),    // both FS and vector extension
@@ -140,6 +140,9 @@ typedef enum riscvArchitectureE {
 // macro indicating if current XLEN is 64
 #define RISCV_XLEN_IS_64(_CPU) ((_CPU)->currentArch & ISA_XLEN_64)
 
+// macro returning XLEN in bytes
+#define RISCV_XLEN_BYTES(_CPU) (RISCV_XLEN_IS_32(_CPU) ? 4 : 8)
+
 //
 // Supported User Architecture versions
 //
@@ -165,8 +168,8 @@ typedef enum riscvPrivVerE {
 //
 // date and tag of master version
 //
-#define RVVV_MASTER_DATE    "4 Match 2020"
-#define RVVV_MASTER_TAG     "45da90d"
+#define RVVV_MASTER_DATE    "15 May 2020"
+#define RVVV_MASTER_TAG     "72a8e0c"
 
 //
 // Supported Vector Architecture versions
@@ -179,9 +182,10 @@ typedef enum riscvVectVerE {
     RVVV_0_8_20191117,                  // version 0.8-draft-20191117
     RVVV_0_8_20191118,                  // version 0.8-draft-20191118
     RVVV_0_8,                           // version 0.8
+    RVVV_0_9,                           // version 0.9
     RVVV_MASTER,                        // master branch
     RVVV_LAST,                          // for sizing
-    RVVV_DEFAULT = RVVV_0_8,            // default version
+    RVVV_DEFAULT = RVVV_0_9,            // default version
 } riscvVectVer;
 
 //
@@ -216,6 +220,7 @@ typedef enum riscvIntCfgE {
 //
 typedef enum riscvDMModeE {
     RVDM_NONE,                          // Debug mode not implemented
+    RVDM_VECTOR,                        // Debug mode causes execution at vector
     RVDM_INTERRUPT,                     // Debug mode implemented as interrupt
     RVDM_HALT,                          // Debug mode implemented as halt
 } riscvDMMode;
@@ -255,7 +260,9 @@ typedef enum riscvVFeatureE {
     RVVF_VS_STATUS_8,       // is [ms]status.VS field in version 0.8 location?
     RVVF_VS_STATUS_9,       // is [ms]status.VS field in version 0.9 location?
     RVVF_FP_RESTRICT_WHOLE, // whole register load/store/move restricted?
-    RVVF_SEG_ONLY_SEW,      // are segment loads/stores restricted to SEW?
+    RVVF_FRACT_LMUL,        // is fractional LMUL implemented?
+    RVVF_AGNOSTIC,          // are agnostic bits implemented?
+    RVVF_MLEN1,             // is MLEN always 1?
     RVVF_LAST,              // for sizing
 } riscvVFeature;
 

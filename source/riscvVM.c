@@ -1681,6 +1681,37 @@ static void createVirtualDomain(
 }
 
 //
+// Create new CLIC domain at cluster root level
+//
+static memDomainP createCLICDomain(riscvP riscv, memDomainP dataDomain) {
+
+    riscvP root = riscv->smpRoot;
+
+    // CLIC memory map is shared by all harts in a cluster
+    if(!root->CLICDomain) {
+
+        Uns32 bits = vmirtGetDomainAddressBits(dataDomain);
+        Uns64 mask = getAddressMask(bits);
+
+        // create domain of width bits
+        memDomainP CLICDomain = createDomain(
+            RISCV_MODE_MACHINE, "CLIC", bits, False, False
+        );
+
+        // create mapping to data domain
+        vmirtAliasMemory(dataDomain, CLICDomain, 0, mask, 0, 0);
+
+        // create CLIC memory-mapped block
+        riscvMapCLICDomain(root, CLICDomain);
+
+        // save CLIC domain on cluster root
+        root->CLICDomain = CLICDomain;
+    }
+
+    return root->CLICDomain;
+}
+
+//
 // Dump the contents of the TLBs
 //
 static VMIRT_COMMAND_PARSE_FN(dumpTLBCommand) {
@@ -1710,6 +1741,12 @@ VMI_VMINIT_FN(riscvVMInit) {
 
     // save size of physical domain
     riscv->extBits = (codeBits<dataBits) ? codeBits : dataBits;
+
+    // install memory-mapped CLIC control regiser block if required
+    if(CLICPresent(riscv)) {
+        dataDomain = createCLICDomain(riscv, dataDomain);
+        unified    = False;
+    }
 
     for(mode=RISCV_MODE_SUPERVISOR; mode<RISCV_MODE_LAST; mode++) {
 

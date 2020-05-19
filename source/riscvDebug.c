@@ -154,9 +154,9 @@ static VMI_REG_WRITE_FN(writeDMStall) {
 //
 static const isrDetails isRegs[] = {
 
-    {"LRSCAddress", "LR/SC active lock address", ISA_A, 0, 0, RISCV_EA_TAG,   0, 0,            vmi_RA_RW, 0, 0             },
-    {"DM",          "Debug mode active",         0,     1, 8, RISCV_DM,       0, writeDM,      vmi_RA_RW, 0, RVDM_INTERRUPT},
-    {"DMStall",     "Debug mode stalled",        0,     1, 8, RISCV_DM_STALL, 0, writeDMStall, vmi_RA_RW, 0, RVDM_HALT     },
+    {"LRSCAddress", "LR/SC active lock address", ISA_A, 0, 0, RISCV_EA_TAG,   0, 0,            vmi_RA_RW, 0, 0          },
+    {"DM",          "Debug mode active",         0,     1, 8, RISCV_DM,       0, writeDM,      vmi_RA_RW, 0, RVDM_VECTOR},
+    {"DMStall",     "Debug mode stalled",        0,     1, 8, RISCV_DM_STALL, 0, writeDMStall, vmi_RA_RW, 0, RVDM_HALT  },
 
     // KEEP LAST
     {0}
@@ -253,8 +253,13 @@ inline static riscvCSRAttrsCP getCSRAttrs(vmiRegInfoCP reg) {
 static VMI_REG_READ_FN(readCSR) {
 
     riscvP riscv = (riscvP)processor;
+    Bool   old   = riscv->artifactAccess;
 
-    return riscvReadCSR(getCSRAttrs(reg), riscv, buffer);
+    riscv->artifactAccess = True;
+    Bool ok = riscvReadCSR(getCSRAttrs(reg), riscv, buffer);
+    riscv->artifactAccess = old;
+
+    return ok;
 }
 
 //
@@ -263,8 +268,13 @@ static VMI_REG_READ_FN(readCSR) {
 static VMI_REG_WRITE_FN(writeCSR) {
 
     riscvP riscv = (riscvP)processor;
+    Bool   old   = riscv->artifactAccess;
 
-    return riscvWriteCSR(getCSRAttrs(reg), riscv, buffer);
+    riscv->artifactAccess = True;
+    Bool ok = riscvWriteCSR(getCSRAttrs(reg), riscv, buffer);
+    riscv->artifactAccess = old;
+
+    return ok;
 }
 
 //
@@ -404,6 +414,7 @@ static vmiRegInfoCP getRegisters(riscvP riscv, Bool normal) {
             dst->readCB        = csrDetails.rdRaw ? 0 : readCSR;
             dst->writeCB       = csrDetails.wrRaw ? 0 : writeCSR;
             dst->userData      = (void *)attrs;
+            dst->noSaveRestore = attrs->noSaveRestore;
             dst->noTraceChange = attrs->noTraceChange;
             dst->extension     = csrDetails.extension;
             dst++;
@@ -560,28 +571,10 @@ void riscvFreeRegInfo(riscvP riscv) {
     RISCV_FIELD_IMPL_RAW(0, _FIELD)
 
 //
-// Ignore register definitions for artifact vector index tables
-//
-static void offsetRegIgnore(riscvP riscv, riscvStrideOffset *base, Uns32 mul) {
-
-	vmiProcessorP processor = (vmiProcessorP)riscv;
-    Uns32         vRegBytes = riscv->configInfo.VLEN/8;
-
-    vmirtRegImplRaw(
-        processor,
-	    0,
-        vmimtGetExtReg(processor, base),
-	    vRegBytes*sizeof(*base)*8*mul
-    );
-}
-
-//
 // Specify vmiReg-to-vmiRegInfoCP correspondence for registers for which this
 // cannot be automatically derived
 //
 VMI_REG_IMPL_FN(riscvRegImpl) {
-
-    riscvP riscv = (riscvP)processor;
 
     // specify that fpFlags is in fflags
     vmiRegInfoCP fflags = vmirtGetRegByName(processor, "fflags");
@@ -595,17 +588,7 @@ VMI_REG_IMPL_FN(riscvRegImpl) {
     RISCV_FIELD_IMPL_IGNORE(pmKey);
     RISCV_FIELD_IMPL_IGNORE(vFirstFault);
     RISCV_FIELD_IMPL_IGNORE(vBase);
-    RISCV_FIELD_IMPL_IGNORE(offsetsLMULx2);
-    RISCV_FIELD_IMPL_IGNORE(offsetsLMULx4);
-    RISCV_FIELD_IMPL_IGNORE(offsetsLMULx8);
     RISCV_FIELD_IMPL_IGNORE(jumpBase);
-
-    // exclude artifact vector index registers
-    if(riscv->offsetsLMULx2) {
-    	offsetRegIgnore(riscv, riscv->offsetsLMULx2, 2);
-    	offsetRegIgnore(riscv, riscv->offsetsLMULx4, 4);
-    	offsetRegIgnore(riscv, riscv->offsetsLMULx8, 8);
-    }
 }
 
 

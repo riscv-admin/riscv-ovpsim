@@ -31,6 +31,11 @@
 #include "riscvVariant.h"
 
 //
+// This default value indicates all bits writable in arch except E, S and U
+//
+#define RV_ARCH_MASK_DEFAULT (~(ISA_XLEN_ANY|ISA_E|ISA_S|ISA_U))
+
+//
 // Function type for adding documentation
 //
 #define RV_DOC_FN(_NAME) void _NAME(riscvP riscv, vmiDocNodeP node)
@@ -73,9 +78,14 @@ typedef struct riscvConfigS {
     // configuration not visible in CSR state
     Uns64             reset_address;    // reset vector address
     Uns64             nmi_address;      // NMI address
+    Uns64             debug_address;    // debug vector address
+    Uns64             dexc_address;     // debug exception address
     Uns64             unimp_int_mask;   // mask of unimplemented interrupts
     Uns64             no_ideleg;        // non-delegated interrupts
     Uns64             no_edeleg;        // non-delegated exceptions
+    Uns64             ecode_mask;       // implemented bits in xcause.ecode
+    Uns64             ecode_nmi;        // exception code for NMI
+    Uns32             counteren_mask;   // counter-enable implemented mask
     Uns32             local_int_num;    // number of local interrupts
     Uns32             lr_sc_grain;      // LR/SC region grain size
     Uns32             ASID_bits;        // number of implemented ASID bits
@@ -108,12 +118,14 @@ typedef struct riscvConfigS {
     Bool              require_vstart0;  // require vstart 0 if uninterruptible?
     Bool              enable_CSR_bus;   // enable CSR implementation bus
     Bool              external_int_id;  // enable external interrupt ID ports
-    Bool              tval_ii_code;     // instruction bits in [sm]tval for
+    Bool              tval_zero;        // whether [smu]tval are always zero
+    Bool              tval_ii_code;     // instruction bits in [smu]tval for
                                         // illegal instruction exception?
 
     // CLIC configuration
     Uns32             CLICLEVELS;       // number of CLIC interrupt levels
-    Bool              CLICANDBASIC;		// implements basic mode also
+    Bool              CLICANDBASIC;		// whether implements basic mode also
+    Uns8              CLICVERSION;      // CLIC version
     Uns8              CLICINTCTLBITS;   // bits implemented in clicintctl[i]
     Uns8              CLICCFGMBITS;     // bits implemented for cliccfg.nmbits
     Uns8              CLICCFGLBITS;     // bits implemented for cliccfg.nlbits
@@ -129,6 +141,7 @@ typedef struct riscvConfigS {
         CSR_REG_DECL (mhartid);         // mhartid value
         CSR_REG_DECL (mtvec);           // mtvec value
         CSR_REG_DECL (mstatus);         // mstatus reset value
+        CSR_REG_DECL (mclicbase);       // mclicbase value
     } csr;
 
     // CSR register masks
@@ -139,7 +152,6 @@ typedef struct riscvConfigS {
         CSR_REG_DECL (mtvt);            // mtvec mask
         CSR_REG_DECL (stvt);            // stvec mask
         CSR_REG_DECL (utvt);            // utvec mask
-        CSR_REG_DECL (cause);           // cause mask
     } csrMask;
 
     // custom documentation

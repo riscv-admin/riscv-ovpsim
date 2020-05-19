@@ -100,6 +100,23 @@ Bool riscvVFSupport(riscvP riscv, riscvVFeature feature) {
             [RVVF_FP_RESTRICT_WHOLE]  = 1,
         },
 
+        // version 0.9
+        [RVVV_0_9] = {
+            [RVVF_W_SYNTAX]           = 1,
+            [RVVF_SEXT_VMV_X_S]       = 1,
+            [RVVF_VAMO_SEW]           = 1,
+            [RVVF_ADC_SBC_MASK]       = 1,
+            [RVVF_SEXT_SLIDE1_SRC]    = 1,
+            [RVVF_FP_REQUIRES_FSNZ]   = 1,
+            [RVVF_VLENB_PRESENT]      = 1,
+            [RVVF_VCSR_PRESENT]       = 1,
+            [RVVF_VS_STATUS_9]        = 1,
+            [RVVF_FP_RESTRICT_WHOLE]  = 1,
+            [RVVF_FRACT_LMUL]         = 1,
+            [RVVF_AGNOSTIC]           = 1,
+            [RVVF_MLEN1]              = 1,
+        },
+
         // version master
         [RVVV_MASTER] = {
             [RVVF_W_SYNTAX]           = 1,
@@ -112,7 +129,9 @@ Bool riscvVFSupport(riscvP riscv, riscvVFeature feature) {
             [RVVF_VCSR_PRESENT]       = 1,
             [RVVF_VS_STATUS_9]        = 1,
             [RVVF_FP_RESTRICT_WHOLE]  = 1,
-            [RVVF_SEG_ONLY_SEW]       = 1,
+            [RVVF_FRACT_LMUL]         = 1,
+            [RVVF_AGNOSTIC]           = 1,
+            [RVVF_MLEN1]              = 1,
         },
     };
 

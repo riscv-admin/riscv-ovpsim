@@ -69,8 +69,11 @@ static void initLeafModelCBs(riscvP riscv) {
     riscv->cb.setTMode           = riscvSetTMode;
     riscv->cb.getTMode           = riscvGetTMode;
     riscv->cb.getDataEndian      = riscvGetDataEndian;
+    riscv->cb.readBaseCSR        = riscvReadBaseCSR;
+    riscv->cb.writeBaseCSR       = riscvWriteBaseCSR;
 
     // from riscvExceptions.h
+    riscv->cb.testInterrupt      = riscvTestInterrupt;
     riscv->cb.illegalInstruction = riscvIllegalInstruction;
     riscv->cb.takeException      = riscvTakeException;
 
@@ -134,37 +137,19 @@ inline static Uns32 getNumChildren(riscvP riscv) {
 }
 
 //
-// Is the processor a cluster container?
+// Give each sub-processor a unique name
 //
-inline static void setName(riscvP hart, const char *name) {
-    vmirtSetProcessorName((vmiProcessorP)hart, name);
-}
+VMI_SMP_NAME_FN(riscvGetSMPName) {
 
-//
-// Set name for an AMP cluster member
-//
-static void setAMPMemberName(riscvP hart, riscvP parent, const char *AMPName) {
+    const char   *baseName = vmirtProcessorName(parent);
+    riscvP        rvParent = (riscvP)parent;
+    riscvConfigCP cfg      = &rvParent->configInfo;
 
-    const char *baseName = vmirtProcessorName((vmiProcessorP)parent);
-    char        name[strlen(baseName)+strlen(AMPName)+2];
-
-    sprintf(name, "%s_%s", baseName, AMPName);
-
-    setName(hart, name);
-}
-
-//
-// Set name for a cluster member
-//
-static void setClusterMemberName(riscvP hart, riscvP cluster) {
-
-    const char *baseName = vmirtProcessorName((vmiProcessorP)cluster);
-    Uns32       index    = RD_CSR(hart, mhartid);
-    char        name[strlen(baseName)+16];
-
-    sprintf(name, "%s_hart%u", baseName, index);
-
-    setName(hart, name);
+    if(riscvIsCluster(rvParent)) {
+        sprintf(name, "%s_%s", baseName, cfg->members[smpIndex]);
+    } else {
+        sprintf(name, "%s_hart%u", baseName, cfg->csr.mhartid.u32.bits+smpIndex);
+    }
 }
 
 //
@@ -217,6 +202,7 @@ static void applyParamsSMP(riscvP riscv, riscvParamValuesP params) {
     cfg->csr.mhartid.u64.bits      = params->mhartid;
     cfg->csr.mtvec.u64.bits        = params->mtvec;
     cfg->csr.mstatus.u64.fields.FS = params->mstatus_FS;
+    cfg->csr.mclicbase.u64.bits    = params->mclicbase;
 
     // get uninterpreted CSR mask configuration parameters
     cfg->csrMask.mtvec.u64.bits = params->mtvec_mask;
@@ -240,18 +226,24 @@ static void applyParamsSMP(riscvP riscv, riscvParamValuesP params) {
     cfg->Sv_modes          = params->Sv_modes | RISCV_VMM_BARE;
     cfg->local_int_num     = params->local_int_num;
     cfg->unimp_int_mask    = params->unimp_int_mask;
+    cfg->ecode_mask        = params->ecode_mask;
+    cfg->ecode_nmi         = params->ecode_nmi;
     cfg->external_int_id   = params->external_int_id;
     cfg->no_ideleg         = params->no_ideleg;
     cfg->no_edeleg         = params->no_edeleg;
     cfg->lr_sc_grain       = powerOfTwo(params->lr_sc_grain, "lr_sc_grain");
     cfg->debug_mode        = params->debug_mode;
+    cfg->debug_address     = params->debug_address;
+    cfg->dexc_address      = params->dexc_address;
     cfg->updatePTEA        = params->updatePTEA;
     cfg->updatePTED        = params->updatePTED;
     cfg->unaligned         = params->unaligned;
     cfg->unalignedAMO      = params->unalignedAMO;
     cfg->wfi_is_nop        = params->wfi_is_nop;
     cfg->mtvec_is_ro       = params->mtvec_is_ro;
+    cfg->counteren_mask    = params->counteren_mask;
     cfg->tvec_align        = params->tvec_align;
+    cfg->tval_zero         = params->tval_zero;
     cfg->tval_ii_code      = params->tval_ii_code;
     cfg->cycle_undefined   = params->cycle_undefined;
     cfg->time_undefined    = params->time_undefined;
@@ -269,6 +261,7 @@ static void applyParamsSMP(riscvP riscv, riscvParamValuesP params) {
     cfg->Zvediv            = params->Zvediv;
     cfg->CLICLEVELS        = params->CLICLEVELS;
     cfg->CLICANDBASIC      = params->CLICANDBASIC;
+    cfg->CLICVERSION       = params->CLICVERSION;
     cfg->CLICINTCTLBITS    = params->CLICINTCTLBITS;
     cfg->CLICCFGMBITS      = params->CLICCFGMBITS;
     cfg->CLICCFGLBITS      = params->CLICCFGLBITS;
@@ -379,6 +372,10 @@ VMI_CONSTRUCTOR_FN(riscvConstructor) {
     riscvP riscv  = (riscvP)processor;
     riscvP parent = getParent(riscv);
 
+    // indicate no interrupts are pending and enabled initially
+    riscv->pendEnab.id  = RV_NO_INT;
+    riscv->clicState.id = RV_NO_INT;
+
     // initialize enhanced model support callbacks that apply at all levels
     initAllModelCBs(riscv);
 
@@ -407,6 +404,9 @@ VMI_CONSTRUCTOR_FN(riscvConstructor) {
 
         // save parameters for use in child
         riscv->paramValues = parameterValues;
+
+        // save the number of child harts
+        riscv->numHarts = numChildren;
 
     } else {
 
@@ -440,17 +440,11 @@ VMI_CONSTRUCTOR_FN(riscvConstructor) {
         // allocate timers
         riscvNewTimers(riscv);
 
+        // allocate CLIC data structures
+        riscvNewCLIC(riscv, smpContext->index);
+
         // do initial reset
         riscvReset(riscv);
-    }
-
-    // set name if this is a cluster member
-    if(!parent) {
-        // not a cluster member
-    } else if(riscvIsCluster(parent)) {
-        setAMPMemberName(riscv, parent, riscv->configInfo.name);
-    } else {
-        setClusterMemberName(riscv, parent);
     }
 }
 
@@ -501,6 +495,9 @@ VMI_DESTRUCTOR_FN(riscvDestructor) {
 
     // free timers
     riscvFreeTimers(riscv);
+
+    // free CLIC data structures
+    riscvFreeCLIC(riscv);
 }
 
 
@@ -614,6 +611,9 @@ VMI_SAVE_STATE_FN(riscvSaveState) {
     // save net state not covered by register read/write API
     riscvNetSave(riscv, cxt, phase);
 
+    // save timer state not covered by register read/write API
+    riscvTimerSave(riscv, cxt, phase);
+
     // end of SMP cluster
     if(phase==SRT_END) {
         vmirtIterAllProcessors(processor, endSave, 0);
@@ -665,6 +665,9 @@ VMI_RESTORE_STATE_FN(riscvRestoreState) {
 
     // restore net state not covered by register read/write API
     riscvNetRestore(riscv, cxt, phase);
+
+    // restore timer state not covered by register read/write API
+    riscvTimerRestore(riscv, cxt, phase);
 
     // end of SMP cluster
     if(phase==SRT_END) {

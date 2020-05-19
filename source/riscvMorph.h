@@ -23,6 +23,7 @@
 #include "riscvBlockState.h"
 #include "riscvRegisterTypes.h"
 #include "riscvTypeRefs.h"
+#include "riscvTypes.h"
 #include "riscvVectorTypes.h"
 #include "riscvVariant.h"
 
@@ -49,6 +50,15 @@ typedef struct illegalDescS {
 }
 
 //
+// Macro used to define illegalDesc structure and emit an Illegal Instruction
+// using it (operand check)
+//
+#define ILLEGAL_OPERAND_MESSAGE(_RISCV, _ID, _DETAIL, _OPERAND) { \
+    static illegalDesc _DESC = { .id=CPU_PREFIX"_"_ID, .detail=_DETAIL};    \
+    riscvEmitIllegalOperandMessageDesc(_RISCV, &_DESC, _OPERAND);           \
+}
+
+//
 // Emit Illegal Instruction because the current mode has insufficient
 // privilege
 //
@@ -58,6 +68,15 @@ void riscvEmitIllegalInstructionMode(riscvP riscv);
 // Emit Illegal Instruction message and take Illegal Instruction exception
 //
 void riscvEmitIllegalInstructionMessageDesc(riscvP riscv, illegalDescP desc);
+
+//
+// Emit Illegal Operand message and take Illegal Instruction exception
+//
+void riscvEmitIllegalOperandMessageDesc(
+    riscvP       riscv,
+    illegalDescP desc,
+    Uns32        operand
+);
 
 //
 // Validate that the given required feature is present and enabled (using
@@ -180,9 +199,15 @@ void riscvFreeVector(riscvP riscv);
 void riscvWVStart(riscvMorphStateP state, Bool useRS1);
 
 //
-// Is the specified SEW valid?
+// Return maximum vector length for the given vector type settings
 //
-riscvSEWMt riscvValidSEW(riscvP riscv, Uns8 vsew);
+Uns32 riscvGetMaxVL(riscvP riscv, riscvVType vtype);
+
+//
+// If the specified vtype is valid, return the SEW, otherwise return
+// SEWMT_UNKNOWN
+//
+riscvSEWMt riscvValidVType(riscvP riscv, riscvVType vtype);
 
 //
 // Emit externally-implemented vector operation

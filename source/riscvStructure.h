@@ -24,6 +24,7 @@
 #include "vmi/vmiPorts.h"
 
 // model header files
+#include "riscvCLICTypes.h"
 #include "riscvConfig.h"
 #include "riscvCSR.h"
 #include "riscvExceptionTypes.h"
@@ -40,7 +41,6 @@
 #define RISCV_DISASSEMBLE_MASK      0x00000001
 #define RISCV_DEBUG_MMU_MASK        0x00000002
 #define RISCV_DEBUG_EXCEPT_MASK     0x00000004
-#define RISCV_DEBUG_VECTIDX_MASK    0x00000008
 
 //
 // Processor flag selection macros
@@ -48,7 +48,6 @@
 #define RISCV_DISASSEMBLE(_P)   ((_P)->flags & RISCV_DISASSEMBLE_MASK)
 #define RISCV_DEBUG_MMU(_P)     ((_P)->flags & RISCV_DEBUG_MMU_MASK)
 #define RISCV_DEBUG_EXCEPT(_P)  ((_P)->flags & RISCV_DEBUG_EXCEPT_MASK)
-#define RISCV_DEBUG_VECTIDX(_P) ((_P)->flags & RISCV_DEBUG_VECTIDX_MASK)
 
 //
 // Debug flags that should be disabled during save/restore
@@ -72,7 +71,8 @@ typedef struct riscvNetValueS {
     Bool haltreq;       // haltreq (Debug mode)
     Bool resethaltreq;  // resethaltreq (Debug mode)
     Bool resethaltreqS; // resethaltreq (Debug mode, sampled at reset)
-    Bool _u1[3];        // (for alignment)
+    Bool deferint;      // defer taking interrupts (artifact)
+    Bool _u1[2];        // (for alignment)
 } riscvNetValue;
 
 //
@@ -90,9 +90,24 @@ typedef union riscvPMPCFGU {
 } riscvPMPCFG;
 
 //
-// This holds all state contributing to an interrupt (for debug messages)
+// This code indicates no interrupt is pending
 //
-typedef struct riscvIntStateS {
+#define RV_NO_INT -1
+
+//
+// This holds information about a pending-and-enabled interrupt
+//
+typedef struct riscvPendEnabS {
+    riscvMode priv;     // mode to which taken
+    Int32     id;       // interrupt id
+    Uns8      level;    // interrupt level
+    Bool      isCLIC;   // whether CLIC mode interrupt
+} riscvPendEnab;
+
+//
+// This holds all state contributing to a basic mode interrupt (for debug)
+//
+typedef struct riscvBasicIntStateS {
     Uns64 pendingEnabled;       // pending-and-enabled state
     Uns64 pending;              // pending state
     Uns64 pendingExternal;      // pending external interrupts
@@ -103,7 +118,30 @@ typedef struct riscvIntStateS {
     Bool  sie;                  // mstatus.sie
     Bool  uie;                  // mstatus.uie
     Bool  _u1;                  // (for alignment)
-} riscvIntState;
+} riscvBasicIntState;
+
+//
+// This holds state for a pending CLIC interrupt
+//
+typedef struct riscvCLICOutStateS {
+    riscvMode priv;     // privilege mode
+    Int32     id;       // interrupt id
+    Uns8      level;    // interrupt level
+    Bool      shv;      // whether selectively hardware vectored
+    Bool      _u1[6];   // (for alignment)
+} riscvCLICOutState;
+
+//
+// This holds CLIC state
+//
+typedef struct riscvCLICS {
+    riscvCLICOutState  sel;         // selected interrupt state
+    CLIC_REG_DECL     (cliccfg);    // cliccfg register value
+    CLIC_REG_DECL     (clicinfo);   // clicinfo register value
+    riscvPP            harts;       // member harts
+    riscvCLICIntStateP intState;    // state for each interrupt
+    Uns64             *ipe;         // mask of pending-and-enabled interrupts
+} riscvCLIC;
 
 //
 // This holds processor and vector information for an interrupt
@@ -139,12 +177,6 @@ typedef struct riscvNetPortS {
 #define NUM_BASE_REGS   4
 
 //
-// This defines the type of elements of the stride tables used to handle
-// striping
-//
-typedef Uns16 riscvStrideOffset;
-
-//
 // Processor model structure
 //
 typedef struct riscvS {
@@ -162,6 +194,7 @@ typedef struct riscvS {
     riscvArchitecture  currentArch;     // current enabled features
     riscvDMode         mode;            // current processor mode
     riscvDisableReason disable;         // reason why processor is disabled
+    Uns32              numHarts;        // numer of hart contexts in container
     Bool               verbose       :1;// whether verbose output enabled
     Bool               artifactAccess:1;// whether current access is an artifact
     Bool               externalActive:1;// whether external CSR access active
@@ -195,7 +228,9 @@ typedef struct riscvS {
     Uns32              swip;            // software interrupt pending bits
     Uns64              exceptionMask;   // mask of all implemented exceptions
     Uns64              interruptMask;   // mask of all implemented interrupts
+    riscvPendEnab      pendEnab;        // pending and enabled interrupt
     Uns32              extInt[RISCV_MODE_LAST]; // external interrupt override
+    riscvCLIC          clic;            // source interrupt indicated from CLIC
     riscvException     exception : 16;  // last activated exception
     riscvICMode        MIMode    :  2;  // custom M interrupt mode
     riscvICMode        SIMode    :  2;  // custom S interrupt mode
@@ -226,6 +261,9 @@ typedef struct riscvS {
     Uns32              ipDWords;        // size of ip in words
     Uns64             *ip;              // interrupt port values
     Uns32              DMPortHandle;    // DM port handle (debug mode)
+    Uns32              LRAddressHandle; // LR address port handle (locking)
+    Uns32              SCAddressHandle; // SC address port handle (locking)
+    Uns32              AMOActiveHandle; // active AMO operation
 
     // Timers
     vmiModelTimerP     stepTimer;       // Debug mode single-step timer
@@ -239,6 +277,7 @@ typedef struct riscvS {
     memDomainP         vmDomains  [RISCV_MODE_LAST][2]; // mapped domains
     memDomainP         pmpDomains [RISCV_MODE_LAST][2]; // pmp domains
     memDomainP         physDomains[RISCV_MODE_LAST][2]; // physical domains
+    memDomainP         CLICDomain;          // CLIC domain
     riscvPMPCFG        pmpcfg;              // pmpcfg registers
     Uns64              pmpaddr[NUM_PMPS];   // pmpaddr registers
     riscvTLBP          tlb;                 // TLB cache
@@ -247,7 +286,8 @@ typedef struct riscvS {
     Bool               PTWBadAddr :  1;     // page table walk address was bad
 
     // Messages
-    riscvIntState      intState;        // for exception debug
+    riscvBasicIntState intState;        // basic interrupt state
+    riscvCLICOutState  clicState;       // CLIC interrupt state
 
     // JIT code translation control
     riscvBlockStateP   blockState;      // active block state
@@ -263,9 +303,6 @@ typedef struct riscvS {
     Uns64              vTmp;                 	// vector operation temporary
     UnsPS              vBase[NUM_BASE_REGS];  	// indexed base registers
     Uns32             *v;                     	// vector registers (configurable size)
-    riscvStrideOffset *offsetsLMULx2;			// LMULx2 stride offsets
-    riscvStrideOffset *offsetsLMULx4; 			// LMULx4 stride offsets
-    riscvStrideOffset *offsetsLMULx8; 			// LMULx8 stride offsets
 
 } riscv;
 
@@ -317,23 +354,35 @@ inline static Bool basicICPresent(riscvP riscv) {
 }
 
 //
-// Should CLIC be used for M-mode interrupts??
+// Should CLIC be used for M-mode interrupts?
 //
 inline static Bool useCLICM(riscvP riscv) {
     return RD_CSR_FIELD(riscv, mtvec, MODE)==riscv_int_CLIC;
 }
 
 //
-// Should CLIC be used for S-mode interrupts??
+// Should CLIC be used for S-mode interrupts?
 //
 inline static Bool useCLICS(riscvP riscv) {
     return RD_CSR_FIELD(riscv, stvec, MODE)==riscv_int_CLIC;
 }
 
 //
-// Should CLIC be used for U-mode interrupts??
+// Should CLIC be used for U-mode interrupts?
 //
 inline static Bool useCLICU(riscvP riscv) {
     return RD_CSR_FIELD(riscv, utvec, MODE)==riscv_int_CLIC;
 }
+
+//
+// Return current vector signed vlmul
+//
+inline static Int32 getSVLMUL(riscvP riscv) {
+
+    Uns32 vlmul  = RD_CSR_FIELD(riscv, vtype, vlmul);
+    Bool  vlmulf = RD_CSR_FIELD(riscv, vtype, vlmulf);
+
+    return getSignedVLMUL(vlmul, vlmulf);
+}
+
 

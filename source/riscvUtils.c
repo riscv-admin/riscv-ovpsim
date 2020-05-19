@@ -596,6 +596,7 @@ const char *riscvGetFeatureName(riscvArchitecture feature) {
         [RISCV_FEATURE_INDEX(XLEN32_CHAR)] = "32-bit XLEN",
         [RISCV_FEATURE_INDEX(XLEN64_CHAR)] = "64-bit XLEN",
         [RISCV_FEATURE_INDEX('A')]         = "extension A (atomic instructions)",
+        [RISCV_FEATURE_INDEX('B')]         = "extension B (Tentatively reserved for Bit-Manipulation extension)",
         [RISCV_FEATURE_INDEX('C')]         = "extension C (compressed instructions)",
         [RISCV_FEATURE_INDEX('E')]         = "RV32E base ISA",
         [RISCV_FEATURE_INDEX('D')]         = "extension D (double-precision floating point)",
@@ -664,8 +665,10 @@ static VMI_MEM_WATCH_FN(abortEA) {
 static void updateExclusiveAccessCallback(riscvP riscv, Bool install) {
 
     memDomainP domain  = vmirtGetProcessorDataDomain((vmiProcessorP)riscv);
-    Uns64      simLow  = riscv->exclusiveTag;
-    Uns64      simHigh = simLow + ~riscv->exclusiveTagMask;
+    Uns32      bits    = vmirtGetDomainAddressBits(domain);
+    Uns64      mask    = (bits==64) ? -1 : ((1ULL<<bits)-1);
+    Uns64      simLow  = mask & riscv->exclusiveTag;
+    Uns64      simHigh = mask & (simLow + ~riscv->exclusiveTagMask);
 
     // install or remove a watchpoint on the current exclusive access address
     if(install) {
