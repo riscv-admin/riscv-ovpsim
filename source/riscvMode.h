@@ -24,9 +24,13 @@
 //
 typedef enum riscvModeS {
     RISCV_MODE_USER       = 0,
+    RISCV_MODE_U          = RISCV_MODE_USER,
     RISCV_MODE_SUPERVISOR = 1,
-    RISCV_MODE_HYPERVISOR = 2,  // not currently in use
+    RISCV_MODE_S          = RISCV_MODE_SUPERVISOR,
+    RISCV_MODE_HYPERVISOR = 2,                      // not currently in use
+    RISCV_MODE_H          = RISCV_MODE_HYPERVISOR,  // not currently in use
     RISCV_MODE_MACHINE    = 3,
+    RISCV_MODE_M          = RISCV_MODE_MACHINE,
     RISCV_MODE_LAST,
     RISCV_MODE_DEBUG      = 4   // pseudo-mode (uses M-mode privileges)
 } riscvMode;

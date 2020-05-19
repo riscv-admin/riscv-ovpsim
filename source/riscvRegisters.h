@@ -45,6 +45,7 @@
 #define RISCV_FPR(_I)           RISCV_CPU_REG(f[_I])
 #define RISCV_SF_TMP            RISCV_CPU_TEMP(SF)
 #define RISCV_LR                RISCV_CPU_REG(x[RV_REG_X_RA])
+#define RISCV_EA_ADDR           RISCV_CPU_REG(exclusiveAddr)
 #define RISCV_EA_TAG            RISCV_CPU_REG(exclusiveTag)
 #define RISCV_DM                RISCV_CPU_REG(DM)
 #define RISCV_DM_STALL          RISCV_CPU_REG(DMStall)

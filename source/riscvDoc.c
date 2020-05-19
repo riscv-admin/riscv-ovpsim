@@ -1074,6 +1074,65 @@ void riscvDoc(riscvP rootProcessor) {
         }
 
         ////////////////////////////////////////////////////////////////////////
+        // VECTOR EXTENSION VERSION 0.9
+        ////////////////////////////////////////////////////////////////////////
+
+        {
+            vmiDocNodeP Version = vmidocAddSection(
+                Vector, "Version 0.9"
+            );
+
+            vmidocAddText(
+                Version,
+                "Stable 0.9 official release (commit cb7d225), with these "
+                "significant changes compared to version 0.8:"
+            );
+            vmidocAddText(
+                Version,
+                "- mstatus.VS and sstatus.VS fields moved to bits 10:9;"
+            );
+            vmidocAddText(
+                Version,
+                "- new CSR vcsr added and fields VXSAT and VXRM relocated "
+                "there from CSR fcsr;"
+            );
+            vmidocAddText(
+                Version,
+                "- vfcvt.rtz.xu.f.v, vfcvt.rtz.x.f.v, vfwcvt.rtz.xu.f.v, "
+                "vfwcvt.rtz.x.f.v, vfncvt.rtz.xu.f.v and vfncvt.rtz.x.f.v "
+                "instructions added;"
+            );
+            vmidocAddText(
+                Version,
+                "- fractional LMUL support added, controlled by an extended "
+                "vtype.vlmul CSR field;"
+            );
+            vmidocAddText(
+                Version,
+                "- vector tail agnostic and vector mask agnostic fields "
+                "added to the vtype CSR;"
+            );
+            vmidocAddText(
+                Version,
+                "- all vector load/store instructions replaced with new "
+                "instructions that explicitly encode EEW of data or index;"
+            );
+            vmidocAddText(
+                Version,
+                "- whole register load and store operation encodings changed;"
+            );
+            vmidocAddText(
+                Version,
+                "- vzext.vf2, vsext.vf2, vzext.vf4, vsext.vf4, vzext.vf8 and "
+                "vsext.vf8 instructions added;"
+            );
+            vmidocAddText(
+                Version,
+                "- MLEN is always 1."
+            );
+        }
+
+        ////////////////////////////////////////////////////////////////////////
         // VECTOR EXTENSION VERSION master
         ////////////////////////////////////////////////////////////////////////
 
@@ -1085,51 +1144,174 @@ void riscvDoc(riscvP rootProcessor) {
             vmidocAddText(
                 Version,
                 "Unstable master version as of "RVVV_MASTER_DATE" (commit "
-                RVVV_MASTER_TAG"), with these changes compared to version 0.8:"
-            );
-            vmidocAddText(
-                Version,
-                "- mstatus.VS and sstatus.VS fields have moved to bits 10:9;"
-            );
-            vmidocAddText(
-                Version,
-                "- new CSR vcsr has been added and fields VXSAT and VXRM "
-                "relocated there from CSR fcsr;"
-            );
-            vmidocAddText(
-                Version,
-                "- segment loads and stores have been restricted to SEW "
-                "element size only."
+                RVVV_MASTER_TAG"). This is currently identical to version 0.9."
             );
         }
     }
 
     ////////////////////////////////////////////////////////////////////////////
-    // PORTS
+    // CLIC
     ////////////////////////////////////////////////////////////////////////////
 
     {
-        vmiDocNodeP Ports = vmidocAddSection(Root, "Interrupts");
+        vmiDocNodeP CLIC = vmidocAddSection(Root, "CLIC");
 
         vmidocAddText(
-            Ports,
+            CLIC,
+            "The model can be configured to implement a Core Local Interrupt "
+            "Controller (CLIC) using parameter \"CLICLEVELS\"; when non-zero, "
+            "the CLIC is present with the specified number of interrupt "
+            "levels (2-256), as described in the RISC-V Core-Local Interrupt "
+            "Controller specification (see references). When non-zero, "
+            "further parameters are made available to configure other aspects "
+            "of the CLIC. These are:"
+        );
+        vmidocAddText(
+            CLIC,
+            "\"CLICANDBASIC\": this Boolean parameter indicates whether both "
+            "CLIC and basic interrupt controller are present (if True) or "
+            "whether only the CLIC is present (if False)."
+        );
+        vmidocAddText(
+            CLIC,
+            "\"CLICCFGMBITS\": this Uns32 parameter indicates the number of "
+            "bits implemented in cliccfg.nmbits, and also indirectly defines "
+            "CLICPRIVMODES. For cores which implement only Machine mode, "
+            "or which implement Machine and User modes but not the N "
+            "extension, the parameter is absent (\"CLICCFGMBITS\" must be "
+            "zero in these cases)."
+        );
+        vmidocAddText(
+            CLIC,
+            "\"CLICCFGLBITS\": this Uns32 parameter indicates the number of "
+            "bits implemented in cliccfg.nlbits."
+        );
+        vmidocAddText(
+            CLIC,
+            "\"CLICSELHVEC\": this Boolean parameter indicates whether "
+            "Selective Hardware Vectoring is supported (if True) or "
+            "unsupported (if False)."
+        );
+        vmidocAddText(
+            CLIC,
+            "\"CLICMNXTI\": this Boolean parameter indicates whether mnxti "
+            "CSRs are implemented (if True) or unimplemented (if False)."
+        );
+        vmidocAddText(
+            CLIC,
+            "\"CLICMCSW\": this Boolean parameter indicates whether "
+            "xscratchcsw and xscratchcswl CSRs registers are implemented "
+            "(if True) or unimplemented (if False)."
+        );
+        vmidocAddText(
+            CLIC,
+            "\"mclicbase\": this parameter specifies the CLIC base address  "
+            "in physical memory."
+        );
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    // LR/SC LOCKING
+    ////////////////////////////////////////////////////////////////////////////
+
+    if(cfg->arch&ISA_A) {
+
+        vmiDocNodeP LRSC = vmidocAddSection(
+            Root, "Load-Reserved/Store-Conditional Locking"
+        );
+
+        vmidocAddText(
+            LRSC,
+            "By default, LR/SC locking is implemented automatically by the "
+            "model and simulator, with a reservation granule defined by the "
+            "\"lr_sc_grain\" parameter. It is also possible to implement "
+            "locking externally to the model in a platform component, using "
+            "the \"LR_address\", \"SC_address\" and \"SC_valid\" net ports, "
+            "as described below."
+        );
+        vmidocAddText(
+            LRSC,
+            "The \"LR_address\" output net port is written by the model with "
+            "the address used by a load-reserved instruction as it executes. "
+            "This port should be connected as an input to the external lock "
+            "management component, which should record the address, and also "
+            "that an LR/SC transaction is active."
+        );
+        vmidocAddText(
+            LRSC,
+            "The \"SC_address\" output net port is written by the model with "
+            "the address used by a store-conditional instruction as it "
+            "executes. This should be connected as an input to the external "
+            "lock management component, which should compare the address with "
+            "the previously-recorded load-reserved address, and determine "
+            "from this (and other implementation-specific constraints) whether "
+            "the store should succeed. It should then immediately write the "
+            "Boolean success/fail code to the \"SC_valid\" input net port of "
+            "the model. Finally, it should update state to indicate that "
+            "an LR/SC transaction is no longer active."
+        );
+        vmidocAddText(
+            LRSC,
+            "It is also possible to write zero to the \"SC_valid\" input net "
+            "port at any time outside the context of a store-conditional "
+            "instruction, which will mark any active LR/SC transaction as "
+            "invalid."
+        );
+        vmidocAddText(
+            LRSC,
+            "Irrespective of whether LR/SC locking is implemented internally "
+            "or externally, taking any exception or interrupt or executing "
+            "exception-return instructions (e.g. MRET) will always mark any "
+            "active LR/SC transaction as invalid."
+        );
+
+        vmiDocNodeP ACODE = vmidocAddSection(
+            Root, "Active Atomic Operation Indication"
+        );
+        vmidocAddText(
+            ACODE,
+            "The \"AMO_active\" output net port is written by the model with "
+            "a code indicating any current atomic memory operation while the "
+            "instruction is active. The written codes are:"
+        );
+        vmidocAddText(ACODE, "0: no atomic instruction active");
+        vmidocAddText(ACODE, "1: AMOMIN active");
+        vmidocAddText(ACODE, "2: AMOMAX active");
+        vmidocAddText(ACODE, "3: AMOMINU active");
+        vmidocAddText(ACODE, "4: AMOMAXU active");
+        vmidocAddText(ACODE, "5: AMOADD active");
+        vmidocAddText(ACODE, "6: AMOXOR active");
+        vmidocAddText(ACODE, "7: AMOOR active");
+        vmidocAddText(ACODE, "8: AMOAND active");
+        vmidocAddText(ACODE, "9: AMOSWAP active");
+        vmidocAddText(ACODE, "10: LR active");
+        vmidocAddText(ACODE, "11: SC active");
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    // INTERRUPTS
+    ////////////////////////////////////////////////////////////////////////////
+
+    {
+        vmiDocNodeP Interrupts = vmidocAddSection(Root, "Interrupts");
+
+        vmidocAddText(
+            Interrupts,
             "The \"reset\" port is an active-high reset input. The processor "
             "is halted when \"reset\" goes high and resumes execution from the "
             "reset address specified using the \"reset_address\" parameter "
             "when the signal goes low. The \"mcause\" register is cleared "
             "to zero."
         );
-
         vmidocAddText(
-            Ports,
+            Interrupts,
             "The \"nmi\" port is an active-high NMI input. The processor "
-            "is halted when \"nmi\" goes high and resumes execution from the "
-            "address specified using the \"nmi_address\" parameter when the "
-            "signal goes low. The \"mcause\" register is cleared to zero."
+            "resumes execution from the address specified using the "
+            "\"nmi_address\" parameter when the NMI signal goes high. The "
+            "\"mcause\" register is cleared to zero."
         );
-
         vmidocAddText(
-            Ports,
+            Interrupts,
             "All other interrupt ports are active high. For each implemented "
             "privileged execution level, there are by default input ports for "
             "software interrupt, timer interrupt and external interrupt; for "
@@ -1144,9 +1326,8 @@ void riscvDoc(riscvP rootProcessor) {
             "\"mie\" and \"mideleg\" CSRs (and Supervisor and User mode "
             "equivalents if implemented)."
         );
-
         vmidocAddText(
-            Ports,
+            Interrupts,
             "Parameter \"external_int_id\" can be used to enable extra "
             "interrupt ID input ports on each hart. If the parameter is True "
             "then when an external interrupt is applied the value on the "
@@ -1154,6 +1335,15 @@ void riscvDoc(riscvP rootProcessor) {
             "in the \"mcause\" CSR (or the equivalent CSR for other execution "
             "levels). For Machine mode, the extra interrupt ID port is called "
             "\"MExternalInterruptID\"."
+        );
+        vmidocAddText(
+            Interrupts,
+            "The \"deferint\" port is an active-high artifact input that, "
+            "when written to 1, prevents any pending-and-enabled interrupt "
+            "being taken (normally, such an interrupt would be taken on the "
+            "next instruction after it becomes pending-and-enabled). The "
+            "purpose of this signal is to enable alignment with hardware "
+            "models in step-and-compare usage."
         );
     }
 
@@ -1175,22 +1365,37 @@ void riscvDoc(riscvP rootProcessor) {
             "Debug Module using a custom harness. Features added are described "
             "below."
         );
-
         vmidocAddText(
             debugMode,
-            "Parameter \"debug_mode\" can be used to specify two different "
-            "behaviors. If set to value \"interrupt\", then operations that "
-            "would cause entry to Debug mode result in the processor "
-            "simulation call (e.g. opProcessorSimulate) returning, with a "
-            "stop reason of OP_SR_INTERRUPT. In this usage scenario, the "
-            "Debug Module is implemented in the simulation harness. If "
-            "parameter \"debug_mode\" is set to value \"halt\", then "
-            "operations that would cause entry to Debug mode result in the "
-            "processor halting. Depending on the simulation environment, "
-            "this might cause a return from the simulation call with a stop "
-            "reason of OP_SR_HALT, or debug mode might be implemented by "
-            "another platform component which then restarts the debugged "
-            "processor again."
+            "Parameter \"debug_mode\" can be used to specify three different "
+            "behaviors, as follows:"
+        );
+        vmidocAddText(
+            debugMode,
+            "1. If set to value \"vector\", then operations that would cause "
+            "entry to Debug mode result in the processor jumping to the "
+            "address specified by the \"debug_address\" parameter. It will "
+            "execute at this address, in Debug mode, until a \"dret\" "
+            "instruction causes return to non-Debug mode. Any exception "
+            "generated during this execution will cause a jump to the address "
+            "specified by the \"dexc_address\" parameter."
+        );
+        vmidocAddText(
+            debugMode,
+            "2. If set to value \"interrupt\", then operations that would "
+            "cause entry to Debug mode result in the processor simulation call "
+            "(e.g. opProcessorSimulate) returning, with a stop reason of "
+            "OP_SR_INTERRUPT. In this usage scenario, the Debug Module is "
+            "implemented in the simulation harness."
+        );
+        vmidocAddText(
+            debugMode,
+            "3. If set to value \"halt\", then operations that would cause "
+            "entry to Debug mode result in the processor halting. Depending on "
+            "the simulation environment, this might cause a return from the "
+            "simulation call with a stop reason of OP_SR_HALT, or debug mode "
+            "might be implemented by another platform component which then "
+            "restarts the debugged processor again."
         );
 
         ////////////////////////////////////////////////////////////////////////
@@ -1242,11 +1447,8 @@ void riscvDoc(riscvP rootProcessor) {
             vmidocAddText(
                 StateEntry,
                 "In all cases, the processor will save required state in "
-                "\"dpc\" and \"dcsr\" and then either return control "
-                "immediately to the harness, with stopReason of "
-                "OP_SR_INTERRUPT, or perform a halt, depending on the value "
-                "of the \"debug_mode\" parameter. The Debug Module can then "
-                "manipulate the processor in Debug state as described below."
+                "\"dpc\" and \"dcsr\" and then perform actions described "
+                "above, depending in the value of the \"debug_mode\" parameter."
             );
         }
 
@@ -1293,12 +1495,13 @@ void riscvDoc(riscvP rootProcessor) {
                 Registers,
                 "When Debug mode is enabled, registers \"dcsr\", \"dpc\", "
                 "\"dscratch0\" and \"dscratch1\" are implemented as described "
-                "in the specification. These may be manipulated by the "
-                "Debug Module using opProcessorRegRead or opProcessorRegWrite; "
-                "for example, the Debug Module could write \"dcsr\" to enable "
-                "\"ebreak\" instruction behavior as described above, or read "
-                "and write \"dpc\" to emulate stepping over an \"ebreak\" "
-                "instruction prior to resumption from Debug mode."
+                "in the specification. These may be manipulated externally by "
+                "a Debug Module using opProcessorRegRead or "
+                "opProcessorRegWrite; for example, the Debug Module could "
+                "write \"dcsr\" to enable \"ebreak\" instruction behavior as "
+                "described above, or read and write \"dpc\" to emulate "
+                "stepping over an \"ebreak\" instruction prior to resumption "
+                "from Debug mode."
             );
         }
 
@@ -1347,10 +1550,10 @@ void riscvDoc(riscvP rootProcessor) {
             );
             vmidocAddText(
                 DebugExecution,
-                "In both cases, the processor will either return control "
-                "immediately to the harness, with stopReason of "
-                "OP_SR_INTERRUPT, or perform a halt, depending on the value "
-                "of the \"debug_mode\" parameter."
+                "In both cases, the processor will either jump to the "
+                "debug exception address, or return control immediately to the "
+                "harness, with stopReason of OP_SR_INTERRUPT, or perform a "
+                "halt, depending on the value of the \"debug_mode\" parameter."
             );
         }
 
@@ -1365,11 +1568,9 @@ void riscvDoc(riscvP rootProcessor) {
 
             vmidocAddText(
                 DebugExecution,
-                "When in Debug mode, the harness can cause a single "
-                "instruction to be executed on return from that mode by using "
-                "opProcessorRegWrite to set dcsr.step, writing False to "
-                "register \"DM\" and then simulation of at least one cycle "
-                "(e.g. using opProcessorSimulate). After one instruction "
+                "When in Debug mode, the processor or harness can cause a "
+                "single instruction to be executed on return from that mode by "
+                "setting dcsr.step. After one non-Debug-mode instruction "
                 "has been executed, control will be returned to the harness. "
                 "The processor will remain in single-step mode until dcsr.step "
                 "is cleared."
@@ -1481,7 +1682,8 @@ void riscvDoc(riscvP rootProcessor) {
                 leafSection,
                 "Artifact register \"LRSCAddress\" shows the active LR/SC "
                 "lock address. The register holds all-ones if there is no "
-                "LR/SC operation active."
+                "LR/SC operation active or if LR/SC locking is implemented "
+                "externally as described above."
             );
         }
     }
@@ -1640,6 +1842,12 @@ void riscvDoc(riscvP rootProcessor) {
             );
             vmidocAddText(References, string);
         }
+
+        vmidocAddText(
+            References,
+            "RISC-V Core-Local Interrupt Controller (CLIC) Version "
+            "0.9-draft-20191208"
+        );
 
         vmidocAddText(
             References,

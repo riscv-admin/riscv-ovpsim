@@ -42,12 +42,15 @@ typedef struct riscvParamValuesS {
     VMI_BOOL_PARAM(verbose);
     VMI_UNS32_PARAM(numHarts);
     VMI_BOOL_PARAM(debug_mode);
+    VMI_UNS64_PARAM(debug_address);
+    VMI_UNS64_PARAM(dexc_address);
     VMI_BOOL_PARAM(updatePTEA);
     VMI_BOOL_PARAM(updatePTED);
     VMI_BOOL_PARAM(unaligned);
     VMI_BOOL_PARAM(unalignedAMO);
     VMI_BOOL_PARAM(wfi_is_nop);
     VMI_BOOL_PARAM(mtvec_is_ro);
+    VMI_UNS32_PARAM(counteren_mask);
     VMI_UNS32_PARAM(tvec_align);
     VMI_UNS64_PARAM(mtvec_mask);
     VMI_UNS64_PARAM(stvec_mask);
@@ -55,6 +58,9 @@ typedef struct riscvParamValuesS {
     VMI_UNS64_PARAM(mtvt_mask);
     VMI_UNS64_PARAM(stvt_mask);
     VMI_UNS64_PARAM(utvt_mask);
+    VMI_UNS64_PARAM(ecode_mask);
+    VMI_UNS64_PARAM(ecode_nmi);
+    VMI_BOOL_PARAM(tval_zero);
     VMI_BOOL_PARAM(tval_ii_code);
     VMI_BOOL_PARAM(time_undefined);
     VMI_BOOL_PARAM(cycle_undefined);
@@ -102,8 +108,10 @@ typedef struct riscvParamValuesS {
     VMI_BOOL_PARAM(Zvqmac);
 
     // CLIC configuration
+    VMI_UNS64_PARAM(mclicbase);
     VMI_UNS32_PARAM(CLICLEVELS);
     VMI_BOOL_PARAM(CLICANDBASIC);
+    VMI_UNS32_PARAM(CLICVERSION);
     VMI_UNS32_PARAM(CLICINTCTLBITS);
     VMI_UNS32_PARAM(CLICCFGMBITS);
     VMI_UNS32_PARAM(CLICCFGLBITS);
