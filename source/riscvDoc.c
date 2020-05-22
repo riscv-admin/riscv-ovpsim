@@ -1098,9 +1098,11 @@ void riscvDoc(riscvP rootProcessor) {
             );
             vmidocAddText(
                 Version,
-                "- vfcvt.rtz.xu.f.v, vfcvt.rtz.x.f.v, vfwcvt.rtz.xu.f.v, "
-                "vfwcvt.rtz.x.f.v, vfncvt.rtz.xu.f.v and vfncvt.rtz.x.f.v "
-                "instructions added;"
+                "- vfslide1up.vf, vfslide1down.vf, vfcvt.rtz.xu.f.v, "
+                "vfcvt.rtz.x.f.v, vfwcvt.rtz.xu.f.v, vfwcvt.rtz.x.f.v, "
+                "vfncvt.rtz.xu.f.v, vfncvt.rtz.x.f.v, vzext.vf2, vsext.vf2, "
+                "vzext.vf4, vsext.vf4, vzext.vf8 and vsext.vf8 instructions "
+                "added;"
             );
             vmidocAddText(
                 Version,
@@ -1123,12 +1125,16 @@ void riscvDoc(riscvP rootProcessor) {
             );
             vmidocAddText(
                 Version,
-                "- vzext.vf2, vsext.vf2, vzext.vf4, vsext.vf4, vzext.vf8 and "
-                "vsext.vf8 instructions added;"
+                "- VFUNARY0 and VFUNARY1 encodings changed;"
             );
             vmidocAddText(
                 Version,
-                "- MLEN is always 1."
+                "- MLEN is always 1;"
+            );
+            vmidocAddText(
+                Version,
+                "- for implementations with SLEN != VLEN, striping is applied "
+                "horizontally rather than the previous vertical striping."
             );
         }
 
