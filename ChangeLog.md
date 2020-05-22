@@ -11,6 +11,18 @@ NOTE: X-commit messages below refer to git commits in the following
   I-commit: https://github.com/riscv/riscv-isa-manual
   V-commit: https://github.com/riscv/riscv-v-spec
 
+- Memory accesses that straddle PMP region boundaries are now disallowed.
+- EBREAK now sets tval to 0 if priv_version is set to master.
+- Some Vector Extension issues have been corrected:
+  - Encodings of VFUNARY0/VFUNARY1 instructions have been corrected for Vector
+    Extension version 0.9.
+  - Alignment of vector register groups when explicit EEW is being used has been
+    corrected for Vector Extension version 0.9.
+
+Date 2020-May-19
+Release 20200518.0
+===
+
 - EBREAK and ECALL no longer count as retired instructions if priv_version
   is set to master.
 - SC instruction behavior has been changed so that store address alignment is

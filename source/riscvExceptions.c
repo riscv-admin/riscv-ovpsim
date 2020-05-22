@@ -406,7 +406,7 @@ static Bool retiredCode(riscvP riscv, riscvException exception) {
         case riscv_E_EnvironmentCallFromSMode:
         case riscv_E_EnvironmentCallFromHMode:
         case riscv_E_EnvironmentCallFromMMode:
-            return (RISCV_PRIV_VERSION(riscv) < RVPV_1_12);
+            return (RISCV_PRIV_VERSION(riscv)<RVPV_1_12);
 
         default:
             return False;
@@ -1102,8 +1102,11 @@ void riscvEBREAK(riscvP riscv) {
 
     } else {
 
+        // from privileged version 1.12, EBREAK no longer sets mtval to the PC
+        Uns64 tval = (RISCV_PRIV_VERSION(riscv)<RVPV_1_12) ? getPC(riscv) : 0;
+
         // handle EBREAK as normal exception
-        riscvTakeException(riscv, riscv_E_Breakpoint, getPC(riscv));
+        riscvTakeException(riscv, riscv_E_Breakpoint, tval);
     }
 }
 

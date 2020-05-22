@@ -336,10 +336,10 @@ static void illegalOperandMessageDesc(
     Uns32        operand
 ) {
     vmiMessage("W", desc->id,
-        SRCREF_FMT "%s (operand %u)",
+        SRCREF_FMT "Operand %u %s",
         SRCREF_ARGS(riscv, getPC(riscv)),
-        desc->detail,
-        operand
+        operand,
+        desc->detail
     );
 }
 
@@ -4851,7 +4851,7 @@ static Bool validateNoOverlap(riscvMorphStateP state, iterDescP id) {
 
         // error if illegal overlap found
         if(!ok) {
-             ILLEGAL_OPERAND_MESSAGE(riscv, "IOVP", "Illegal overlap of Vd", srcNum);
+             ILLEGAL_OPERAND_MESSAGE(riscv, "IOVP", "illegal overlap of Vd", srcNum);
         }
     }
 
@@ -4902,16 +4902,16 @@ static Bool validateVArgWidths(riscvMorphStateP state, iterDescP id) {
 
             if(EEW>riscv->configInfo.ELEN) {
 
-                ILLEGAL_OPERAND_MESSAGE(riscv, "IEEW", "Illegal EEW>ELEN", i);
+                ILLEGAL_OPERAND_MESSAGE(riscv, "IEEW", "EEW>ELEN", i);
 
                 ok = False;
 
             } else if((EEW<riscv->configInfo.SEW_min) && (type!=VRT_MASK)) {
 
                 if(riscv->configInfo.SEW_min==8) {
-                    ILLEGAL_OPERAND_MESSAGE(riscv, "IEEW", "Illegal EEW<8", i);
+                    ILLEGAL_OPERAND_MESSAGE(riscv, "IEEW", "EEW<8", i);
                 } else {
-                    ILLEGAL_OPERAND_MESSAGE(riscv, "IEEW", "Illegal EEW<SEW_min", i);
+                    ILLEGAL_OPERAND_MESSAGE(riscv, "IEEW", "EEW<SEW_min", i);
                 }
 
                 ok = False;
@@ -4919,14 +4919,14 @@ static Bool validateVArgWidths(riscvMorphStateP state, iterDescP id) {
             } else if(!EMULx8) {
 
                 // LCOV_EXCL_START
-                ILLEGAL_OPERAND_MESSAGE(riscv, "IEMUL", "Illegal EMUL<1/8", i);
+                ILLEGAL_OPERAND_MESSAGE(riscv, "IEMUL", "EMUL<1/8", i);
 
                 ok = False;
                 // LCOV_EXCL_STOP
 
             } else if(EMULx8>VLMULx8MT_8) {
 
-                ILLEGAL_OPERAND_MESSAGE(riscv, "IEMUL", "Illegal EMUL>8", i);
+                ILLEGAL_OPERAND_MESSAGE(riscv, "IEMUL", "EMUL>8", i);
 
                 ok = False;
 
@@ -5090,9 +5090,18 @@ static vmiReg getVMIRegV(
     Uns32          index  = getRIndex(r);
 
     // validate register index is a multiple of the current EMUL, ignoring
-    // the case when EMULx8 is zero for which a better message is emitted later
-    if(EMULx8 && ((index*8) & (EMULx8-1))) {
-        ILLEGAL_OPERAND_MESSAGE(riscv, "IVI", "Illegal vector register index", i);
+    // the case when EMULx8 is zero or greater than 8 (for which a better
+    // message is emitted later)
+    if(!EMULx8) {
+        // no action
+    } else if(!((index*8) & (EMULx8-1))) {
+        // no action
+    } else if(EMULx8==VLMULx8MT_2) {
+        ILLEGAL_OPERAND_MESSAGE(riscv, "IVI", "register index must be multiple of 2", i);
+    } else if(EMULx8==VLMULx8MT_4) {
+        ILLEGAL_OPERAND_MESSAGE(riscv, "IVI", "register index must be multiple of 4", i);
+    } else if(EMULx8==VLMULx8MT_8) {
+        ILLEGAL_OPERAND_MESSAGE(riscv, "IVI", "register index must be multiple of 8", i);
     }
 
     return getVMIReg(riscv, r);
@@ -5197,41 +5206,37 @@ static void getVectorOpRegisters(riscvMorphStateP state, iterDescP id) {
             vr->type = VRT_MASK;
         }
 
-        // seed operand EEW and EMUL
+        // seed operand EEW and EMULx8
         vr->EEW    = (vr->type==VRT_MASK)   ? id->MLEN    : id->SEW;
         vr->EMULx8 = (vr->type==VRT_VECTOR) ? id->VLMULx8 : VLMULx8MT_1;
 
-        // divide operand size and multiplier if required
-        if(isDividedN(vShape, i)) {
-            vr->EEW    /= state->info.eewDiv;
-            vr->EMULx8 /= state->info.eewDiv;
-        }
-
-        // determine effective operand SEW and multiplier
+        // refine operand SEW and EMULx8
         if((vr->type==VRT_SCALAR) || (vr->type==VRT_VECTOR)) {
 
-            Uns32 mulN = getWidthMultiplierN(vShape, i);
+            riscvVLMULx8Mt mulNx8 = getWidthMultiplierN(vShape, i)*VLMULx8MT_1;
+            riscvSEWMt     eew    = state->info.eew;
 
-            if(state->info.eew && ((i==2) || (state->info.memBits!=-1))) {
-
-                // take into account EEW encoded in the instruction
-                VMI_ASSERT(mulN==1, "unexpected widened operand");
-                vr->EEW      = state->info.eew;
+            // take into account EEW encoded in the instruction
+            if(eew && ((i==2) || (state->info.memBits!=-1))) {
                 vr->forceEEW = True;
-
-            } else {
-
-                // take into account EEW widening
-                vr->EEW *= mulN;
-
-                // take into account EMUL widening
-                if(vr->type==VRT_VECTOR) {
-                    vr->EMULx8 *= mulN;
-                }
+                mulNx8 = (mulNx8*eew)/vr->EEW;
             }
+
+            // take into account EEW divisor encoded in the instruction
+            if(isDividedN(vShape, i)) {
+                mulNx8 /= state->info.eewDiv;
+            }
+
+            // adjust EMULx8
+            if(vr->type==VRT_VECTOR) {
+                vr->EMULx8 = (vr->EMULx8*mulNx8)/VLMULx8MT_1;
+            }
+
+            // adjust EEW
+            vr->EEW = (vr->EEW*mulNx8)/VLMULx8MT_1;
         }
 
-        // determine effective operand multiplier (1 if fractional)
+        // determine EMUL (1 if fractional)
         vr->EMUL = (vr->EMULx8/VLMULx8MT_1) ? : 1;
 
         // get VMI register for the operand
