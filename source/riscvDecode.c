@@ -1276,22 +1276,6 @@ const static decodeEntry32 decodeCommon32[] = {
     DECODE32_ENTRY(        VFLT_VV, "|011011|.|.....|.....|001|.....|1010111|"),
     DECODE32_ENTRY(        VFNE_VV, "|011100|.|.....|.....|001|.....|1010111|"),
     DECODE32_ENTRY(       VFDIV_VV, "|100000|.|.....|.....|001|.....|1010111|"),
-    DECODE32_ENTRY(    VFCVT_XUF_V, "|100010|.|.....|00000|001|.....|1010111|"),
-    DECODE32_ENTRY(     VFCVT_XF_V, "|100010|.|.....|00001|001|.....|1010111|"),
-    DECODE32_ENTRY(    VFCVT_FXU_V, "|100010|.|.....|00010|001|.....|1010111|"),
-    DECODE32_ENTRY(     VFCVT_FX_V, "|100010|.|.....|00011|001|.....|1010111|"),
-    DECODE32_ENTRY(   VFWCVT_XUF_V, "|100010|.|.....|01000|001|.....|1010111|"),
-    DECODE32_ENTRY(    VFWCVT_XF_V, "|100010|.|.....|01001|001|.....|1010111|"),
-    DECODE32_ENTRY(   VFWCVT_FXU_V, "|100010|.|.....|01010|001|.....|1010111|"),
-    DECODE32_ENTRY(    VFWCVT_FX_V, "|100010|.|.....|01011|001|.....|1010111|"),
-    DECODE32_ENTRY(    VFWCVT_FF_V, "|100010|.|.....|01100|001|.....|1010111|"),
-    DECODE32_ENTRY(   VFNCVT_XUF_V, "|100010|.|.....|10000|001|.....|1010111|"),
-    DECODE32_ENTRY(    VFNCVT_XF_V, "|100010|.|.....|10001|001|.....|1010111|"),
-    DECODE32_ENTRY(   VFNCVT_FXU_V, "|100010|.|.....|10010|001|.....|1010111|"),
-    DECODE32_ENTRY(    VFNCVT_FX_V, "|100010|.|.....|10011|001|.....|1010111|"),
-    DECODE32_ENTRY(    VFNCVT_FF_V, "|100010|.|.....|10100|001|.....|1010111|"),
-    DECODE32_ENTRY(       VFSQRT_V, "|100011|.|.....|00000|001|.....|1010111|"),
-    DECODE32_ENTRY(      VFCLASS_V, "|100011|.|.....|10000|001|.....|1010111|"),
     DECODE32_ENTRY(       VFMUL_VV, "|100100|.|.....|.....|001|.....|1010111|"),
     DECODE32_ENTRY(      VFMADD_VV, "|101000|.|.....|.....|001|.....|1010111|"),
     DECODE32_ENTRY(     VFNMADD_VV, "|101001|.|.....|.....|001|.....|1010111|"),
@@ -1799,6 +1783,25 @@ const static decodeEntry32 decodePre09[] = {
     DECODE32_ENTRY(     VAMOSWAP_R, "|00001..|.....|.....|11.|.....|0101111|"),
     DECODE32_ENTRY(      VAMOXOR_R, "|00100..|.....|.....|11.|.....|0101111|"),
 
+    // V-extension FVV-type instructions
+    //                               |funct6|m|  vs2|  vs1|FVV|  vs3| opcode|
+    DECODE32_ENTRY(    VFCVT_XUF_V, "|100010|.|.....|00000|001|.....|1010111|"),
+    DECODE32_ENTRY(     VFCVT_XF_V, "|100010|.|.....|00001|001|.....|1010111|"),
+    DECODE32_ENTRY(    VFCVT_FXU_V, "|100010|.|.....|00010|001|.....|1010111|"),
+    DECODE32_ENTRY(     VFCVT_FX_V, "|100010|.|.....|00011|001|.....|1010111|"),
+    DECODE32_ENTRY(   VFWCVT_XUF_V, "|100010|.|.....|01000|001|.....|1010111|"),
+    DECODE32_ENTRY(    VFWCVT_XF_V, "|100010|.|.....|01001|001|.....|1010111|"),
+    DECODE32_ENTRY(   VFWCVT_FXU_V, "|100010|.|.....|01010|001|.....|1010111|"),
+    DECODE32_ENTRY(    VFWCVT_FX_V, "|100010|.|.....|01011|001|.....|1010111|"),
+    DECODE32_ENTRY(    VFWCVT_FF_V, "|100010|.|.....|01100|001|.....|1010111|"),
+    DECODE32_ENTRY(   VFNCVT_XUF_V, "|100010|.|.....|10000|001|.....|1010111|"),
+    DECODE32_ENTRY(    VFNCVT_XF_V, "|100010|.|.....|10001|001|.....|1010111|"),
+    DECODE32_ENTRY(   VFNCVT_FXU_V, "|100010|.|.....|10010|001|.....|1010111|"),
+    DECODE32_ENTRY(    VFNCVT_FX_V, "|100010|.|.....|10011|001|.....|1010111|"),
+    DECODE32_ENTRY(    VFNCVT_FF_V, "|100010|.|.....|10100|001|.....|1010111|"),
+    DECODE32_ENTRY(       VFSQRT_V, "|100011|.|.....|00000|001|.....|1010111|"),
+    DECODE32_ENTRY(      VFCLASS_V, "|100011|.|.....|10000|001|.....|1010111|"),
+
     // table termination entry
     {0}
 };
@@ -1903,12 +1906,29 @@ const static decodeEntry32 decodeInitial09[] = {
 
     // V-extension FVV-type instructions
     //                               |funct6|m|  vs2|  vs1|FVV|  vs3| opcode|
-    DECODE32_ENTRY( VFCVTRTZ_XUF_V, "|100010|.|.....|00110|001|.....|1010111|"),
-    DECODE32_ENTRY(  VFCVTRTZ_XF_V, "|100010|.|.....|00111|001|.....|1010111|"),
-    DECODE32_ENTRY(VFWCVTRTZ_XUF_V, "|100010|.|.....|01110|001|.....|1010111|"),
-    DECODE32_ENTRY( VFWCVTRTZ_XF_V, "|100010|.|.....|01111|001|.....|1010111|"),
-    DECODE32_ENTRY(VFNCVTRTZ_XUF_V, "|100010|.|.....|10110|001|.....|1010111|"),
-    DECODE32_ENTRY( VFNCVTRTZ_XF_V, "|100010|.|.....|10111|001|.....|1010111|"),
+    DECODE32_ENTRY(    VFCVT_XUF_V, "|010010|.|.....|00000|001|.....|1010111|"),
+    DECODE32_ENTRY(     VFCVT_XF_V, "|010010|.|.....|00001|001|.....|1010111|"),
+    DECODE32_ENTRY(    VFCVT_FXU_V, "|010010|.|.....|00010|001|.....|1010111|"),
+    DECODE32_ENTRY(     VFCVT_FX_V, "|010010|.|.....|00011|001|.....|1010111|"),
+    DECODE32_ENTRY( VFCVTRTZ_XUF_V, "|010010|.|.....|00110|001|.....|1010111|"),
+    DECODE32_ENTRY(  VFCVTRTZ_XF_V, "|010010|.|.....|00111|001|.....|1010111|"),
+    DECODE32_ENTRY(   VFWCVT_XUF_V, "|010010|.|.....|01000|001|.....|1010111|"),
+    DECODE32_ENTRY(    VFWCVT_XF_V, "|010010|.|.....|01001|001|.....|1010111|"),
+    DECODE32_ENTRY(   VFWCVT_FXU_V, "|010010|.|.....|01010|001|.....|1010111|"),
+    DECODE32_ENTRY(    VFWCVT_FX_V, "|010010|.|.....|01011|001|.....|1010111|"),
+    DECODE32_ENTRY(    VFWCVT_FF_V, "|010010|.|.....|01100|001|.....|1010111|"),
+    DECODE32_ENTRY(VFWCVTRTZ_XUF_V, "|010010|.|.....|01110|001|.....|1010111|"),
+    DECODE32_ENTRY( VFWCVTRTZ_XF_V, "|010010|.|.....|01111|001|.....|1010111|"),
+    DECODE32_ENTRY(   VFNCVT_XUF_V, "|010010|.|.....|10000|001|.....|1010111|"),
+    DECODE32_ENTRY(    VFNCVT_XF_V, "|010010|.|.....|10001|001|.....|1010111|"),
+    DECODE32_ENTRY(   VFNCVT_FXU_V, "|010010|.|.....|10010|001|.....|1010111|"),
+    DECODE32_ENTRY(    VFNCVT_FX_V, "|010010|.|.....|10011|001|.....|1010111|"),
+    DECODE32_ENTRY(    VFNCVT_FF_V, "|010010|.|.....|10100|001|.....|1010111|"),
+    DECODE32_ENTRY( VFNCVTROD_FF_V, "|010010|.|.....|10101|001|.....|1010111|"),
+    DECODE32_ENTRY(VFNCVTRTZ_XUF_V, "|010010|.|.....|10110|001|.....|1010111|"),
+    DECODE32_ENTRY( VFNCVTRTZ_XF_V, "|010010|.|.....|10111|001|.....|1010111|"),
+    DECODE32_ENTRY(       VFSQRT_V, "|010011|.|.....|00000|001|.....|1010111|"),
+    DECODE32_ENTRY(      VFCLASS_V, "|010011|.|.....|10000|001|.....|1010111|"),
 
     // V-extension FVF-type instructions
     //                               |funct6|m|  vs2|  fs1|FVF|  vs3| opcode|
@@ -2536,7 +2556,7 @@ static vmidDecodeTableP createDecodeTable32(riscvVectVer vect_version) {
     }
 
     // insert vector-extension-dependent table entries after 0.7.1+
-    if(vect_version>RVVV_0_7_1_P) {
+    if((vect_version>RVVV_0_7_1_P) && (vect_version<=RVVV_0_8)) {
         insertEntries32(table, &decodeVectorV071P[0]);
     }
 
