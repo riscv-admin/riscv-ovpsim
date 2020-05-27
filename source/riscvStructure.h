@@ -161,6 +161,12 @@ typedef struct riscvNetPortS {
 } riscvNetPort;
 
 //
+// Set of domains of a particular type
+//
+typedef memDomainP riscvDomainSet [RISCV_MODE_LAST][2];
+typedef riscvDomainSet *riscvDomainSetP;
+
+//
 // Maximum supported value of VLEN and number of vector registers (vector
 // extension)
 //
@@ -274,9 +280,10 @@ typedef struct riscvS {
     riscvBusPortP      csrPort;         // externally-implemented CSR port
 
     // Memory management support
-    memDomainP         vmDomains  [RISCV_MODE_LAST][2]; // mapped domains
-    memDomainP         pmpDomains [RISCV_MODE_LAST][2]; // pmp domains
-    memDomainP         physDomains[RISCV_MODE_LAST][2]; // physical domains
+    riscvDomainSet     pmaDomains;          // pma domains
+    riscvDomainSet     pmpDomains;          // pmp domains
+    riscvDomainSet     physDomains;         // physical domains
+    riscvDomainSet     vmDomains;           // mapped domains
     memDomainP         CLICDomain;          // CLIC domain
     riscvPMPCFG        pmpcfg;              // pmpcfg registers
     Uns64              pmpaddr[NUM_PMPS];   // pmpaddr registers

@@ -11,6 +11,13 @@ NOTE: X-commit messages below refer to git commits in the following
   I-commit: https://github.com/riscv/riscv-isa-manual
   V-commit: https://github.com/riscv/riscv-v-spec
 
+- Memory accesses that straddle PMP region boundaries are now disallowed for
+  M-mode, even if those regions imply full M-mode access.
+
+Date 2020-May-22
+Release 20200521.0
+===
+
 - Memory accesses that straddle PMP region boundaries are now disallowed.
 - EBREAK now sets tval to 0 if priv_version is set to master.
 - Some Vector Extension issues have been corrected:

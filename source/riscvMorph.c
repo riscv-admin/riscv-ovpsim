@@ -5969,7 +5969,7 @@ static riscvVLClassMt fillVectorOperationData(
     if(state->info.isWhole) {
         id->VLMULx8 = VLMULx8MT_1;
         id->VLEN    = riscv->configInfo.VLEN * (state->info.nf+1);
-        id->SEW     = SEWMT_8;
+        id->SEW     = riscv->configInfo.SEW_min;
         id->SLEN    = vectorFractLMUL(riscv) ? riscv->configInfo.SLEN : id->VLEN;
         id->nf      = 0;
         vlClass     = VLCLASSMT_MAX;

@@ -1608,9 +1608,9 @@ static memDomainP createDomain(
 }
 
 //
-// Create new PMP domain for the given mode
+// Create new PMA domain for the given mode
 //
-static Bool createPMPDomain(
+static Bool createPMADomain(
     riscvP     riscv,
     riscvMode  mode,
     Bool       isCode,
@@ -1618,10 +1618,35 @@ static Bool createPMPDomain(
     memDomainP otherDomain
 ) {
     Bool  unified = (extDomain==otherDomain);
-    Uns32 pmpBits = 64;
-    Uns32 numRegs = riscv->configInfo.PMP_registers;
-    Uns64 pmpMask = getAddressMask(pmpBits);
+    Uns32 pmaBits = 64;
     Uns64 extMask = getAddressMask(riscv->extBits);
+
+    // create domain of width pmaBits
+    memDomainP pmaDomain = createDomain(
+        mode, "PMA", pmaBits, isCode, unified
+    );
+
+    // create mapping to external domain
+    vmirtAliasMemory(extDomain, pmaDomain, 0, extMask, 0, 0);
+
+    // save domain
+    riscv->pmaDomains[mode][isCode] = pmaDomain;
+
+    return unified;
+}
+
+//
+// Create new PMP domain for the given mode
+//
+static Bool createPMPDomain(riscvP riscv, riscvMode mode, Bool isCode) {
+
+    memDomainP pmaDomain   = riscv->pmaDomains[mode][isCode];
+    memDomainP otherDomain = riscv->pmaDomains[mode][!isCode];
+    Bool       unified     = (pmaDomain==otherDomain);
+    Uns32      pmpBits     = 64;
+    Uns32      numRegs     = riscv->configInfo.PMP_registers;
+    Uns64      pmpMask     = getAddressMask(pmpBits);
+    Uns64      extMask     = getAddressMask(riscv->extBits);
 
     // create domain of width pmpBits
     memDomainP pmpDomain = createDomain(
@@ -1629,7 +1654,7 @@ static Bool createPMPDomain(
     );
 
     // create mapping to external domain
-    vmirtAliasMemory(extDomain, pmpDomain, 0, extMask, 0, 0);
+    vmirtAliasMemory(pmaDomain, pmpDomain, 0, extMask, 0, 0);
 
     // protect PMP domain if PMP registers are implemented
     if(numRegs) {
@@ -1750,11 +1775,18 @@ VMI_VMINIT_FN(riscvVMInit) {
 
     for(mode=RISCV_MODE_S; mode<RISCV_MODE_LAST; mode++) {
 
+        // create PMA data and code domains for this mode
+        if(createPMADomain(riscv, mode, False, dataDomain, codeDomain)) {
+            riscv->pmaDomains[mode][1] = riscv->pmaDomains[mode][0];
+        } else {
+            createPMADomain(riscv, mode, True, codeDomain, dataDomain);
+        }
+
         // create PMP data and code domains for this mode
-        if(createPMPDomain(riscv, mode, False, dataDomain, codeDomain)) {
+        if(createPMPDomain(riscv, mode, False)) {
             riscv->pmpDomains[mode][1] = riscv->pmpDomains[mode][0];
         } else {
-            createPMPDomain(riscv, mode, True, codeDomain, dataDomain);
+            createPMPDomain(riscv, mode, True);
         }
 
         // create physical data and code domains for this mode
@@ -1765,7 +1797,9 @@ VMI_VMINIT_FN(riscvVMInit) {
         }
     }
 
-    // use Supervisor-mode PMP and physical domains for User mode
+    // use Supervisor-mode PMA, PMP and physical domains for User mode
+    riscv->pmaDomains [RISCV_MODE_U][0] = riscv->pmaDomains [RISCV_MODE_S][0];
+    riscv->pmaDomains [RISCV_MODE_U][1] = riscv->pmaDomains [RISCV_MODE_S][1];
     riscv->pmpDomains [RISCV_MODE_U][0] = riscv->pmpDomains [RISCV_MODE_S][0];
     riscv->pmpDomains [RISCV_MODE_U][1] = riscv->pmpDomains [RISCV_MODE_S][1];
     riscv->physDomains[RISCV_MODE_U][0] = riscv->physDomains[RISCV_MODE_S][0];
@@ -2098,30 +2132,35 @@ static Bool pmpLockedTOR(riscvP riscv, Uns8 index) {
 }
 
 //
-// Set privileges in PMP domain, removing privileges on adjacent regions if
-// required to detect accesses that straddle PMP boundaries
+// If updatePriv is True, set privileges in PMP domain, removing privileges on
+// adjacent regions if required to detect accesses that straddle PMP boundaries;
+// if updatePriv is False, update adjacent regions without modifying main region
+// privileges
 //
 static void pmpProtect(
     riscvP     riscv,
     memDomainP domain,
     Uns64      lo,
     Uns64      hi,
-    memPriv    priv
+    memPriv    priv,
+    Bool       updatePriv
 ) {
     Bool unalignedOK = riscv->configInfo.unaligned;
 
-    // set the required permissions on the PMP region
-    vmirtProtectMemory(domain, lo, hi, priv, MEM_PRIV_SET);
+    // set the required permissions on the PMP region if required
+    if(updatePriv) {
+        vmirtProtectMemory(domain, lo, hi, priv, MEM_PRIV_SET);
+    }
 
     // remove permissions on adjacent region bytes if accesses could possibly
     // straddle region boundaries
     if(
-        priv &&
+        (priv || !updatePriv) &&
         (
             // unaligned accesses could straddle any boundary
             unalignedOK ||
-            // 64-bit D registers could straddle any 32-bit boundary
-            (riscv->configInfo.arch & ISA_D) ||
+            // 64-bit F registers could straddle any 32-bit boundary
+            (riscvGetFlenArch(riscv) > 32) ||
             // 64-bit X registers could straddle any 32-bit boundary
             (riscvGetXlenArch(riscv) > 32)
         )
@@ -2144,20 +2183,22 @@ static void pmpProtect(
 }
 
 //
-// Set privileges in PMP domain for the given mode
+// Set privileges in PMP domain for the given mode, or, if updatePriv is False,
+// only remove permissions on adjacent regions
 //
 static void setPMPPriv(
     riscvP    riscv,
     riscvMode mode,
     Uns64     low,
     Uns64     high,
-    memPriv   priv
+    memPriv   priv,
+    Bool      updatePriv
 ) {
     memDomainP dataDomain = riscv->pmpDomains[mode][0];
     memDomainP codeDomain = riscv->pmpDomains[mode][1];
 
     // emit debug if required
-    if(RISCV_DEBUG_MMU(riscv)) {
+    if(updatePriv && RISCV_DEBUG_MMU(riscv)) {
         vmiPrintf(
             "PMP PRIV=%s 0x"FMT_6408x":0x"FMT_6408x" (mode %s)\n",
             privName(priv), low, high, riscvGetModeName(mode)
@@ -2167,18 +2208,21 @@ static void setPMPPriv(
     if(dataDomain==codeDomain) {
 
         // set permissions in unified domain
-        pmpProtect(riscv, dataDomain, low, high, priv);
+        pmpProtect(riscv, dataDomain, low, high, priv, updatePriv);
 
     } else {
 
+        memPriv privRW = priv&MEM_PRIV_RW;
+        memPriv privX  = priv&MEM_PRIV_X;
+
         // set permissions in data domain if required
-        if((priv==MEM_PRIV_NONE) || (priv&MEM_PRIV_RW)) {
-            pmpProtect(riscv, dataDomain, low, high, priv&MEM_PRIV_RW);
+        if(!updatePriv || (priv==MEM_PRIV_NONE) || privRW) {
+            pmpProtect(riscv, dataDomain, low, high, privRW, updatePriv);
         }
 
         // set permissions in code domain if required
-        if((priv==MEM_PRIV_NONE) || (priv&MEM_PRIV_X)) {
-            pmpProtect(riscv, codeDomain, low, high, priv&MEM_PRIV_X);
+        if(!updatePriv || (priv==MEM_PRIV_NONE) || privX) {
+            pmpProtect(riscv, codeDomain, low, high, privX, updatePriv);
         }
     }
 }
@@ -2263,14 +2307,13 @@ static void invalidatePMPEntry(riscvP riscv, Uns32 index) {
         if(low<=high) {
 
             // remove access in Supervisor address space
-            setPMPPriv(riscv, RISCV_MODE_SUPERVISOR, low, high, MEM_PRIV_NONE);
+            setPMPPriv(riscv, RISCV_MODE_S, low, high, MEM_PRIV_NONE, True);
 
             // remove access in Machine address space if the entry is locked
             // or if any lower-priority entry is locked (enabling or disabling
             // this region may reveal or conceal that region)
-            if(e.L || lowerPriorityPMPEntryLocked(riscv, index)) {
-                setPMPPriv(riscv, RISCV_MODE_MACHINE, low, high, MEM_PRIV_NONE);
-            }
+            Bool updateM = (e.L || lowerPriorityPMPEntryLocked(riscv, index));
+            setPMPPriv(riscv, RISCV_MODE_M, low, high, MEM_PRIV_NONE, updateM);
         }
     }
 }
@@ -2511,7 +2554,7 @@ static void mapPMP(
         if(((priv&requiredPriv) != requiredPriv) || (highMap<highPA)) {
             riscv->AFErrorIn = riscv_AFault_PMP;
         } else {
-            setPMPPriv(riscv, mode, lowMap, highMap, priv);
+            setPMPPriv(riscv, mode, lowMap, highMap, priv, True);
         }
     }
 }
@@ -2570,12 +2613,10 @@ static void mapTLBEntry(
     memPriv    priv       = miP->priv;
     Uns64      size       = highPA-lowPA+1;
     Uns64      vmiPageMax = 0x100000000ULL;
+    Uns64      VAtoPA     = lowPA-lowVA;
 
     // restrict mapping size to VMI maximum (4Gb)
     if(size>vmiPageMax) {
-
-        Uns64 VAtoPA = lowPA-lowVA;
-
         size   = vmiPageMax;
         lowVA  = miP->lowVA & -size;
         lowPA  = lowVA + VAtoPA;
@@ -2586,6 +2627,10 @@ static void mapTLBEntry(
     vmirtAliasMemoryVM(
         domainP, domainV, lowPA, highPA, lowVA, 0, priv, ASIDMask, ASID
     );
+
+    // determine physical bounds of original access
+    lowPA  = miP->lowVA  + VAtoPA;
+    highPA = miP->highVA + VAtoPA;
 
     // update PMP mapping if required
     mapPMP(riscv, mode, requiredPriv, lowPA, highPA);

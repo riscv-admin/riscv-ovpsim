@@ -2212,20 +2212,6 @@ static void updateCLICInterruptField(
 }
 
 //
-// Return rending for the indexed interrupt
-//
-inline static Bool getCLICInterruptPending(riscvP hart, Uns32 intIndex) {
-    return getCLICInterruptField(hart, intIndex, CIT_clicintip);
-}
-
-//
-// Return enable for the indexed interrupt
-//
-inline static Bool getCLICInterruptEnable(riscvP hart, Uns32 intIndex) {
-    return getCLICInterruptField(hart, intIndex, CIT_clicintie);
-}
-
-//
 // Return clicintattr for the indexed interrupt
 //
 inline static CLIC_REG_TYPE(clicintattr) getCLICInterruptAttr(
@@ -2240,13 +2226,97 @@ inline static CLIC_REG_TYPE(clicintattr) getCLICInterruptAttr(
 }
 
 //
+// Is the indexed interrupt edge triggered?
+//
+inline static Bool isCLICInterruptEdge(riscvP hart, Uns32 intIndex) {
+
+    CLIC_REG_DECL(clicintattr) = getCLICInterruptAttr(hart, intIndex);
+
+    return clicintattr.fields.trig&1;
+}
+
+//
+// Is the indexed interrupt active low?
+//
+inline static Bool isCLICInterruptActiveLow(riscvP hart, Uns32 intIndex) {
+
+    CLIC_REG_DECL(clicintattr) = getCLICInterruptAttr(hart, intIndex);
+
+    return clicintattr.fields.trig&2;
+}
+
+//
+// Return pending for the indexed interrupt
+//
+static Bool getCLICInterruptPending(riscvP hart, Uns32 intIndex) {
+
+    // get latched pending bit
+    Bool IP = getCLICInterruptField(hart, intIndex, CIT_clicintip);
+
+    // for level-triggered interrupts, include the unlatched external source
+    if(!isCLICInterruptEdge(hart, intIndex)) {
+
+        Uns32 wordIndex  = intIndex/64;
+        Uns64 mask       = (1ULL<<(intIndex%64));
+        Bool  externalIP = hart->ip[wordIndex] & mask;
+
+        IP |= externalIP;
+    }
+
+    return IP;
+}
+
+//
+// Set pending for the indexed interrupt
+//
+inline static void setCLICInterruptPending(
+    riscvP hart,
+    Uns32  intIndex,
+    Bool   newValue,
+    Bool   isStore
+) {
+    // level-triggered pending values are not latched
+    if(isStore || isCLICInterruptEdge(hart, intIndex)) {
+        setCLICInterruptField(hart, intIndex, CIT_clicintip, newValue);
+    }
+}
+
+//
+// Return enable for the indexed interrupt
+//
+inline static Bool getCLICInterruptEnable(riscvP hart, Uns32 intIndex) {
+    return getCLICInterruptField(hart, intIndex, CIT_clicintie);
+}
+
+//
+// Set enable for the indexed interrupt
+//
+inline static void setCLICInterruptEnable(
+    riscvP hart,
+    Uns32  intIndex,
+    Bool   newValue
+) {
+    setCLICInterruptField(hart, intIndex, CIT_clicintie, newValue);
+}
+
+//
+// Return CLIC pending+enabled state for the given interrupt
+//
+static Bool getCLICPendingEnable(riscvP hart, Uns32 intIndex) {
+
+    Uns32 wordIndex = intIndex/64;
+    Uns64 mask      = (1ULL<<(intIndex%64));
+
+    return hart->clic.ipe[wordIndex] & mask;
+}
+
+//
 // Update state when CLIC pending+enabled state changes for the given interrupt
 //
 static void updateCLICPendingEnable(riscvP hart, Uns32 intIndex, Bool newIPE) {
 
     Uns32 wordIndex = intIndex/64;
-    Uns32 bitIndex  = intIndex%64;
-    Uns64 mask      = (1ULL<<bitIndex);
+    Uns64 mask      = (1ULL<<(intIndex%64));
 
     if(newIPE) {
         hart->clic.ipe[wordIndex] |= mask;
@@ -2263,15 +2333,15 @@ static void updateCLICPendingEnable(riscvP hart, Uns32 intIndex, Bool newIPE) {
 static void writeCLICInterruptPending(
     riscvP hart,
     Uns32  intIndex,
-    Uns8   newValue
+    Uns8   newValue,
+    Bool   isStore
 ) {
-    riscvCLICIntStateP intState = &hart->clic.intState[intIndex];
-    Bool               oldIE    = intState->fields[CIT_clicintie];
-    Bool               newIP    = newValue&1;
+    Bool oldIE = getCLICInterruptEnable(hart, intIndex);
+    Bool newIP = newValue&1;
 
     // update field, detecting change in pending+enabled
-    Bool oldIPE = oldIE && intState->fields[CIT_clicintip];
-    intState->fields[CIT_clicintip] = newIP;
+    Bool oldIPE = getCLICPendingEnable(hart, intIndex);
+    setCLICInterruptPending(hart, intIndex, newIP, isStore);
     Bool newIPE = oldIE && newIP;
 
     // update state if pending+enabled has changed
@@ -2288,13 +2358,12 @@ static void writeCLICInterruptEnable(
     Uns32  intIndex,
     Uns8   newValue
 ) {
-    riscvCLICIntStateP intState = &hart->clic.intState[intIndex];
-    Bool               oldIP    = intState->fields[CIT_clicintip];
-    Bool               newIE    = newValue&1;
+    Bool oldIP = getCLICInterruptPending(hart, intIndex);
+    Bool newIE = newValue&1;
 
     // update field, detecting change in pending+enabled
-    Bool oldIPE = oldIP && intState->fields[CIT_clicintie];
-    intState->fields[CIT_clicintie] = newIE;
+    Bool oldIPE = getCLICPendingEnable(hart, intIndex);
+    setCLICInterruptEnable(hart, intIndex, newIE);
     Bool newIPE = oldIP && newIE;
 
     // update state if pending+enabled has changed
@@ -2438,7 +2507,16 @@ static Uns32 readCLICInterrupt(riscvP root, Uns32 offset) {
         riscvP hart     = getCLICHart(root, offset);
         Uns32  intIndex = getCLICIntIndex(offset);
 
-        result = getCLICInterruptValue(hart, intIndex);
+        switch(getCLICIntFieldType(offset)) {
+
+            case CIT_clicintip:
+                result = getCLICInterruptPending(hart, intIndex);
+                break;
+
+            default:
+                result = getCLICInterruptValue(hart, intIndex);
+                break;
+        }
     }
 
     return result;
@@ -2458,7 +2536,7 @@ static void writeCLICInterrupt(riscvP root, Uns32 offset, Uns8 newValue) {
         switch(getCLICIntFieldType(offset)) {
 
             case CIT_clicintip:
-                writeCLICInterruptPending(hart, intIndex, newValue);
+                writeCLICInterruptPending(hart, intIndex, newValue, True);
                 break;
 
             case CIT_clicintie:
@@ -2630,7 +2708,7 @@ static void refreshPendingAndEnabledCLIC(riscvP hart) {
 }
 
 //
-// Refresh CliC pending+enable mask (after restore)
+// Refresh CLIC pending+enable mask (after restore)
 //
 static void refreshCLICIPE(riscvP hart) {
 
@@ -2663,14 +2741,9 @@ static void refreshCLICIPE(riscvP hart) {
 //
 void riscvAcknowledgeCLICInt(riscvP hart, Uns32 intIndex) {
 
-    CLIC_REG_DECL(clicintattr) = getCLICInterruptAttr(hart, intIndex);
-
-    // determine interrupt configuration
-    Bool isEdge = clicintattr.fields.trig&1;
-
     // deassert interrupt if edge triggered, or refresh pending state if not
-    if(isEdge) {
-        writeCLICInterruptPending(hart, intIndex, 0);
+    if(isCLICInterruptEdge(hart, intIndex)) {
+        writeCLICInterruptPending(hart, intIndex, 0, False);
     } else {
         refreshPendingAndEnabled(hart);
     }
@@ -2681,18 +2754,16 @@ void riscvAcknowledgeCLICInt(riscvP hart, Uns32 intIndex) {
 //
 static void updateCLICInput(riscvP hart, Uns32 intIndex, Bool newValue) {
 
-    CLIC_REG_DECL(clicintattr) = getCLICInterruptAttr(hart, intIndex);
-
     // determine interrupt configuration
-    Bool isEdge    = clicintattr.fields.trig&1;
-    Bool activeLow = clicintattr.fields.trig&2;
+    Bool isEdge    = isCLICInterruptEdge(hart, intIndex);
+    Bool activeLow = isCLICInterruptActiveLow(hart, intIndex);
 
     // handle active low inputs
     newValue ^= activeLow;
 
     // apply new value if either level triggered or edge triggered and asserted
     if(!isEdge || newValue) {
-        writeCLICInterruptPending(hart, intIndex, newValue);
+        writeCLICInterruptPending(hart, intIndex, newValue, False);
     }
 }
 
@@ -3533,7 +3604,7 @@ void riscvNetRestore(
                 sizeof(*riscv->clic.intState)*getIntNum(riscv)
             );
 
-            // refresh CliC pending+enable mask
+            // refresh CLIC pending+enable mask
             refreshCLICIPE(riscv);
         }
 
