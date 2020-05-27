@@ -2584,7 +2584,7 @@ static RISCV_CSR_WRITEFN(dcsrW) {
 static const riscvCSRAttrs csrs[CSR_ID(LAST)] = {
 
     //                name          num    arch         access      version   attrs    description                                      present wState       rCB           rwCB      wCB
-    CSR_ATTR_P__     (ustatus,      0x000, ISA_N,       0,          1_10,   0,0,0,0,0, "User Status",                                   0,      0,           ustatusR,     0,        ustatusW      ),
+    CSR_ATTR_P__     (ustatus,      0x000, ISA_N,       0,          1_10,   0,0,0,0,1, "User Status",                                   0,      0,           ustatusR,     0,        ustatusW      ),
     CSR_ATTR_P__     (fflags,       0x001, ISA_DF,      0,          1_10,   0,0,0,0,0, "Floating-Point Flags",                          0,      riscvWFS,    fflagsR,      0,        fflagsW       ),
     CSR_ATTR_P__     (frm,          0x002, ISA_DF,      0,          1_10,   1,0,0,0,0, "Floating-Point Rounding Mode",                  0,      riscvWFS,    frmR,         0,        frmW          ),
     CSR_ATTR_P__     (fcsr,         0x003, ISA_DFV,     ISA_FS,     1_10,   1,0,0,0,0, "Floating-Point Control and Status",             0,      riscvWFS,    fcsrR,        0,        fcsrW         ),
@@ -2617,7 +2617,7 @@ static const riscvCSRAttrs csrs[CSR_ID(LAST)] = {
     CSR_ATTR_P__3_31 (hpmcounterh,  0xC80, ISA_XLEN_32, 0,          1_10,   0,0,0,0,0, "Performance Monitor High ",                     0,      0,           mhpmR,        0,        0             ),
 
     //                name          num    arch         access      version   attrs    description                                      present wState       rCB           rwCB      wCB
-    CSR_ATTR_P__     (sstatus,      0x100, ISA_S,       0,          1_10,   0,0,0,0,0, "Supervisor Status",                             0,      riscvRstFS,  sstatusR,     0,        sstatusW      ),
+    CSR_ATTR_P__     (sstatus,      0x100, ISA_S,       0,          1_10,   0,0,0,0,1, "Supervisor Status",                             0,      riscvRstFS,  sstatusR,     0,        sstatusW      ),
     CSR_ATTR_TV_     (sedeleg,      0x102, ISA_SandN,   0,          1_10,   0,0,0,0,0, "Supervisor Exception Delegation",               0,      0,           0,            0,        0             ),
     CSR_ATTR_T__     (sideleg,      0x103, ISA_SandN,   0,          1_10,   1,0,0,0,0, "Supervisor Interrupt Delegation",               0,      0,           0,            0,        sidelegW      ),
     CSR_ATTR_P__     (sie,          0x104, ISA_S,       0,          1_10,   1,0,0,0,0, "Supervisor Interrupt Enable",                   0,      0,           sieR,         0,        sieW          ),
