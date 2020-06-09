@@ -245,13 +245,17 @@ static void putFence(
 //
 // Emit rounding mode argument
 //
-static void putOptRM(char **result, riscvRMDesc rm, Bool uncooked) {
-
+static void putOptRM(
+    char      **result,
+    riscvRMDesc rm,
+    Bool        explicitRM,
+    Bool        uncooked
+) {
     if(rm) {
 
         putUncookedKey(result, " RM", uncooked);
 
-        if(!uncooked && (rm==RV_RM_ROD)) {
+        if(!uncooked && explicitRM) {
 
             // rounding mode in opcode (not consistent with base architecture)
 
@@ -299,19 +303,53 @@ static void putVType(char **result, riscvP riscv, riscvVType vtype) {
 }
 
 //
+// Return B/H/W/D extension based on bits
+//
+inline static char getBHWD(Uns32 bits) {
+
+    char result = 0;
+
+    switch(bits) {
+        case 8:
+            result = 'b';
+            break;
+        case 16:
+            result = 'h';
+            break;
+        case 32:
+            result = 'w';
+            break;
+        case 64:
+            result = 'd';
+            break;
+        default:
+            VMI_ABORT("Unimplemented bits %u", bits); // LCOV_EXCL_LINE
+    }
+
+    return result;
+}
+
+//
 // Emit opcode modifier based on argument type
 //
 static riscvRegDesc putType(
     char          **result,
     riscvInstrInfoP info,
-    riscvRegDesc    this,
+    Uns32           argIndex,
     riscvRegDesc    prev
 ) {
-    if(this && !isQReg(this) && (getRType(this)!=getRType(prev))) {
+    riscvRegDesc this         = info->r[argIndex];
+    Uns32        explicitType = info->explicitType;
+
+    if(explicitType && (argIndex<(explicitType-1))) {
+
+        // skip to the first operand for which type should be reported
+
+    } else if(this && !isQReg(this) && (getRType(this)!=getRType(prev))) {
 
         Uns32 bits = getRBits(this);
 
-        if(info->explicitType) {
+        if(explicitType) {
 
             // emit dot before type
             putChar(result, '.');
@@ -322,7 +360,7 @@ static riscvRegDesc putType(
             } else if(isWLReg(this)) {
                 putChar(result, (bits==32) ? 'w' : 'l');
             } else if(isXReg(this)) {
-                putChar(result, (bits==32) ? 'w' : 'd');
+                putChar(result, getBHWD(bits));
             } else if(isFReg(this)) {
                 putChar(result, (bits==32) ? 's' : 'd');
             } else {
@@ -354,12 +392,18 @@ static void putOpcode(char **result, riscvP riscv, riscvInstrInfoP info) {
     riscvRegDesc type = RV_RD_NA;
     Uns32        i;
 
+    // emit shift prefix if required
+    if(info->shN) {
+        putString(result, "sh");
+        putD(result, info->shN);
+    }
+
     // emit basic opcode
     putString(result, info->opcode);
 
     // emit modifiers based on argument register types
     for(i=0; i<RV_MAX_AREGS; i++) {
-        type = putType(result, info, info->r[i], type);
+        type = putType(result, info, i, type);
     }
 
     if(info->isWhole) {
@@ -385,7 +429,7 @@ static void putOpcode(char **result, riscvP riscv, riscvInstrInfoP info) {
 
         } else switch(info->memBits) {
 
-            // version 0.8 memBits
+            // standard memBits
             case 8:  putChar(result, 'b'); break;
             case 16: putChar(result, 'h'); break;
             case 32: putChar(result, 'w'); break;
@@ -590,7 +634,7 @@ static void disassembleFormat(
     }
 
     // emit optional rounding mode
-    putOptRM(result, info->rm, uncooked);
+    putOptRM(result, info->rm, info->explicitRM, uncooked);
 
     // strip trailing whitespace and commas
     char *tail = (*result)-1;

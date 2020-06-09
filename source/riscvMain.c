@@ -27,6 +27,7 @@
 #include "vmi/vmiRt.h"
 
 // Model header files
+#include "riscvCLIC.h"
 #include "riscvCluster.h"
 #include "riscvBus.h"
 #include "riscvConfig.h"
@@ -176,6 +177,18 @@ static Uns64 powerOfTwo(Uns64 oldValue, const char *name) {
 }
 
 //
+// Handle absent bit manipulation subsets
+//
+#define ADD_BM_SET(_PROC, _CFG, _PARAMS, _NAME) { \
+    if(!_PARAMS->_NAME) {                       \
+        _CFG->bitmanip_absent |= RVBS_##_NAME;  \
+    }                                           \
+    if(_PARAMS->_NAME##__set) {                 \
+        _PROC->commercial = True;               \
+    }                                           \
+}
+
+//
 // Apply parameters applicable to SMP member
 //
 static void applyParamsSMP(riscvP riscv, riscvParamValuesP params) {
@@ -213,61 +226,79 @@ static void applyParamsSMP(riscvP riscv, riscvParamValuesP params) {
     cfg->csrMask.utvt.u64.bits  = params->utvt_mask;
 
     // get uninterpreted architectural configuration parameters
-    cfg->user_version      = params->user_version;
-    cfg->priv_version      = params->priv_version;
-    cfg->vect_version      = params->vector_version;
-    cfg->fp16_version      = params->fp16_version;
-    cfg->mstatus_fs_mode   = params->mstatus_fs_mode;
-    cfg->reset_address     = params->reset_address;
-    cfg->nmi_address       = params->nmi_address;
-    cfg->ASID_bits         = params->ASID_bits;
-    cfg->PMP_grain         = params->PMP_grain;
-    cfg->PMP_registers     = params->PMP_registers;
-    cfg->Sv_modes          = params->Sv_modes | RISCV_VMM_BARE;
-    cfg->local_int_num     = params->local_int_num;
-    cfg->unimp_int_mask    = params->unimp_int_mask;
-    cfg->ecode_mask        = params->ecode_mask;
-    cfg->ecode_nmi         = params->ecode_nmi;
-    cfg->external_int_id   = params->external_int_id;
-    cfg->no_ideleg         = params->no_ideleg;
-    cfg->no_edeleg         = params->no_edeleg;
-    cfg->lr_sc_grain       = powerOfTwo(params->lr_sc_grain, "lr_sc_grain");
-    cfg->debug_mode        = params->debug_mode;
-    cfg->debug_address     = params->debug_address;
-    cfg->dexc_address      = params->dexc_address;
-    cfg->updatePTEA        = params->updatePTEA;
-    cfg->updatePTED        = params->updatePTED;
-    cfg->unaligned         = params->unaligned;
-    cfg->unalignedAMO      = params->unalignedAMO;
-    cfg->wfi_is_nop        = params->wfi_is_nop;
-    cfg->mtvec_is_ro       = params->mtvec_is_ro;
-    cfg->counteren_mask    = params->counteren_mask;
-    cfg->tvec_align        = params->tvec_align;
-    cfg->tval_zero         = params->tval_zero;
-    cfg->tval_ii_code      = params->tval_ii_code;
-    cfg->cycle_undefined   = params->cycle_undefined;
-    cfg->time_undefined    = params->time_undefined;
-    cfg->instret_undefined = params->instret_undefined;
-    cfg->enable_CSR_bus    = params->enable_CSR_bus;
-    cfg->d_requires_f      = params->d_requires_f;
-    cfg->xret_preserves_lr = params->xret_preserves_lr;
-    cfg->require_vstart0   = params->require_vstart0;
-    cfg->ELEN              = powerOfTwo(params->ELEN, "ELEN");
-    cfg->SLEN              = powerOfTwo(params->SLEN, "SLEN");
-    cfg->VLEN              = powerOfTwo(params->VLEN, "VLEN");
-    cfg->SEW_min           = powerOfTwo(params->SEW_min, "SEW_min");
-    cfg->Zvlsseg           = params->Zvlsseg;
-    cfg->Zvamo             = params->Zvamo;
-    cfg->Zvediv            = params->Zvediv;
-    cfg->CLICLEVELS        = params->CLICLEVELS;
-    cfg->CLICANDBASIC      = params->CLICANDBASIC;
-    cfg->CLICVERSION       = params->CLICVERSION;
-    cfg->CLICINTCTLBITS    = params->CLICINTCTLBITS;
-    cfg->CLICCFGMBITS      = params->CLICCFGMBITS;
-    cfg->CLICCFGLBITS      = params->CLICCFGLBITS;
-    cfg->CLICSELHVEC       = params->CLICSELHVEC;
-    cfg->CLICMNXTI         = params->CLICMNXTI;
-    cfg->CLICMCSW          = params->CLICMCSW;
+    cfg->user_version        = params->user_version;
+    cfg->priv_version        = params->priv_version;
+    cfg->vect_version        = params->vector_version;
+    cfg->bitmanip_version    = params->bitmanip_version;
+    cfg->fp16_version        = params->fp16_version;
+    cfg->mstatus_fs_mode     = params->mstatus_fs_mode;
+    cfg->reset_address       = params->reset_address;
+    cfg->nmi_address         = params->nmi_address;
+    cfg->ASID_bits           = params->ASID_bits;
+    cfg->PMP_grain           = params->PMP_grain;
+    cfg->PMP_registers       = params->PMP_registers;
+    cfg->Sv_modes            = params->Sv_modes | RISCV_VMM_BARE;
+    cfg->local_int_num       = params->local_int_num;
+    cfg->unimp_int_mask      = params->unimp_int_mask;
+    cfg->ecode_mask          = params->ecode_mask;
+    cfg->ecode_nmi           = params->ecode_nmi;
+    cfg->external_int_id     = params->external_int_id;
+    cfg->no_ideleg           = params->no_ideleg;
+    cfg->no_edeleg           = params->no_edeleg;
+    cfg->lr_sc_grain         = powerOfTwo(params->lr_sc_grain, "lr_sc_grain");
+    cfg->debug_mode          = params->debug_mode;
+    cfg->debug_address       = params->debug_address;
+    cfg->dexc_address        = params->dexc_address;
+    cfg->updatePTEA          = params->updatePTEA;
+    cfg->updatePTED          = params->updatePTED;
+    cfg->unaligned           = params->unaligned;
+    cfg->unalignedAMO        = params->unalignedAMO;
+    cfg->wfi_is_nop          = params->wfi_is_nop;
+    cfg->mtvec_is_ro         = params->mtvec_is_ro;
+    cfg->counteren_mask      = params->counteren_mask;
+    cfg->tvec_align          = params->tvec_align;
+    cfg->tval_zero           = params->tval_zero;
+    cfg->tval_ii_code        = params->tval_ii_code;
+    cfg->cycle_undefined     = params->cycle_undefined;
+    cfg->time_undefined      = params->time_undefined;
+    cfg->instret_undefined   = params->instret_undefined;
+    cfg->enable_CSR_bus      = params->enable_CSR_bus;
+    cfg->d_requires_f        = params->d_requires_f;
+    cfg->xret_preserves_lr   = params->xret_preserves_lr;
+    cfg->require_vstart0     = params->require_vstart0;
+    cfg->ELEN                = powerOfTwo(params->ELEN, "ELEN");
+    cfg->SLEN                = powerOfTwo(params->SLEN, "SLEN");
+    cfg->VLEN                = powerOfTwo(params->VLEN, "VLEN");
+    cfg->SEW_min             = powerOfTwo(params->SEW_min, "SEW_min");
+    cfg->Zvlsseg             = params->Zvlsseg;
+    cfg->Zvamo               = params->Zvamo;
+    cfg->Zvediv              = params->Zvediv;
+    cfg->CLICLEVELS          = params->CLICLEVELS;
+    cfg->CLICANDBASIC        = params->CLICANDBASIC;
+    cfg->CLICVERSION         = params->CLICVERSION;
+    cfg->CLICINTCTLBITS      = params->CLICINTCTLBITS;
+    cfg->CLICCFGMBITS        = params->CLICCFGMBITS;
+    cfg->CLICCFGLBITS        = params->CLICCFGLBITS;
+    cfg->CLICSELHVEC         = params->CLICSELHVEC;
+    cfg->CLICXNXTI           = params->CLICXNXTI;
+    cfg->CLICXCSW            = params->CLICXCSW;
+    cfg->externalCLIC        = params->externalCLIC;
+    cfg->tvt_undefined       = params->tvt_undefined;
+    cfg->intthresh_undefined = params->intthresh_undefined;
+    cfg->mclicbase_undefined = params->mclicbase_undefined;
+
+    // handle bit manipulation subset parameters
+    cfg->bitmanip_absent = 0;
+    ADD_BM_SET(riscv, cfg, params, Zba);
+    ADD_BM_SET(riscv, cfg, params, Zbb);
+    ADD_BM_SET(riscv, cfg, params, Zbc);
+    ADD_BM_SET(riscv, cfg, params, Zbe);
+    ADD_BM_SET(riscv, cfg, params, Zbf);
+    ADD_BM_SET(riscv, cfg, params, Zbm);
+    ADD_BM_SET(riscv, cfg, params, Zbp);
+    ADD_BM_SET(riscv, cfg, params, Zbr);
+    ADD_BM_SET(riscv, cfg, params, Zbs);
+    ADD_BM_SET(riscv, cfg, params, Zbt);
 
     // set number of children
     Bool isSMPMember = riscv->parent && !riscvIsCluster(riscv->parent);
@@ -375,6 +406,7 @@ VMI_CONSTRUCTOR_FN(riscvConstructor) {
     // indicate no interrupts are pending and enabled initially
     riscv->pendEnab.id  = RV_NO_INT;
     riscv->clicState.id = RV_NO_INT;
+    riscv->clic.sel.id  = RV_NO_INT;
 
     // initialize enhanced model support callbacks that apply at all levels
     initAllModelCBs(riscv);
@@ -440,8 +472,10 @@ VMI_CONSTRUCTOR_FN(riscvConstructor) {
         // allocate timers
         riscvNewTimers(riscv);
 
-        // allocate CLIC data structures
-        riscvNewCLIC(riscv, smpContext->index);
+        // allocate CLIC data structures if required
+        if(CLICInternal(riscv)) {
+            riscvNewCLIC(riscv, smpContext->index);
+        }
 
         // do initial reset
         riscvReset(riscv);

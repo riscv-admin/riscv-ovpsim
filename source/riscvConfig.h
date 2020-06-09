@@ -70,6 +70,8 @@ typedef struct riscvConfigS {
     riscvUserVer      user_version;     // user-level ISA version
     riscvPrivVer      priv_version;     // privileged architecture version
     riscvVectVer      vect_version;     // vector architecture version
+    riscvBitManipVer  bitmanip_version; // bitmanip architecture version
+    riscvBitManipSet  bitmanip_absent;  // bitmanip absent extensions
     riscvFP16Ver      fp16_version;     // 16-bit floating point version
     riscvFSMode       mstatus_fs_mode;  // mstatus.FS update mode
     riscvDMMode       debug_mode;       // is Debug mode implemented?
@@ -130,8 +132,12 @@ typedef struct riscvConfigS {
     Uns8              CLICCFGMBITS;     // bits implemented for cliccfg.nmbits
     Uns8              CLICCFGLBITS;     // bits implemented for cliccfg.nlbits
     Bool              CLICSELHVEC;		// selective hardware vectoring?
-    Bool              CLICMNXTI;		// mnxti CSR implemented?
-    Bool              CLICMCSW;			// mscratchcs* CSRs implemented?
+    Bool              CLICXNXTI;		// *nxti CSRs implemented?
+    Bool              CLICXCSW;			// *scratchcs* CSRs implemented?
+    Bool              externalCLIC;     // is CLIC externally implemented?
+    Bool              tvt_undefined;    // whether *tvt CSRs are undefined
+    Bool              intthresh_undefined;// whether *intthresh CSRs undefined
+    Bool              mclicbase_undefined;// whether mclicbase CSR is undefined
 
     // CSR register values
     struct {

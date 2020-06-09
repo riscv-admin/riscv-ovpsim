@@ -72,7 +72,8 @@ typedef struct riscvNetValueS {
     Bool resethaltreq;  // resethaltreq (Debug mode)
     Bool resethaltreqS; // resethaltreq (Debug mode, sampled at reset)
     Bool deferint;      // defer taking interrupts (artifact)
-    Bool _u1[2];        // (for alignment)
+    Bool enableCLIC;    // is CLIC enabled?
+    Bool _u1;           // (for alignment)
 } riscvNetValue;
 
 //
@@ -119,29 +120,6 @@ typedef struct riscvBasicIntStateS {
     Bool  uie;                  // mstatus.uie
     Bool  _u1;                  // (for alignment)
 } riscvBasicIntState;
-
-//
-// This holds state for a pending CLIC interrupt
-//
-typedef struct riscvCLICOutStateS {
-    riscvMode priv;     // privilege mode
-    Int32     id;       // interrupt id
-    Uns8      level;    // interrupt level
-    Bool      shv;      // whether selectively hardware vectored
-    Bool      _u1[6];   // (for alignment)
-} riscvCLICOutState;
-
-//
-// This holds CLIC state
-//
-typedef struct riscvCLICS {
-    riscvCLICOutState  sel;         // selected interrupt state
-    CLIC_REG_DECL     (cliccfg);    // cliccfg register value
-    CLIC_REG_DECL     (clicinfo);   // clicinfo register value
-    riscvPP            harts;       // member harts
-    riscvCLICIntStateP intState;    // state for each interrupt
-    Uns64             *ipe;         // mask of pending-and-enabled interrupts
-} riscvCLIC;
 
 //
 // This holds processor and vector information for an interrupt
@@ -216,6 +194,7 @@ typedef struct riscvS {
     Uns8               SF;              // operation saturation flag
     Bool               DM;              // whether in Debug mode
     Bool               DMStall;         // whether stalled in Debug mode
+    Bool               commercial;      // whether commercial feature in use
     Uns32              flags;           // model control flags
     Uns32              flagsRestore;    // saved flags during restore
     riscvConfig        configInfo;      // model configuration
@@ -270,6 +249,9 @@ typedef struct riscvS {
     Uns32              LRAddressHandle; // LR address port handle (locking)
     Uns32              SCAddressHandle; // SC address port handle (locking)
     Uns32              AMOActiveHandle; // active AMO operation
+    Uns32              irq_ack_Handle;  // interrupt acknowledge (external CLIC)
+    Uns32              irq_id_Handle;   // interrupt id (external CLIC)
+    Uns32              sec_lvl_Handle;  // security level (external CLIC)
 
     // Timers
     vmiModelTimerP     stepTimer;       // Debug mode single-step timer
@@ -351,6 +333,20 @@ inline static Bool inDebugMode(riscvP riscv) {
 //
 inline static Bool CLICPresent(riscvP riscv) {
     return riscv->configInfo.CLICLEVELS;
+}
+
+//
+// Is CLIC interrupt controller present and implemented internally?
+//
+inline static Bool CLICInternal(riscvP riscv) {
+    return CLICPresent(riscv) && !riscv->configInfo.externalCLIC;
+}
+
+//
+// Is CLIC interrupt controller present and implemented externally?
+//
+inline static Bool CLICExternal(riscvP riscv) {
+    return CLICPresent(riscv) && riscv->configInfo.externalCLIC;
 }
 
 //

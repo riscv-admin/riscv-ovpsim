@@ -80,21 +80,6 @@
 }
 
 //
-// Attribute entries for 32-bit instructions like SLTZ
-//
-#define ATTR32_SLTZ(_NAME, _GENERIC, _ARCH, _OPCODE) [IT32_##_NAME] = { \
-    opcode   : _OPCODE,             \
-    format   : FMT_R1_R2,           \
-    type     : RV_IT_##_GENERIC,    \
-    arch     : _ARCH,               \
-    r1       : RS_X_11_7,           \
-    r2       : RS_X_19_15,          \
-    r3       : RS_X_24_20,          \
-    wX       : WX_3,                \
-    priDelta : 1,                   \
-}
-
-//
 // Attribute entries for 32-bit instructions like NOP
 //
 #define ATTR32_NOP(_NAME, _GENERIC, _ARCH, _OPCODE) [IT32_##_NAME] = { \
@@ -617,6 +602,136 @@
 }
 
 //
+// Attribute entries for 32-bit instructions like SLTZ
+//
+#define ATTR32_SLTZ(_NAME, _GENERIC, _ARCH, _OPCODE) [IT32_##_NAME] = { \
+    opcode   : _OPCODE,             \
+    format   : FMT_R1_R2,           \
+    type     : RV_IT_##_GENERIC,    \
+    arch     : _ARCH,               \
+    r1       : RS_X_11_7,           \
+    r2       : RS_X_19_15,          \
+    r3       : RS_X_24_20,          \
+    wX       : WX_3,                \
+    priDelta : 1,                   \
+}
+
+//
+// Attribute entries for 32-bit instructions like CRC32
+//
+#define ATTR32_CRC32(_NAME, _GENERIC, _ARCH, _OPCODE) [IT32_##_NAME] = { \
+    opcode   : _OPCODE,             \
+    format   : FMT_R1_R2,           \
+    type     : RV_IT_##_GENERIC,    \
+    arch     : _ARCH,               \
+    r1       : RS_X_11_7,           \
+    r2       : RS_X_19_15_S_21_20,  \
+}
+
+//
+// Attribute entries for 32-bit instructions like ADDWU
+//
+#define ATTR32_ADDWU(_NAME, _GENERIC, _ARCH, _OPCODE) [IT32_##_NAME] = { \
+    opcode   : _OPCODE,             \
+    format   : FMT_R1_R2_R3,        \
+    type     : RV_IT_##_GENERIC,    \
+    arch     : _ARCH,               \
+    r1       : RS_X_11_7,           \
+    r2       : RS_X_19_15,          \
+    r3       : RS_X_24_20,          \
+    wX       : WX_3,                \
+    unsExt   : USX_T,               \
+}
+
+//
+// Attribute entries for 32-bit instructions like SHFLI
+//
+#define ATTR32_SHFLI(_NAME, _GENERIC, _ARCH, _OPCODE) [IT32_##_NAME] = { \
+    opcode   : _OPCODE,             \
+    format   : FMT_R1_R2_SIMM,      \
+    type     : RV_IT_##_GENERIC,    \
+    arch     : _ARCH,               \
+    r1       : RS_X_11_7,           \
+    r2       : RS_X_19_15,          \
+    cs       : CS_SHAMT_25_20,      \
+    wX       : WX_3,                \
+}
+
+//
+// Attribute entries for 32-bit instructions like ADDIW.U
+//
+#define ATTR32_ADDIWU(_NAME, _GENERIC, _ARCH, _OPCODE) [IT32_##_NAME] = { \
+    opcode   : _OPCODE,             \
+    format   : FMT_R1_R2_SIMM,      \
+    type     : RV_IT_##_GENERIC,    \
+    arch     : _ARCH,               \
+    r1       : RS_X_11_7,           \
+    r2       : RS_X_19_15,          \
+    cs       : CS_S_31_20,          \
+    wX       : WX_3,                \
+    unsExt   : USX_14,              \
+}
+
+//
+// Attribute entries for 32-bit instructions like SLLIU.W
+//
+#define ATTR32_SLLIU_W(_NAME, _GENERIC, _ARCH, _OPCODE) [IT32_##_NAME] = { \
+    opcode   : _OPCODE,             \
+    format   : FMT_R1_R2_SIMM,      \
+    type     : RV_IT_##_GENERIC,    \
+    arch     : _ARCH,               \
+    r1       : RS_X_11_7,           \
+    r2       : RS_X_19_15,          \
+    cs       : CS_U_26_20,          \
+    wX       : WX_3,                \
+}
+
+//
+// Attribute entries for 32-bit instructions like CMIX
+//
+#define ATTR32_CMIX(_NAME, _GENERIC, _ARCH, _OPCODE) [IT32_##_NAME] = { \
+    opcode   : _OPCODE,             \
+    format   : FMT_R1_R2_R3_R4,     \
+    type     : RV_IT_##_GENERIC,    \
+    arch     : _ARCH,               \
+    r1       : RS_X_11_7,           \
+    r2       : RS_X_19_15,          \
+    r3       : RS_X_24_20,          \
+    r4       : RS_X_31_27,          \
+    wX       : WX_3,                \
+}
+
+//
+// Attribute entries for 32-bit instructions like FSRI
+//
+#define ATTR32_FSRI(_NAME, _GENERIC, _ARCH, _OPCODE) [IT32_##_NAME] = { \
+    opcode   : _OPCODE,             \
+    format   : FMT_R1_R2_R3_SIMM,   \
+    type     : RV_IT_##_GENERIC,    \
+    arch     : _ARCH,               \
+    r1       : RS_X_11_7,           \
+    r2       : RS_X_19_15,          \
+    r3       : RS_X_31_27,          \
+    cs       : CS_SHAMT_25_20,      \
+    wX       : WX_3,                \
+}
+
+//
+// Attribute entries for 32-bit instructions like SH1ADD
+//
+#define ATTR32_SHADD(_NAME, _GENERIC, _ARCH, _OPCODE) [IT32_##_NAME] = { \
+    opcode   : _OPCODE,             \
+    format   : FMT_R1_R2_R3,        \
+    type     : RV_IT_##_GENERIC,    \
+    arch     : _ARCH,               \
+    r1       : RS_X_11_7,           \
+    r2       : RS_X_19_15,          \
+    r3       : RS_X_24_20,          \
+    wX       : WX_3,                \
+    shN      : True,                \
+}
+
+//
 // Attribute entries for 32-bit instructions like ATTR32_VSETVLI
 //
 #define ATTR32_VSETVLI(_NAME, _GENERIC, _ARCH, _OPCODE) [IT32_##_NAME] = { \
@@ -690,7 +805,7 @@
 //
 #define ATTR32_VAMOADD(_NAME, _GENERIC, _ARCH, _OPCODE) [IT32_##_NAME] = { \
     opcode   : _OPCODE,             \
-    format   : FMT_R1_R3_MEM2_R4_RM,\
+    format   : FMT_R1_MEM2_R3_R4_RM,\
     type     : RV_IT_##_GENERIC,    \
     arch     : _ARCH,               \
     r1       : RS_V_11_7_Z26,       \
@@ -762,7 +877,7 @@
 //
 #define ATTR32_VAMOADDEI(_NAME, _GENERIC, _ARCH, _OPCODE) [IT32_##_NAME] = { \
     opcode   : _OPCODE,             \
-    format   : FMT_R1_R3_MEM2_R4_RM,\
+    format   : FMT_R1_MEM2_R3_R4_RM,\
     type     : RV_IT_##_GENERIC,    \
     arch     : _ARCH,               \
     r1       : RS_V_11_7_Z26,       \
