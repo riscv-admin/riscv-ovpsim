@@ -13,8 +13,6 @@ NOTE: X-commit messages below refer to git commits in the following
 
 - The Bit-Manipulation Extension is now implemented in the model, with version
   defined by parameter bitmanip_version.
-  - When enabled, parameters Zba, Zbb, Zbc, Zbe, Zbf, Zbm, Zbp, Zbr, Zbs and Zbt
-    allow the precise subset of supported instructions to be specified.
 - Some Vector Extension issues have been corrected:
   - Parameter order shown by disassembly of vector AMO instructions has been
     corrected. Model behavior is not affected by this change.
