@@ -31,6 +31,7 @@
 #include "vmi/vmiTypes.h"
 
 // Model header files
+#include "riscvCLIC.h"
 #include "riscvExceptions.h"
 #include "riscvFunctions.h"
 #include "riscvMessage.h"
@@ -1769,7 +1770,7 @@ VMI_VMINIT_FN(riscvVMInit) {
     riscv->extBits = (codeBits<dataBits) ? codeBits : dataBits;
 
     // install memory-mapped CLIC control register block if required
-    if(CLICPresent(riscv)) {
+    if(CLICInternal(riscv)) {
         dataDomain = createCLICDomain(riscv, dataDomain);
     }
 

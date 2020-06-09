@@ -132,6 +132,7 @@ Bool riscvVFSupport(riscvP riscv, riscvVFeature feature) {
             [RVVF_FRACT_LMUL]         = 1,
             [RVVF_AGNOSTIC]           = 1,
             [RVVF_MLEN1]              = 1,
+            [RVVF_EEW_OVERLAP]        = 1,
         },
     };
 

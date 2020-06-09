@@ -37,6 +37,7 @@ typedef struct riscvParamValuesS {
     VMI_ENUM_PARAM(user_version);
     VMI_ENUM_PARAM(priv_version);
     VMI_ENUM_PARAM(vector_version);
+    VMI_ENUM_PARAM(bitmanip_version);
     VMI_ENUM_PARAM(fp16_version);
     VMI_ENUM_PARAM(mstatus_fs_mode);
     VMI_BOOL_PARAM(verbose);
@@ -106,6 +107,16 @@ typedef struct riscvParamValuesS {
     VMI_BOOL_PARAM(Zvamo);
     VMI_BOOL_PARAM(Zvediv);
     VMI_BOOL_PARAM(Zvqmac);
+    VMI_BOOL_PARAM(Zba);
+    VMI_BOOL_PARAM(Zbb);
+    VMI_BOOL_PARAM(Zbc);
+    VMI_BOOL_PARAM(Zbe);
+    VMI_BOOL_PARAM(Zbf);
+    VMI_BOOL_PARAM(Zbm);
+    VMI_BOOL_PARAM(Zbp);
+    VMI_BOOL_PARAM(Zbr);
+    VMI_BOOL_PARAM(Zbs);
+    VMI_BOOL_PARAM(Zbt);
 
     // CLIC configuration
     VMI_UNS64_PARAM(mclicbase);
@@ -116,8 +127,12 @@ typedef struct riscvParamValuesS {
     VMI_UNS32_PARAM(CLICCFGMBITS);
     VMI_UNS32_PARAM(CLICCFGLBITS);
     VMI_BOOL_PARAM(CLICSELHVEC);
-    VMI_BOOL_PARAM(CLICMNXTI);
-    VMI_BOOL_PARAM(CLICMCSW);
+    VMI_BOOL_PARAM(CLICXNXTI);
+    VMI_BOOL_PARAM(CLICXCSW);
+    VMI_BOOL_PARAM(externalCLIC);
+    VMI_BOOL_PARAM(tvt_undefined);
+    VMI_BOOL_PARAM(intthresh_undefined);
+    VMI_BOOL_PARAM(mclicbase_undefined);
 
 } riscvParamValues;
 
@@ -145,6 +160,11 @@ const char *riscvGetUserVersionDesc(riscvP riscv);
 // Return Vector Architecture description
 //
 const char *riscvGetVectorVersionDesc(riscvP riscv);
+
+//
+// Return Bit Manipulation Architecture description
+//
+const char *riscvGetBitManipVersionDesc(riscvP riscv);
 
 //
 // Return 16-bit floating point description

@@ -92,7 +92,7 @@ static const vmiRegGroup groups[RV_RG_LAST+1] = {
 //
 // This is the index of the first ISR
 //
-#define RISCV_ISR0_INDEX        0x1000
+#define RISCV_ISR0_INDEX        0x1100
 
 //
 // This is the index of the first vector register
@@ -154,9 +154,10 @@ static VMI_REG_WRITE_FN(writeDMStall) {
 //
 static const isrDetails isRegs[] = {
 
-    {"LRSCAddress", "LR/SC active lock address", ISA_A, 0, 0, RISCV_EA_TAG,   0, 0,            vmi_RA_RW, 0, 0          },
-    {"DM",          "Debug mode active",         0,     1, 8, RISCV_DM,       0, writeDM,      vmi_RA_RW, 0, RVDM_VECTOR},
-    {"DMStall",     "Debug mode stalled",        0,     1, 8, RISCV_DM_STALL, 0, writeDMStall, vmi_RA_RW, 0, RVDM_HALT  },
+    {"LRSCAddress", "LR/SC active lock address", ISA_A, 0, 0, RISCV_EA_TAG,     0, 0,            vmi_RA_RW, 0, 0          },
+    {"DM",          "Debug mode active",         0,     1, 8, RISCV_DM,         0, writeDM,      vmi_RA_RW, 0, RVDM_VECTOR},
+    {"DMStall",     "Debug mode stalled",        0,     2, 8, RISCV_DM_STALL,   0, writeDMStall, vmi_RA_RW, 0, RVDM_HALT  },
+    {"commercial",  "Commercial feature in use", 0,     3, 8, RISCV_COMMERCIAL, 0, 0,            vmi_RA_R,  0, 0          },
 
     // KEEP LAST
     {0}

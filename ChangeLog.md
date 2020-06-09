@@ -11,6 +11,24 @@ NOTE: X-commit messages below refer to git commits in the following
   I-commit: https://github.com/riscv/riscv-isa-manual
   V-commit: https://github.com/riscv/riscv-v-spec
 
+- The Bit-Manipulation Extension is now implemented in the model, with version
+  defined by parameter bitmanip_version.
+  - When enabled, parameters Zba, Zbb, Zbc, Zbe, Zbf, Zbm, Zbp, Zbr, Zbs and Zbt
+    allow the precise subset of supported instructions to be specified.
+- Some Vector Extension issues have been corrected:
+  - Parameter order shown by disassembly of vector AMO instructions has been
+    corrected. Model behavior is not affected by this change.
+  - Encodings of integer extension instructions have been corrected for Vector
+    Extension version 0.9.
+- The vector version master branch currently has these differences compared to
+  the previous 0.9 version:
+  - V-commit 443ce5b: overlap constraints for different source/destination EEW
+    changed.
+
+Date 2020-May-27
+Release 20200526.0
+===
+
 - Memory accesses that straddle PMP region boundaries are now disallowed for
   M-mode, even if those regions imply full M-mode access.
 
