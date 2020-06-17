@@ -99,6 +99,7 @@ typedef struct riscvParamValuesS {
     VMI_UNS64_PARAM(mhartid);
     VMI_UNS64_PARAM(mtvec);
     VMI_UNS32_PARAM(mstatus_FS);
+    VMI_UNS32_PARAM(mstatus_VS);
     VMI_UNS32_PARAM(ELEN);
     VMI_UNS32_PARAM(SLEN);
     VMI_UNS32_PARAM(VLEN);

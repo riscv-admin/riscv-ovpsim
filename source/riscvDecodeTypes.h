@@ -547,6 +547,7 @@ typedef enum riscvVITypeE {
     RV_VIT_VVN,     // instruction type .vv/.wv (version-dependent)
     RV_VIT_VIN,     // instruction type .vi/.wi (version-dependent)
     RV_VIT_VXN,     // instruction type .vx/.wx (version-dependent)
+    RV_VIT_V_V,     // instruction type .v.v
     RV_VIT_LAST     // KEEP LAST: for sizing
 
 } riscvVIType;

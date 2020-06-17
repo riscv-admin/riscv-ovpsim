@@ -115,8 +115,8 @@ typedef enum riscvCSRIdE {
     CSR_ID      (uip),          // 0x044
     CSR_ID      (unxti),        // 0x045
     CSR_ID      (uintstatus),   // 0xC46
+    CSR_ID      (uintthresh),   // 0x047
     CSR_ID      (uscratchcswl), // 0x049
-    CSR_ID      (uintthresh),   // 0x04A
 
     CSR_ID      (cycle),        // 0xC00
     CSR_ID      (time),         // 0xC01
@@ -144,9 +144,9 @@ typedef enum riscvCSRIdE {
     CSR_ID      (sip),          // 0x144
     CSR_ID      (snxti),        // 0x145
     CSR_ID      (sintstatus),   // 0xD46
+    CSR_ID      (sintthresh),   // 0x147
     CSR_ID      (sscratchcsw),  // 0x148
     CSR_ID      (sscratchcswl), // 0x149
-    CSR_ID      (sintthresh),   // 0x14A
     CSR_ID      (satp),         // 0x180
 
     CSR_ID      (mvendorid),    // 0xF11
@@ -170,9 +170,9 @@ typedef enum riscvCSRIdE {
     CSR_ID      (mip),          // 0x344
     CSR_ID      (mnxti),        // 0x345
     CSR_ID      (mintstatus),   // 0xF46
+    CSR_ID      (mintthresh),   // 0x347
     CSR_ID      (mscratchcsw),  // 0x348
     CSR_ID      (mscratchcswl), // 0x349
-    CSR_ID      (mintthresh),   // 0x34A
     CSR_ID      (mclicbase),    // 0x34B
     CSR_ID_0_3  (pmpcfg),       // 0x3A0-0x3A3
     CSR_ID_0_15 (pmpaddr),      // 0x3B0-0x3BF
@@ -987,6 +987,26 @@ CSR_REG_STRUCT_DECL_32(mintstatus);
 #define RM32_uintstatus 0x000000ff
 
 // -----------------------------------------------------------------------------
+// uintthresh   (id 0x047)
+// sintthresh   (id 0x147)
+// mintthresh   (id 0x347)
+// -----------------------------------------------------------------------------
+
+// 32-bit view
+typedef struct {
+    Uns32 th  :  8;
+    Uns32 _u1 : 24;
+} CSR_REG_TYPE_32(intthresh);
+
+// define 32 bit type
+CSR_REG_STRUCT_DECL_32(intthresh);
+
+// define alias types
+typedef CSR_REG_TYPE(intthresh) CSR_REG_TYPE(uintthresh);
+typedef CSR_REG_TYPE(intthresh) CSR_REG_TYPE(sintthresh);
+typedef CSR_REG_TYPE(intthresh) CSR_REG_TYPE(mintthresh);
+
+// -----------------------------------------------------------------------------
 // sscratchcsw (id 0x148)
 // mscratchcsw (id 0x348)
 // -----------------------------------------------------------------------------
@@ -1005,26 +1025,6 @@ typedef CSR_REG_TYPE(genericXLEN) CSR_REG_TYPE(mscratchcsw);
 typedef CSR_REG_TYPE(genericXLEN) CSR_REG_TYPE(uscratchcswl);
 typedef CSR_REG_TYPE(genericXLEN) CSR_REG_TYPE(sscratchcswl);
 typedef CSR_REG_TYPE(genericXLEN) CSR_REG_TYPE(mscratchcswl);
-
-// -----------------------------------------------------------------------------
-// uintthresh   (id 0x04A)
-// sintthresh   (id 0x14A)
-// mintthresh   (id 0x34A)
-// -----------------------------------------------------------------------------
-
-// 32-bit view
-typedef struct {
-    Uns32 th  :  8;
-    Uns32 _u1 : 24;
-} CSR_REG_TYPE_32(intthresh);
-
-// define 32 bit type
-CSR_REG_STRUCT_DECL_32(intthresh);
-
-// define alias types
-typedef CSR_REG_TYPE(intthresh) CSR_REG_TYPE(uintthresh);
-typedef CSR_REG_TYPE(intthresh) CSR_REG_TYPE(sintthresh);
-typedef CSR_REG_TYPE(intthresh) CSR_REG_TYPE(mintthresh);
 
 // -----------------------------------------------------------------------------
 // mclicbase    (id 0x34B)

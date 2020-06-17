@@ -2631,8 +2631,8 @@ static const riscvCSRAttrs csrs[CSR_ID(LAST)] = {
     CSR_ATTR_P__     (uip,          0x044, ISA_N,       0,          1_10,   0,0,0,0,0, "User Interrupt Pending",                        0,        0,           uipR,         uipRW,    uipW          ),
     CSR_ATTR_P__     (unxti,        0x045, ISA_N,       0,          1_10,   0,0,0,1,1, "User Interrupt Handler Address/Enable",         clicNXTP, 0,           unxtiR,       ustatusR, unxtiW        ),
     CSR_ATTR_P__     (uintstatus,   0xC46, ISA_N,       0,          1_10,   0,0,0,0,0, "User Interrupt Status",                         clicP,    0,           uintstatusR,  0,        0             ),
+    CSR_ATTR_T__     (uintthresh,   0x047, ISA_N,       0,          1_10,   0,0,0,0,0, "User Interrupt Level Threshold",                clicITP,  0,           0,            0,        uintthreshW   ),
     CSR_ATTR_P__     (uscratchcswl, 0x049, ISA_N,       0,          1_10,   0,1,0,1,1, "User Conditional Scratch Swap, Level",          clicSWP,  0,           uscratchcswlR,0,        uscratchcswlW ),
-    CSR_ATTR_T__     (uintthresh,   0x04A, ISA_N,       0,          1_10,   0,0,0,0,0, "User Interrupt Level Threshold",                clicITP,  0,           0,            0,        uintthreshW   ),
     CSR_ATTR_P__     (cycle,        0xC00, 0,           0,          1_10,   0,1,0,0,0, "Cycle Counter",                                 0,        0,           mcycleR,      0,        0             ),
     CSR_ATTR_P__     (time,         0xC01, 0,           0,          1_10,   0,1,0,0,0, "Timer",                                         0,        0,           mtimeR,       0,        0             ),
     CSR_ATTR_P__     (instret,      0xC02, 0,           0,          1_10,   0,1,0,0,0, "Instructions Retired",                          0,        0,           minstretR,    0,        0             ),
@@ -2660,9 +2660,9 @@ static const riscvCSRAttrs csrs[CSR_ID(LAST)] = {
     CSR_ATTR_P__     (sip,          0x144, ISA_S,       0,          1_10,   0,0,0,0,0, "Supervisor Interrupt Pending",                  0,        0,           sipR,         sipRW,    sipW          ),
     CSR_ATTR_P__     (snxti,        0x145, ISA_S,       0,          1_10,   0,0,0,1,1, "Supervisor Interrupt Handler Address/Enable",   clicNXTP, 0,           snxtiR,       sstatusR, snxtiW        ),
     CSR_ATTR_P__     (sintstatus,   0xD46, ISA_S,       0,          1_10,   0,0,0,0,0, "Supervisor Interrupt Status",                   clicP,    0,           sintstatusR,  0,        0             ),
+    CSR_ATTR_T__     (sintthresh,   0x147, ISA_S,       0,          1_10,   0,0,0,0,0, "Supervisor Interrupt Level Threshold",          clicITP,  0,           0,            0,        sintthreshW   ),
     CSR_ATTR_P__     (sscratchcsw,  0x148, ISA_S,       0,          1_10,   0,1,0,1,1, "Supervisor Conditional Scratch Swap, Priv",     clicSWP,  0,           sscratchcswR, 0,        sscratchcswW  ),
     CSR_ATTR_P__     (sscratchcswl, 0x149, ISA_S,       0,          1_10,   0,1,0,1,1, "Supervisor Conditional Scratch Swap, Level",    clicSWP,  0,           sscratchcswlR,0,        sscratchcswlW ),
-    CSR_ATTR_T__     (sintthresh,   0x14A, ISA_S,       0,          1_10,   0,0,0,0,0, "Supervisor Interrupt Level Threshold",          clicITP,  0,           0,            0,        sintthreshW   ),
     CSR_ATTR_T__     (satp,         0x180, ISA_S,       0,          1_10,   0,0,1,0,0, "Supervisor Address Translation and Protection", 0,        0,           0,            0,        satpW         ),
 
     //                name          num    arch         access      version   attrs    description                                      present   wState       rCB           rwCB      wCB
@@ -2687,9 +2687,9 @@ static const riscvCSRAttrs csrs[CSR_ID(LAST)] = {
     CSR_ATTR_T__     (mip,          0x344, 0,           0,          1_10,   0,0,0,0,0, "Machine Interrupt Pending",                     0,        0,           mipR,         mipRW,    mipW          ),
     CSR_ATTR_P__     (mnxti,        0x345, 0,           0,          1_10,   0,0,0,1,1, "Machine Interrupt Handler Address/Enable",      clicNXTP, 0,           mnxtiR,       mstatusR, mnxtiW        ),
     CSR_ATTR_T__     (mintstatus,   0xF46, 0,           0,          1_10,   0,0,0,0,0, "Machine Interrupt Status",                      clicP,    0,           0,            0,        0             ),
+    CSR_ATTR_T__     (mintthresh,   0x347, 0,           0,          1_10,   0,0,0,0,0, "Machine Interrupt Level Threshold",             clicITP,  0,           0,            0,        mintthreshW   ),
     CSR_ATTR_P__     (mscratchcsw,  0x348, ISA_U,       0,          1_10,   0,1,0,1,1, "Machine Conditional Scratch Swap, Priv",        clicSWP,  0,           mscratchcswR, 0,        mscratchcswW  ),
     CSR_ATTR_P__     (mscratchcswl, 0x349, 0,           0,          1_10,   0,1,0,1,1, "Machine Conditional Scratch Swap, Level",       clicSWP,  0,           mscratchcswlR,0,        mscratchcswlW ),
-    CSR_ATTR_T__     (mintthresh,   0x34A, 0,           0,          1_10,   0,0,0,0,0, "Machine Interrupt Level Threshold",             clicITP,  0,           0,            0,        mintthreshW   ),
     CSR_ATTR_T__     (mclicbase,    0x34B, 0,           0,          1_10,   0,0,0,0,0, "Machine CLIC Base Address",                     clicMCBP, 0,           0,            0,        mclicbaseW    ),
 
     //                name          num    arch         access      version   attrs    description                                      present   wState       rCB           rwCB      wCB
