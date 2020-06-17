@@ -391,6 +391,23 @@ static const char *getFeatureDesc(riscvArchitecture feature) {
 }
 
 //
+// Take Illegal Instruction exception irrespective of feature presence
+//
+static void illegalInstruction(riscvP riscv) {
+
+    // report FS state
+    if(riscv->verbose) {
+        vmiMessage("W", CPU_PREFIX "_ILL",
+            SRCREF_FMT "Illegal instruction",
+            SRCREF_ARGS(riscv, getPC(riscv))
+        );
+    }
+
+    // take Illegal Instruction exception
+    riscvIllegalInstruction(riscv);
+}
+
+//
 // Take Illegal Instruction exception in special case that FS=0
 //
 static void illegalInstructionFS0(riscvP riscv) {
@@ -435,7 +452,9 @@ static void emitIllegalInstructionAbsentArch(riscvArchitecture missing) {
 
     vmimtArgProcessor();
 
-    if(missing==ISA_FS) {
+    if(!missing) {
+        vmimtCallAttrs((vmiCallFn)illegalInstruction, VMCA_EXCEPTION);
+    } else if(missing==ISA_FS) {
         vmimtCallAttrs((vmiCallFn)illegalInstructionFS0, VMCA_EXCEPTION);
     } else {
         vmimtArgUns32(missing);
@@ -4887,6 +4906,7 @@ typedef enum overlapTypeE {
 // This structure gives information for each vector operation shape
 //
 typedef struct shapeInfoS {
+    Bool        r0IsDst;        // is register 0 a destination?
     Uns8        argMul   [3];   // width multipliers (result, arg0, argN)
     Bool        argDiv   [3];   // divided-width operand (result, arg0, argN)
     Bool        isFloat  [3];   // are operands floating point?
@@ -4910,56 +4930,57 @@ typedef struct shapeInfoS {
 static const shapeInfo shapeDetails[RVVW_LAST] = {
 
     // INTEGER ARGUMENTS
-    [RVVW_V1I_V1I_V1I]      = {{1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_V1I_V1I_V1I_XSM]  = {{1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT_XSM },
-    [RVVW_V1I_V1I_V1I_SAT]  = {{1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 1, 1, 0, 0, 0, OT___  },
-    [RVVW_V1I_V1I_V1I_VXRM] = {{1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 1, 0, 0, 0, OT___  },
-    [RVVW_V1I_V1I_V1I_SEW8] = {{1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 1, 0, OT___  },
-    [RVVW_V1I_S1I_V1I]      = {{1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,1,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 1, OT___  },
-    [RVVW_S1I_V1I_V1I]      = {{1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {1,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_P1I_V1I_V1I]      = {{1,1,1}, {0,0,0}, {0,0,0}, {1,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_S1I_V1I_S1I]      = {{1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {1,0,1}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_V1I_V1I_V1I_CIN]  = {{1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 1, 0, 0, OT___  },
-    [RVVW_P1I_V1I_V1I_CIN]  = {{1,1,1}, {0,0,0}, {0,0,0}, {1,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 1, 0, 0, OT___  },
-    [RVVW_S2I_V1I_S2I]      = {{2,1,2}, {0,0,0}, {0,0,0}, {0,0,0}, {1,0,1}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_V1I_V2I_V1I]      = {{1,2,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 1, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_V1I_V2I_V1I_SAT]  = {{1,2,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 1, 1, 1, 0, 0, 0, OT___  },
-    [RVVW_V2I_V1I_V1I_IW]   = {{2,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 1, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_V2I_V1I_V1I]      = {{2,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_V2I_V1I_V1I_SAT]  = {{2,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 1, 1, 0, 0, 0, OT___  },
-    [RVVW_V4I_V1I_V1I]      = {{4,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_V2I_V2I_V1I]      = {{2,2,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_V1I_V2I_FN]       = {{1,1,1}, {0,1,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_V1I_V1I_V1I]      = {1, {1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_V1I_V1I_V1I_LD]   = {1, {1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT_XSM },
+    [RVVW_V1I_V1I_V1I_ST]   = {0, {1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_V1I_V1I_V1I_SAT]  = {1, {1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 1, 1, 0, 0, 0, OT___  },
+    [RVVW_V1I_V1I_V1I_VXRM] = {1, {1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 1, 0, 0, 0, OT___  },
+    [RVVW_V1I_V1I_V1I_SEW8] = {1, {1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 1, 0, OT___  },
+    [RVVW_V1I_S1I_V1I]      = {1, {1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,1,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 1, OT___  },
+    [RVVW_S1I_V1I_V1I]      = {1, {1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {1,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_P1I_V1I_V1I]      = {1, {1,1,1}, {0,0,0}, {0,0,0}, {1,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_S1I_V1I_S1I]      = {1, {1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {1,0,1}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_V1I_V1I_V1I_CIN]  = {1, {1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 1, 0, 0, OT___  },
+    [RVVW_P1I_V1I_V1I_CIN]  = {1, {1,1,1}, {0,0,0}, {0,0,0}, {1,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 1, 0, 0, OT___  },
+    [RVVW_S2I_V1I_S2I]      = {1, {2,1,2}, {0,0,0}, {0,0,0}, {0,0,0}, {1,0,1}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_V1I_V2I_V1I]      = {1, {1,2,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 1, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_V1I_V2I_V1I_SAT]  = {1, {1,2,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 1, 1, 1, 0, 0, 0, OT___  },
+    [RVVW_V2I_V1I_V1I_IW]   = {1, {2,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 1, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_V2I_V1I_V1I]      = {1, {2,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_V2I_V1I_V1I_SAT]  = {1, {2,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 1, 1, 0, 0, 0, OT___  },
+    [RVVW_V4I_V1I_V1I]      = {1, {4,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_V2I_V2I_V1I]      = {1, {2,2,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_V1I_V2I_FN]       = {1, {1,1,1}, {0,1,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
 
     // FLOATING POINT ARGUMENTS
-    [RVVW_V1F_V1F_V1F]      = {{1,1,1}, {0,0,0}, {1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_V1F_S1F_V1F]      = {{1,1,1}, {0,0,0}, {1,1,1}, {0,0,0}, {0,1,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 1, OT___  },
-    [RVVW_S1F_V1I_V1I]      = {{1,1,1}, {0,0,0}, {1,1,1}, {0,0,0}, {1,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_P1I_V1F_V1F]      = {{1,1,1}, {0,0,0}, {0,1,1}, {1,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_S1F_V1F_S1F]      = {{1,1,1}, {0,0,0}, {1,1,1}, {0,0,0}, {1,0,1}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_S2F_V1F_S2F]      = {{2,1,2}, {0,0,0}, {1,1,1}, {0,0,0}, {1,0,1}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_V1F_V2F_V1F_IW]   = {{1,2,1}, {0,0,0}, {1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 1, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_V2F_V1F_V1F_IW]   = {{2,1,1}, {0,0,0}, {1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 1, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_V2F_V1F_V1F]      = {{2,1,1}, {0,0,0}, {1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_V2F_V2F_V1F]      = {{2,2,1}, {0,0,0}, {1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_V1F_V1F_V1F]      = {1, {1,1,1}, {0,0,0}, {1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_V1F_S1F_V1F]      = {1, {1,1,1}, {0,0,0}, {1,1,1}, {0,0,0}, {0,1,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 1, OT___  },
+    [RVVW_S1F_V1I_V1I]      = {1, {1,1,1}, {0,0,0}, {1,1,1}, {0,0,0}, {1,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_P1I_V1F_V1F]      = {1, {1,1,1}, {0,0,0}, {0,1,1}, {1,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_S1F_V1F_S1F]      = {1, {1,1,1}, {0,0,0}, {1,1,1}, {0,0,0}, {1,0,1}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_S2F_V1F_S2F]      = {1, {2,1,2}, {0,0,0}, {1,1,1}, {0,0,0}, {1,0,1}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_V1F_V2F_V1F_IW]   = {1, {1,2,1}, {0,0,0}, {1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 1, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_V2F_V1F_V1F_IW]   = {1, {2,1,1}, {0,0,0}, {1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 1, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_V2F_V1F_V1F]      = {1, {2,1,1}, {0,0,0}, {1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_V2F_V2F_V1F]      = {1, {2,2,1}, {0,0,0}, {1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
 
     // CONVERSIONS
-    [RVVW_V1F_V1I]          = {{1,1,1}, {0,0,0}, {1,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_V1I_V1F]          = {{1,1,1}, {0,0,0}, {0,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_V2F_V1I]          = {{2,1,0}, {0,0,0}, {1,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 1, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_V2I_V1F]          = {{2,1,0}, {0,0,0}, {0,1,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 1, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_V1F_V2I_IW]       = {{1,2,0}, {0,0,0}, {1,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 1, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_V1I_V2F_IW]       = {{1,2,0}, {0,0,0}, {0,1,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 1, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_V1F_V1I]          = {1, {1,1,1}, {0,0,0}, {1,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_V1I_V1F]          = {1, {1,1,1}, {0,0,0}, {0,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_V2F_V1I]          = {1, {2,1,0}, {0,0,0}, {1,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 1, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_V2I_V1F]          = {1, {2,1,0}, {0,0,0}, {0,1,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 1, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_V1F_V2I_IW]       = {1, {1,2,0}, {0,0,0}, {1,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 1, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_V1I_V2F_IW]       = {1, {1,2,0}, {0,0,0}, {0,1,0}, {0,0,0}, {0,0,0}, {0,0,0}, 0, 1, 0, 0, 0, 0, 0, 0, OT___  },
 
     // MASK ARGUMENTS
-    [RVVW_P1I_P1I_P1I]      = {{1,1,1}, {0,0,0}, {0,0,0}, {1,1,1}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
-    [RVVW_V1I_P1I_P1I]      = {{1,1,1}, {0,0,0}, {0,0,0}, {0,1,1}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT_SM  },
+    [RVVW_P1I_P1I_P1I]      = {1, {1,1,1}, {0,0,0}, {0,0,0}, {1,1,1}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT___  },
+    [RVVW_V1I_P1I_P1I]      = {1, {1,1,1}, {0,0,0}, {0,0,0}, {0,1,1}, {0,0,0}, {0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT_SM  },
 
     // SLIDING ARGUMENTS
-    [RVVW_V1I_V1I_V1I_GR]   = {{1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,1,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT_SM  },
-    [RVVW_V1I_V1I_V1I_UP]   = {{1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,1,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT_SM71},
-    [RVVW_V1I_V1I_V1I_DN]   = {{1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,1,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT__M71},
-    [RVVW_V1I_V1I_V1I_CMP]  = {{1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {1,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT_SM  },
+    [RVVW_V1I_V1I_V1I_GR]   = {1, {1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,1,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT_SM  },
+    [RVVW_V1I_V1I_V1I_UP]   = {1, {1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,1,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT_SM71},
+    [RVVW_V1I_V1I_V1I_DN]   = {1, {1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,1,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT__M71},
+    [RVVW_V1I_V1I_V1I_CMP]  = {1, {1,1,1}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {1,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, OT_SM  },
 };
 
 //
@@ -4994,6 +5015,13 @@ static Uns32 getWidthMultiplier(riscvVShape vShape) {
     }
 
     return result;
+}
+
+//
+// Is the first register argument a destination?
+//
+inline static Bool isR0Dst(riscvVShape vShape) {
+    return shapeDetails[vShape].r0IsDst;
 }
 
 //
@@ -5209,10 +5237,10 @@ inline static riscvSEWMt getEEW(iterDescP id, Uns32 argIndex) {
 }
 
 //
-// Return EMULx8 for operation Nth vector argument
+// Is EEW forced for operation Nth vector argument?
 //
-inline static riscvVLMULx8Mt getEMULx8(iterDescP id, Uns32 argIndex) {
-    return id->vr[argIndex].EMULx8;
+inline static Bool forceEEW(iterDescP id, Uns32 argIndex) {
+    return id->vr[argIndex].forceEEW;
 }
 
 //
@@ -5223,16 +5251,16 @@ inline static Uns32 getEMUL(iterDescP id, Uns32 argIndex) {
 }
 
 //
-// Is EEW forced for operation Nth vector argument?
+// Return EMULx8 for operation Nth vector argument
 //
-inline static Bool forceEEW(iterDescP id, Uns32 argIndex) {
-    return id->vr[argIndex].forceEEW;
+inline static riscvVLMULx8Mt getEMULx8(iterDescP id, Uns32 argIndex) {
+    return id->vr[argIndex].EMULx8;
 }
 
 //
-// Return the number of vector registers affected by a vector operation
+// Return EMULxNF for operation Nth vector argument
 //
-static Uns32 getVRegNum(riscvMorphStateP state, iterDescP id, Uns32 index) {
+static Uns32 getEMULxNF(riscvMorphStateP state, iterDescP id, Uns32 index) {
 
     Uns32          fieldNum = state->info.nf+1;
     riscvVLMULx8Mt EMULx8   = getEMULx8(id, index);
@@ -5242,16 +5270,16 @@ static Uns32 getVRegNum(riscvMorphStateP state, iterDescP id, Uns32 index) {
 }
 
 //
-// Is the load/store vector register index legal (register numbers must not
+// Is EMULxNF valid for the indexed vector register (register numbers must not
 // increment past the last-supported vector register)
 //
-static Bool legalVRegIndex(
+static Bool legalEMULxNFIndex(
     riscvMorphStateP state,
     iterDescP        id,
     Uns32            index
 ) {
     riscvRegDesc rv      = getRVReg(state, index);
-    Uns32        numRegs = getVRegNum(state, id, index);
+    Uns32        numRegs = getEMULxNF(state, id, index);
     Uns32        last    = getRIndex(rv)+numRegs-1;
 
     return last<VREG_NUM;
@@ -5334,12 +5362,12 @@ static Bool validateNoOverlap(riscvMorphStateP state, iterDescP id) {
     riscvVShape  vShape = state->attrs->vShape;
     riscvRegDesc rD     = getRVReg(state, 0);
 
-    if(isVReg(rD) && !isScalarN(vShape, 0)) {
+    if(isR0Dst(vShape) && isVReg(rD) && !isScalarN(vShape, 0)) {
 
         riscvP       riscv     = state->riscv;
         riscvRegDesc mask      = state->info.mask;
         Uns32        index     = getRIndex(rD);
-        Uns32        dstRegNum = getEMUL(id, 0);
+        Uns32        dstRegNum = getEMULxNF(state, id, 0);
         overlapType  ot        = getOverlapType(vShape);
         Uns32        badMask   = 0;
         Uns32        i;
@@ -6431,6 +6459,8 @@ static void endVectorOp(
         // no top zero state change
     } else if(!requireZeroTail(state->riscv)) {
         // after version 0.7.1, top parts are preserved, not zeroed
+    } else if(!isR0Dst(state->attrs->vShape)) {
+        // first register is not a destination
     } else if(isScalarN(state->attrs->vShape, 0)) {
         updateScalarTopZero(state, id);
     } else {
@@ -7181,13 +7211,13 @@ static RISCV_CHECKV_FN(emitVLdStCheckCB) {
         // whole register loads/store check failed
         ok = False;
 
-    } else if(getVRegNum(state, id, 0)>8) {
+    } else if(getEMULxNF(state, id, 0)>8) {
 
         // VLMUL*NFIELDS must not exceed 8 for load/store segment instructions
         ILLEGAL_INSTRUCTION_MESSAGE(riscv, "IVLMUL", "Illegal VLMUL*NFIELDS>8");
         ok = False;
 
-    } else if(!legalVRegIndex(state, id, 0)) {
+    } else if(!legalEMULxNFIndex(state, id, 0)) {
 
         // register indices must not wrap
         ILLEGAL_INSTRUCTION_MESSAGE(riscv, "IVWRAP", "Illegal vector index wrap-around");
@@ -7242,16 +7272,16 @@ static RISCV_CHECKV_FN(emitVMVRCheckCB) {
     riscvRegDesc rsA    = getRVReg(state, 1);
     Uns32        dIndex = getRIndex(rdA);
     Uns32        sIndex = getRIndex(rsA);
-    Uns32        regNum = getVRegNum(state, id, 0);
+    Uns32        regNum = getEMULxNF(state, id, 0);
     Bool         ok     = True;
 
-    if(!legalVRegIndex(state, id, 0)) {
+    if(!legalEMULxNFIndex(state, id, 0)) {
 
         // destination register indices must not wrap
         ILLEGAL_INSTRUCTION_MESSAGE(riscv, "IVWRAPD", "Illegal destination vector index wrap-around");
         ok = False;
 
-    } else if(!legalVRegIndex(state, id, 1)) {
+    } else if(!legalEMULxNFIndex(state, id, 1)) {
 
         // source register indices must not wrap
         ILLEGAL_INSTRUCTION_MESSAGE(riscv, "IVWRAPS", "Illegal source vector index wrap-around");
@@ -9547,12 +9577,12 @@ const static riscvMorphAttr dispatchTable[] = {
     [RV_IT_VSETVL_I]         = {morph:emitVSetVLRRC},
 
     // V-extension load/store instructions
-    [RV_IT_VL_I]             = {morph:emitVectorOp, opTCB:emitVLdUCB, checkCB:emitVLdStCheckUCB, initCB:emitVLdStInitCB, vstart0:RVVS_ANY, vShape:RVVW_V1I_V1I_V1I_XSM},
-    [RV_IT_VLS_I]            = {morph:emitVectorOp, opTCB:emitVLdSCB, checkCB:emitVLdStCheckSCB, initCB:emitVLdStInitCB, vstart0:RVVS_ANY, vShape:RVVW_V1I_V1I_V1I_XSM},
-    [RV_IT_VLX_I]            = {morph:emitVectorOp, opTCB:emitVLdICB, checkCB:emitVLdStCheckXCB, initCB:emitVLdStInitCB, vstart0:RVVS_ANY, vShape:RVVW_V1I_V1I_V1I_XSM},
-    [RV_IT_VS_I]             = {morph:emitVectorOp, opTCB:emitVStUCB, checkCB:emitVLdStCheckUCB, initCB:emitVLdStInitCB, vstart0:RVVS_ANY, vShape:RVVW_V1I_V1I_V1I    },
-    [RV_IT_VSS_I]            = {morph:emitVectorOp, opTCB:emitVStSCB, checkCB:emitVLdStCheckSCB, initCB:emitVLdStInitCB, vstart0:RVVS_ANY, vShape:RVVW_V1I_V1I_V1I    },
-    [RV_IT_VSX_I]            = {morph:emitVectorOp, opTCB:emitVStICB, checkCB:emitVLdStCheckXCB, initCB:emitVLdStInitCB, vstart0:RVVS_ANY, vShape:RVVW_V1I_V1I_V1I    },
+    [RV_IT_VL_I]             = {morph:emitVectorOp, opTCB:emitVLdUCB, checkCB:emitVLdStCheckUCB, initCB:emitVLdStInitCB, vstart0:RVVS_ANY, vShape:RVVW_V1I_V1I_V1I_LD},
+    [RV_IT_VLS_I]            = {morph:emitVectorOp, opTCB:emitVLdSCB, checkCB:emitVLdStCheckSCB, initCB:emitVLdStInitCB, vstart0:RVVS_ANY, vShape:RVVW_V1I_V1I_V1I_LD},
+    [RV_IT_VLX_I]            = {morph:emitVectorOp, opTCB:emitVLdICB, checkCB:emitVLdStCheckXCB, initCB:emitVLdStInitCB, vstart0:RVVS_ANY, vShape:RVVW_V1I_V1I_V1I_LD},
+    [RV_IT_VS_I]             = {morph:emitVectorOp, opTCB:emitVStUCB, checkCB:emitVLdStCheckUCB, initCB:emitVLdStInitCB, vstart0:RVVS_ANY, vShape:RVVW_V1I_V1I_V1I_ST},
+    [RV_IT_VSS_I]            = {morph:emitVectorOp, opTCB:emitVStSCB, checkCB:emitVLdStCheckSCB, initCB:emitVLdStInitCB, vstart0:RVVS_ANY, vShape:RVVW_V1I_V1I_V1I_ST},
+    [RV_IT_VSX_I]            = {morph:emitVectorOp, opTCB:emitVStICB, checkCB:emitVLdStCheckXCB, initCB:emitVLdStInitCB, vstart0:RVVS_ANY, vShape:RVVW_V1I_V1I_V1I_ST},
 
     // V-extension AMO operations (Zvamo)
     [RV_IT_VAMOADD_R]        = {morph:emitVectorOp, opTCB:emitVAMOBinopRRR, checkCB:emitVAMOCheckCB, binop:vmi_ADD,  vstart0:RVVS_ANY},

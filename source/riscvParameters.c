@@ -758,6 +758,7 @@ static riscvParameter parameters[] = {
     {  RVPV_ALL,     default_mtvec,                VMI_UNS64_PARAM_SPEC (riscvParamValues, mtvec,                0, 0,          -1,         "Override mtvec register")},
     {  RVPV_CLIC,    default_mclicbase,            VMI_UNS64_PARAM_SPEC (riscvParamValues, mclicbase,            0, 0,          -1,         "Override mclicbase register")},
     {  RVPV_FP,      0,                            VMI_UNS32_PARAM_SPEC (riscvParamValues, mstatus_FS,           0, 0,          3,          "Override default value of mstatus.FS (initial state of floating point unit)")},
+    {  RVPV_V,       0,                            VMI_UNS32_PARAM_SPEC (riscvParamValues, mstatus_VS,           0, 0,          3,          "Override default value of mstatus.VS (initial state of vector unit)")},
     {  RVPV_V,       default_ELEN,                 VMI_UNS32_PARAM_SPEC (riscvParamValues, ELEN,                 0, ELEN_MIN,   ELEN_MAX,   "Override ELEN (vector extension)")},
     {  RVPV_V,       default_SLEN,                 VMI_UNS32_PARAM_SPEC (riscvParamValues, SLEN,                 0, SLEN_MIN,   VLEN_MAX,   "Override SLEN (vector extension)")},
     {  RVPV_V,       default_VLEN,                 VMI_UNS32_PARAM_SPEC (riscvParamValues, VLEN,                 0, SLEN_MIN,   VLEN_MAX,   "Override VLEN (vector extension)")},

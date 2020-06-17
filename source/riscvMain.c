@@ -287,6 +287,13 @@ static void applyParamsSMP(riscvP riscv, riscvParamValuesP params) {
     cfg->intthresh_undefined = params->intthresh_undefined;
     cfg->mclicbase_undefined = params->mclicbase_undefined;
 
+    // initialise vector-version-dependent mstatus.VS
+    if(riscvVFSupport(riscv, RVVF_VS_STATUS_9)) {
+        cfg->csr.mstatus.u64.fields.VS_9 = params->mstatus_VS;
+    } else {
+        cfg->csr.mstatus.u64.fields.VS_8 = params->mstatus_VS;
+    }
+
     // handle bit manipulation subset parameters
     cfg->bitmanip_absent = 0;
     ADD_BM_SET(riscv, cfg, params, Zba);
@@ -400,8 +407,9 @@ static void applyParams(riscvP riscv, riscvParamValuesP params) {
 //
 VMI_CONSTRUCTOR_FN(riscvConstructor) {
 
-    riscvP riscv  = (riscvP)processor;
-    riscvP parent = getParent(riscv);
+    riscvP            riscv       = (riscvP)processor;
+    riscvP            parent      = getParent(riscv);
+    riscvParamValuesP paramValues = parameterValues;
 
     // indicate no interrupts are pending and enabled initially
     riscv->pendEnab.id  = RV_NO_INT;
@@ -418,11 +426,11 @@ VMI_CONSTRUCTOR_FN(riscvConstructor) {
 
     // use parameters from parent if that is an SMP container
     if(parent && !riscvIsCluster(parent)) {
-        parameterValues = parent->paramValues;
+        paramValues = parent->paramValues;
     }
 
     // apply parameters
-    applyParams(riscv, parameterValues);
+    applyParams(riscv, paramValues);
 
     // if this is a container, get the number of children
     Uns32 numChildren = getNumChildren(riscv);
@@ -435,7 +443,7 @@ VMI_CONSTRUCTOR_FN(riscvConstructor) {
         smpContext->numChildren = numChildren;
 
         // save parameters for use in child
-        riscv->paramValues = parameterValues;
+        riscv->paramValues = paramValues;
 
         // save the number of child harts
         riscv->numHarts = numChildren;

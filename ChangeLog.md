@@ -11,6 +11,16 @@ NOTE: X-commit messages below refer to git commits in the following
   I-commit: https://github.com/riscv/riscv-isa-manual
   V-commit: https://github.com/riscv/riscv-v-spec
 
+- Core-Local Interrupt Controller (CLIC)
+  - address for xintthresh CSRs have been changed to 0xm47 (previously 0xm4A)
+- Vector Extension
+  - Checking of overlap of vector registers for vector indexed segment loads and
+    stores has been corrected.
+
+Date 2020-June-09
+Release 20200608.0
+===
+
 - The Bit-Manipulation Extension is now implemented in the model, with version
   defined by parameter bitmanip_version.
 - Some Vector Extension issues have been corrected:
