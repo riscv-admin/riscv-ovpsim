@@ -11,6 +11,14 @@ NOTE: X-commit messages below refer to git commits in the following
   I-commit: https://github.com/riscv/riscv-isa-manual
   V-commit: https://github.com/riscv/riscv-v-spec
 
+- Vector Extension
+  - sstatus.VS field alias has been implemented in its new position (from
+    specification version 0.9).
+
+Date 2020-June-17
+Release 20200616.0
+===
+
 - Core-Local Interrupt Controller (CLIC)
   - address for xintthresh CSRs have been changed to 0xm47 (previously 0xm4A)
 - Vector Extension

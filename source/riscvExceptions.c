@@ -713,7 +713,7 @@ void riscvIllegalInstruction(riscvP riscv) {
 
     // tval is either 0 or the instruction pattern
     if(riscv->configInfo.tval_ii_code && !riscv->configInfo.tval_zero) {
-        tval = riscvGetInstruction(riscv, getPC(riscv));
+        tval = riscvFetchInstruction(riscv, getPC(riscv), 0);
     }
 
     riscvTakeException(riscv, riscv_E_IllegalInstruction, tval);

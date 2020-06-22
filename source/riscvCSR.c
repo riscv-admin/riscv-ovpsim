@@ -2966,7 +2966,7 @@ inline static riscvCSRAttrsCP getEntryCSRAttrs(vmiRangeEntryP entry) {
 //
 // Register new CSR
 //
-void riscvNewCSR(riscvCSRAttrsCP attrs, riscvP riscv) {
+static void newCSR(riscvCSRAttrsCP attrs, riscvP riscv) {
 
     Uns32           csrNum = attrs->csrNum;
     vmiRangeTablePP tableP = &riscv->csrTable;
@@ -2979,6 +2979,43 @@ void riscvNewCSR(riscvCSRAttrsCP attrs, riscvP riscv) {
 
     // register attributes and entry
     vmirtSetRangeEntryUserData(entry, (UnsPS)attrs);
+}
+
+//
+// Adjust the given vmiReg for a register in the extension object so that it
+// can be accessed from the processor
+//
+static vmiReg getObjectReg(riscvP riscv, vmiosObjectP object, vmiReg reg) {
+
+    UnsPS delta = (UnsPS)object - (UnsPS)riscv;
+
+    return VMI_REG_DELTA(reg, delta);
+}
+
+//
+// Register new externally-implemented CSR
+//
+void riscvNewCSR(
+    riscvCSRAttrsP  attrs,
+    riscvCSRAttrsCP src,
+    riscvP          riscv,
+    vmiosObjectP    object
+) {
+    // fill attributes from template
+    if(src) {
+        *attrs = *src;
+    }
+
+    // save client object
+    attrs->object = object;
+
+    // adjust any vmiReg offsets to include object offset
+    attrs->reg32        = getObjectReg(riscv, object, attrs->reg32);
+    attrs->reg64        = getObjectReg(riscv, object, attrs->reg64);
+    attrs->writeMaskV32 = getObjectReg(riscv, object, attrs->writeMaskV32);
+    attrs->writeMaskV64 = getObjectReg(riscv, object, attrs->writeMaskV64);
+
+    newCSR(attrs, riscv);
 }
 
 //
@@ -3411,7 +3448,7 @@ void riscvCSRInit(riscvP riscv, Uns32 index) {
     // insert all standard CSRs into CSR lookup table
     for(id=0; id<CSR_ID(LAST); id++) {
         if(RISCV_PRIV_VERSION(riscv) >= csrs[id].version) {
-            riscvNewCSR(&csrs[id], riscv);
+            newCSR(&csrs[id], riscv);
         }
     }
 

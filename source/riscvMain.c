@@ -33,6 +33,8 @@
 #include "riscvConfig.h"
 #include "riscvCSR.h"
 #include "riscvDebug.h"
+#include "riscvDecode.h"
+#include "riscvDisassemble.h"
 #include "riscvDoc.h"
 #include "riscvExceptions.h"
 #include "riscvFunctions.h"
@@ -78,8 +80,16 @@ static void initLeafModelCBs(riscvP riscv) {
     riscv->cb.illegalInstruction = riscvIllegalInstruction;
     riscv->cb.takeException      = riscvTakeException;
 
+    // from riscvDecode.h
+    riscv->cb.fetchInstruction   = riscvExtFetchInstruction;
+
+    // from riscvDisassemble.h
+    riscv->cb.disassInstruction  = riscvDisassembleInstruction;
+
     // from riscvMorph.h
     riscv->cb.instructionEnabled = riscvInstructionEnabled;
+    riscv->cb.morphExternal      = riscvMorphExternal;
+    riscv->cb.morphIllegal       = riscvEmitIllegalInstructionMessage;
     riscv->cb.getVMIReg          = riscvGetVMIReg;
     riscv->cb.getVMIRegFS        = riscvGetVMIRegFS;
     riscv->cb.writeRegSize       = riscvWriteRegSize;
