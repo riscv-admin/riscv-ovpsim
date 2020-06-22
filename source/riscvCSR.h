@@ -328,9 +328,14 @@ typedef struct riscvCSRDetailsS {
 Bool riscvGetCSRDetails(riscvP riscv, riscvCSRDetailsP details, Bool normal);
 
 //
-// Register new CSR
+// Register new externally-implemented CSR
 //
-void riscvNewCSR(riscvCSRAttrsCP attrs, riscvP riscv);
+void riscvNewCSR(
+    riscvCSRAttrsP  attrs,
+    riscvCSRAttrsCP src,
+    riscvP          riscv,
+    vmiosObjectP    object
+);
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -584,8 +589,8 @@ typedef CSR_REG_TYPE(status) CSR_REG_TYPE(ustatus);
 typedef CSR_REG_TYPE(status) CSR_REG_TYPE(sstatus);
 typedef CSR_REG_TYPE(status) CSR_REG_TYPE(mstatus);
 
-// define alias masks
-#define sstatus_AMASK 0x80000003818de133ULL
+// define alias masks (include sstatus.VS field in both 0.8 and 0.9 positions)
+#define sstatus_AMASK 0x80000003818de733ULL
 #define ustatus_AMASK 0x0000000000000011ULL
 
 // define bit masks

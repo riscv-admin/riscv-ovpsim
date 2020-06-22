@@ -651,7 +651,7 @@
 }
 
 //
-// Attribute entries for 32-bit instructions like FMV.D.X
+// instructions like FMV.D.X
 //
 #define ATTR32_FMVFX(_NAME, _GENERIC, _ARCH, _OPCODE) [IT32_##_NAME] = { \
     opcode   : _OPCODE,             \
@@ -697,7 +697,7 @@
 }
 
 //
-// Attribute entries for 32-bit instructions like FMV.X.D
+// instructions like FMV.X.D
 //
 #define ATTR32_FMVXF(_NAME, _GENERIC, _ARCH, _OPCODE) [IT32_##_NAME] = { \
     opcode   : _OPCODE,             \
@@ -711,7 +711,7 @@
 }
 
 //
-// Attribute entries for 32-bit instructions like CRC32
+// instructions like CRC32
 //
 #define ATTR32_CRC32(_NAME, _GENERIC, _ARCH, _OPCODE) [IT32_##_NAME] = { \
     opcode   : _OPCODE,             \
@@ -723,7 +723,7 @@
 }
 
 //
-// Attribute entries for 32-bit instructions like ATTR32_VSETVLI
+// instructions like ATTR32_VSETVLI
 //
 #define ATTR32_VSETVLI(_NAME, _GENERIC, _ARCH, _OPCODE) [IT32_##_NAME] = { \
     opcode   : _OPCODE,             \
@@ -737,7 +737,7 @@
 }
 
 //
-// Attribute entries for 32-bit instructions like VLB
+// instructions like VLB
 //
 #define ATTR32_VL(_NAME, _GENERIC, _ARCH, _OPCODE, _UNS) [IT32_##_NAME] = { \
     opcode   : _OPCODE,             \
@@ -756,7 +756,7 @@
 }
 
 //
-// Attribute entries for 32-bit instructions like VLSB
+// instructions like VLSB
 //
 #define ATTR32_VLS(_NAME, _GENERIC, _ARCH, _OPCODE, _UNS) [IT32_##_NAME] = { \
     opcode   : _OPCODE,             \
@@ -774,7 +774,7 @@
 }
 
 //
-// Attribute entries for 32-bit instructions like VLXB
+// instructions like VLXB
 //
 #define ATTR32_VLX(_NAME, _GENERIC, _ARCH, _OPCODE, _UNS) [IT32_##_NAME] = { \
     opcode   : _OPCODE,             \
@@ -792,7 +792,7 @@
 }
 
 //
-// Attribute entries for 32-bit instructions like VAMOADD
+// instructions like VAMOADD
 //
 #define ATTR32_VAMOADD(_NAME, _GENERIC, _ARCH, _OPCODE) [IT32_##_NAME] = { \
     opcode   : _OPCODE,             \
@@ -809,7 +809,7 @@
 }
 
 //
-// Attribute entries for 32-bit instructions like VLE8
+// instructions like VLE8
 //
 #define ATTR32_VLE(_NAME, _GENERIC, _ARCH, _OPCODE) [IT32_##_NAME] = { \
     opcode   : _OPCODE,             \
@@ -828,7 +828,7 @@
 }
 
 //
-// Attribute entries for 32-bit instructions like VLSE8
+// instructions like VLSE8
 //
 #define ATTR32_VLSE(_NAME, _GENERIC, _ARCH, _OPCODE) [IT32_##_NAME] = { \
     opcode   : _OPCODE,             \
@@ -846,7 +846,7 @@
 }
 
 //
-// Attribute entries for 32-bit instructions like VLXEI8
+// instructions like VLXEI8
 //
 #define ATTR32_VLXEI(_NAME, _GENERIC, _ARCH, _OPCODE) [IT32_##_NAME] = { \
     opcode   : _OPCODE,             \
@@ -864,7 +864,7 @@
 }
 
 //
-// Attribute entries for 32-bit instructions like VAMOADDEI8
+// instructions like VAMOADDEI8
 //
 #define ATTR32_VAMOADDEI(_NAME, _GENERIC, _ARCH, _OPCODE) [IT32_##_NAME] = { \
     opcode   : _OPCODE,             \
@@ -1352,9 +1352,9 @@
 }
 
 //
-// Vd, Vs2, Rs1, Vm (VX)
+// Vd, Rs2, Vs1, Vm (VX)
 //
-#define ATTR32_VD_VS2_RS1_M_VX(_NAME, _GENERIC, _ARCH, _OPCODE) [IT32_##_NAME] = { \
+#define ATTR32_VD_RS2_VS1_M_VX(_NAME, _GENERIC, _ARCH, _OPCODE) [IT32_##_NAME] = { \
     opcode   : _OPCODE,             \
     format   : FMT_R1_R2_R3_RM,     \
     type     : RV_IT_##_GENERIC,    \
@@ -1456,9 +1456,9 @@
 }
 
 //
-// Vd, Fs2
+// Vd, Rs2
 //
-#define ATTR32_VMV_S_X(_NAME, _GENERIC, _ARCH, _OPCODE) [IT32_##_NAME] = { \
+#define ATTR32_VD_RS2(_NAME, _GENERIC, _ARCH, _OPCODE) [IT32_##_NAME] = { \
     opcode   : _OPCODE,             \
     format   : FMT_R1_R2,           \
     type     : RV_IT_##_GENERIC,    \
@@ -1498,7 +1498,7 @@
 }
 
 //
-// Attribute entries for 32-bit instructions like VADD.VX
+// instructions like VEXT.V
 //
 #define ATTR32_VEXT_V(_NAME, _GENERIC, _ARCH, _OPCODE) [IT32_##_NAME] = { \
     opcode   : _OPCODE,             \
@@ -1513,7 +1513,7 @@
 }
 
 //
-// Attribute entries for 32-bit instructions like LAST
+// instructions like LAST
 //
 #define ATTR32_LAST(_NAME, _GENERIC, _OPCODE) [IT32_##_NAME] = { \
     opcode   : _OPCODE,             \
@@ -1527,7 +1527,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 //
-// Attribute entries for 16-bit instructions like NOP
+// instructions like NOP
 //
 #define ATTR16_NOP(_NAME, _GENERIC, _ARCH, _OPCODE) [IT16_##_NAME] = { \
     opcode : _OPCODE,           \
@@ -1537,7 +1537,7 @@
 }
 
 //
-// Attribute entries for 16-bit instructions like ADD
+// instructions like ADD
 //
 #define ATTR16_ADD(_NAME, _GENERIC, _ARCH, _OPCODE) [IT16_##_NAME] = { \
     opcode : _OPCODE,           \
@@ -1550,7 +1550,7 @@
 }
 
 //
-// Attribute entries for 16-bit instructions like AND
+// instructions like AND
 //
 #define ATTR16_AND(_NAME, _GENERIC, _ARCH, _OPCODE) [IT16_##_NAME] = { \
     opcode : _OPCODE,           \
@@ -1563,7 +1563,7 @@
 }
 
 //
-// Attribute entries for 16-bit instructions like ADDW
+// instructions like ADDW
 //
 #define ATTR16_ADDW(_NAME, _GENERIC, _ARCH, _OPCODE) [IT16_##_NAME] = { \
     opcode : _OPCODE,           \
@@ -1577,7 +1577,7 @@
 }
 
 //
-// Attribute entries for 16-bit instructions like MV
+// instructions like MV
 //
 #define ATTR16_MV(_NAME, _GENERIC, _ARCH, _OPCODE) [IT16_##_NAME] = { \
     opcode : _OPCODE,           \
@@ -1589,7 +1589,7 @@
 }
 
 //
-// Attribute entries for 16-bit instructions like ADDI
+// instructions like ADDI
 //
 #define ATTR16_ADDI(_NAME, _GENERIC, _ARCH, _OPCODE) [IT16_##_NAME] = { \
     opcode : _OPCODE,           \
@@ -1602,7 +1602,7 @@
 }
 
 //
-// Attribute entries for 16-bit instructions like ADDI16SP
+// instructions like ADDI16SP
 //
 #define ATTR16_ADDI16SP(_NAME, _GENERIC, _ARCH, _OPCODE) [IT16_##_NAME] = { \
     opcode : _OPCODE,           \
@@ -1615,7 +1615,7 @@
 }
 
 //
-// Attribute entries for 16-bit instructions like ADDI4SPN
+// instructions like ADDI4SPN
 //
 #define ATTR16_ADDI4SPN(_NAME, _GENERIC, _ARCH, _OPCODE) [IT16_##_NAME] = { \
     opcode : _OPCODE,           \
@@ -1628,7 +1628,7 @@
 }
 
 //
-// Attribute entries for 16-bit instructions like ADDIW
+// instructions like ADDIW
 //
 #define ATTR16_ADDIW(_NAME, _GENERIC, _ARCH, _OPCODE) [IT16_##_NAME] = { \
     opcode : _OPCODE,           \
@@ -1642,7 +1642,7 @@
 }
 
 //
-// Attribute entries for 16-bit instructions like ANDI
+// instructions like ANDI
 //
 #define ATTR16_ANDI(_NAME, _GENERIC, _ARCH, _OPCODE) [IT16_##_NAME] = { \
     opcode : _OPCODE,           \
@@ -1655,7 +1655,7 @@
 }
 
 //
-// Attribute entries for 16-bit instructions like SLLI
+// instructions like SLLI
 //
 #define ATTR16_SLLI(_NAME, _GENERIC, _ARCH, _OPCODE) [IT16_##_NAME] = { \
     opcode : _OPCODE,           \
@@ -1668,7 +1668,7 @@
 }
 
 //
-// Attribute entries for 16-bit instructions like SRAI
+// instructions like SRAI
 //
 #define ATTR16_SRAI(_NAME, _GENERIC, _ARCH, _OPCODE) [IT16_##_NAME] = { \
     opcode : _OPCODE,           \
@@ -1681,7 +1681,7 @@
 }
 
 //
-// Attribute entries for 16-bit instructions like BEQZ
+// instructions like BEQZ
 //
 #define ATTR16_BEQZ(_NAME, _GENERIC, _ARCH, _OPCODE) [IT16_##_NAME] = { \
     opcode : _OPCODE,           \
@@ -1694,7 +1694,7 @@
 }
 
 //
-// Attribute entries for 16-bit instructions like J
+// instructions like J
 //
 #define ATTR16_J(_NAME, _GENERIC, _ARCH, _OPCODE) [IT16_##_NAME] = { \
     opcode : _OPCODE,           \
@@ -1706,7 +1706,7 @@
 }
 
 //
-// Attribute entries for 16-bit instructions like JAL
+// instructions like JAL
 //
 #define ATTR16_JAL(_NAME, _GENERIC, _ARCH, _OPCODE) [IT16_##_NAME] = { \
     opcode : _OPCODE,           \
@@ -1718,7 +1718,7 @@
 }
 
 //
-// Attribute entries for 16-bit instructions like JR
+// instructions like JR
 //
 #define ATTR16_JR(_NAME, _GENERIC, _ARCH, _OPCODE) [IT16_##_NAME] = { \
     opcode   : _OPCODE,             \
@@ -1730,7 +1730,7 @@
 }
 
 //
-// Attribute entries for 16-bit instructions like JALR
+// instructions like JALR
 //
 #define ATTR16_JALR(_NAME, _GENERIC, _ARCH, _OPCODE) [IT16_##_NAME] = { \
     opcode   : _OPCODE,             \
@@ -1742,7 +1742,7 @@
 }
 
 //
-// Attribute entries for 16-bit instructions like LI
+// instructions like LI
 //
 #define ATTR16_LI(_NAME, _GENERIC, _ARCH, _OPCODE) [IT16_##_NAME] = { \
     opcode : _OPCODE,           \
@@ -1755,7 +1755,7 @@
 }
 
 //
-// Attribute entries for 16-bit instructions like LUI
+// instructions like LUI
 //
 #define ATTR16_LUI(_NAME, _GENERIC, _ARCH, _OPCODE) [IT16_##_NAME] = { \
     opcode : _OPCODE,           \
@@ -1768,7 +1768,7 @@
 }
 
 //
-// Attribute entries for 16-bit instructions like LD
+// instructions like LD
 //
 #define ATTR16_LD(_NAME, _GENERIC, _ARCH, _OPCODE) [IT16_##_NAME] = { \
     opcode : _OPCODE,           \
@@ -1782,7 +1782,7 @@
 }
 
 //
-// Attribute entries for 16-bit instructions like LDSP
+// instructions like LDSP
 //
 #define ATTR16_LDSP(_NAME, _GENERIC, _ARCH, _OPCODE) [IT16_##_NAME] = { \
     opcode : _OPCODE,           \
@@ -1796,7 +1796,7 @@
 }
 
 //
-// Attribute entries for 16-bit instructions like SDSP
+// instructions like SDSP
 //
 #define ATTR16_SDSP(_NAME, _GENERIC, _ARCH, _OPCODE) [IT16_##_NAME] = { \
     opcode : _OPCODE,           \
@@ -1810,7 +1810,7 @@
 }
 
 //
-// Attribute entries for 16-bit instructions like LW
+// instructions like LW
 //
 #define ATTR16_LW(_NAME, _GENERIC, _ARCH, _OPCODE) [IT16_##_NAME] = { \
     opcode : _OPCODE,           \
@@ -1826,7 +1826,7 @@
 }
 
 //
-// Attribute entries for 16-bit instructions like LWSP
+// instructions like LWSP
 //
 #define ATTR16_LWSP(_NAME, _GENERIC, _ARCH, _OPCODE) [IT16_##_NAME] = { \
     opcode : _OPCODE,           \
@@ -1842,7 +1842,7 @@
 }
 
 //
-// Attribute entries for 16-bit instructions like SWSP
+// instructions like SWSP
 //
 #define ATTR16_SWSP(_NAME, _GENERIC, _ARCH, _OPCODE) [IT16_##_NAME] = { \
     opcode : _OPCODE,           \
@@ -1856,7 +1856,7 @@
 }
 
 //
-// Attribute entries for 16-bit instructions like FLD
+// instructions like FLD
 //
 #define ATTR16_FLD(_NAME, _GENERIC, _ARCH, _OPCODE) [IT16_##_NAME] = { \
     opcode : _OPCODE,           \
@@ -1872,7 +1872,7 @@
 }
 
 //
-// Attribute entries for 16-bit instructions like FLDSP
+// instructions like FLDSP
 //
 #define ATTR16_FLDSP(_NAME, _GENERIC, _ARCH, _OPCODE) [IT16_##_NAME] = { \
     opcode : _OPCODE,           \
@@ -1888,7 +1888,7 @@
 }
 
 //
-// Attribute entries for 16-bit instructions like FSDSP
+// instructions like FSDSP
 //
 #define ATTR16_FSDSP(_NAME, _GENERIC, _ARCH, _OPCODE) [IT16_##_NAME] = { \
     opcode : _OPCODE,           \
@@ -1904,7 +1904,7 @@
 }
 
 //
-// Attribute entries for 16-bit instructions like FLW
+// instructions like FLW
 //
 #define ATTR16_FLW(_NAME, _GENERIC, _ARCH, _OPCODE) [IT16_##_NAME] = { \
     opcode : _OPCODE,           \
@@ -1920,7 +1920,7 @@
 }
 
 //
-// Attribute entries for 16-bit instructions like FLWSP
+// instructions like FLWSP
 //
 #define ATTR16_FLWSP(_NAME, _GENERIC, _ARCH, _OPCODE) [IT16_##_NAME] = { \
     opcode : _OPCODE,           \
@@ -1936,7 +1936,7 @@
 }
 
 //
-// Attribute entries for 16-bit instructions like FSWSP
+// instructions like FSWSP
 //
 #define ATTR16_FSWSP(_NAME, _GENERIC, _ARCH, _OPCODE) [IT16_##_NAME] = { \
     opcode : _OPCODE,           \
@@ -1952,7 +1952,7 @@
 }
 
 //
-// Attribute entries for 16-bit instructions like LAST
+// instructions like LAST
 //
 #define ATTR16_LAST(_NAME, _GENERIC, _OPCODE) [IT16_##_NAME] = { \
     opcode : _OPCODE,           \

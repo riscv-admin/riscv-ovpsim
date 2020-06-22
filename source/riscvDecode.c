@@ -666,11 +666,7 @@ typedef enum riscvIType32E {
     IT32_SBINVI_I,
     IT32_SBEXTI_I,
     IT32_GORCI_I,
-    IT32_ORCB_I,
-    IT32_ORC16_I,
     IT32_GREVI_I,
-    IT32_REV8_I,
-    IT32_REV_I,
     IT32_SHFLI_I,
     IT32_UNSHFLI_I,
     IT32_ADDIWU_I,
@@ -1641,8 +1637,6 @@ const static decodeEntry32 decodeBitmanipUntilV090[] = {
     // B-extension I-type instructions
     //                               |       imm32|  rs1|fun|   rd| opcode|
     DECODE32_ENTRY(        GREVI_I, "|01000.......|.....|001|.....|001.011|"),
-    DECODE32_ENTRY(         REV8_I, "|010000.11000|.....|001|.....|001.011|"),
-    DECODE32_ENTRY(          REV_I, "|010000.11111|.....|001|.....|001.011|"),
 
     // table termination entry
     {0}
@@ -1663,11 +1657,7 @@ const static decodeEntry32 decodeBitmanipPostV090[] = {
     // B-extension I-type instructions
     //                               |       imm32|  rs1|fun|   rd| opcode|
     DECODE32_ENTRY(        GORCI_I, "|001010......|.....|101|.....|001.011|"),
-    DECODE32_ENTRY(         ORCB_I, "|001010000111|.....|101|.....|001.011|"),
-    DECODE32_ENTRY(        ORC16_I, "|001010.10000|.....|101|.....|001.011|"),
     DECODE32_ENTRY(        GREVI_I, "|011010......|.....|101|.....|001.011|"),
-    DECODE32_ENTRY(         REV8_I, "|011010.11000|.....|101|.....|001.011|"),
-    DECODE32_ENTRY(          REV_I, "|011010.11111|.....|101|.....|001.011|"),
 
     // table termination entry
     {0}
@@ -2432,11 +2422,7 @@ const static opAttrs attrsArray32[] = {
     ATTR32_RD_RS1_SSHIFT    (       SBINVI_I,        SBINVI_I, RVANYB,  "sbinvi"  ),
     ATTR32_RD_RS1_SSHIFT    (       SBEXTI_I,        SBEXTI_I, RVANYB,  "sbexti"  ),
     ATTR32_RD_RS1_USHIFT    (        GORCI_I,         GORCI_I, RVANYB,  "gorci"   ),
-    ATTR32_RD_RS1_USHIFT    (         ORCB_I,          ORCB_I, RVANYB,  "gorci"   ),
-    ATTR32_RD_RS1_USHIFT    (        ORC16_I,         ORC16_I, RVANYB,  "gorci"   ),
     ATTR32_RD_RS1_USHIFT    (        GREVI_I,         GREVI_I, RVANYB,  "grevi"   ),
-    ATTR32_RD_RS1_USHIFT    (         REV8_I,          REV8_I, RVANYB,  "grevi"   ),
-    ATTR32_RD_RS1_USHIFT    (          REV_I,           REV_I, RVANYB,  "grevi"   ),
     ATTR32_RD_RS1_SSHIFT    (        SHFLI_I,         SHFLI_I, RVANYB,  "shfli"   ),
     ATTR32_RD_RS1_SSHIFT    (      UNSHFLI_I,       UNSHFLI_I, RVANYB,  "unshfli" ),
     ATTR32_RD_RS1_SI_U      (       ADDIWU_I,        ADDIWU_I, RVANYB,  "addi"    ),
@@ -2746,14 +2732,14 @@ const static opAttrs attrsArray32[] = {
     ATTR32_VD_VS1_RS2_M_VXN (       VNSRA_VX,        VNSRA_VR, RVANYV,  "vnsra"     ),
     ATTR32_VD_VS1_RS2_M_VXN (     VNCLIPU_VX,      VNCLIPU_VR, RVANYV,  "vnclipu"   ),
     ATTR32_VD_VS1_RS2_M_VXN (      VNCLIP_VX,       VNCLIP_VR, RVANYV,  "vnclip"    ),
-    ATTR32_VD_VS2_RS1_M_VX  (    VWSMACCU_VX,     VWSMACCU_VR, RVANYV,  "vwsmaccu"  ),
-    ATTR32_VD_VS2_RS1_M_VX  (     VWSMACC_VX,      VWSMACC_VR, RVANYV,  "vwsmacc"   ),
-    ATTR32_VD_VS2_RS1_M_VX  (   VWSMACCSU_VX,    VWSMACCSU_VR, RVANYV,  "vwsmaccsu" ),
-    ATTR32_VD_VS2_RS1_M_VX  (   VWSMACCUS_VX,    VWSMACCUS_VR, RVANYV,  "vwsmaccus" ),
-    ATTR32_VD_VS2_RS1_M_VX  (     VQMACCU_VX,      VQMACCU_VR, RVANYV,  "vqmaccu"   ),
-    ATTR32_VD_VS2_RS1_M_VX  (      VQMACC_VX,       VQMACC_VR, RVANYV,  "vqmacc"    ),
-    ATTR32_VD_VS2_RS1_M_VX  (    VQMACCSU_VX,     VQMACCSU_VR, RVANYV,  "vqmaccsu"  ),
-    ATTR32_VD_VS2_RS1_M_VX  (    VQMACCUS_VX,     VQMACCUS_VR, RVANYV,  "vqmaccus"  ),
+    ATTR32_VD_RS2_VS1_M_VX  (    VWSMACCU_VX,     VWSMACCU_VR, RVANYV,  "vwsmaccu"  ),
+    ATTR32_VD_RS2_VS1_M_VX  (     VWSMACC_VX,      VWSMACC_VR, RVANYV,  "vwsmacc"   ),
+    ATTR32_VD_RS2_VS1_M_VX  (   VWSMACCSU_VX,    VWSMACCSU_VR, RVANYV,  "vwsmaccsu" ),
+    ATTR32_VD_RS2_VS1_M_VX  (   VWSMACCUS_VX,    VWSMACCUS_VR, RVANYV,  "vwsmaccus" ),
+    ATTR32_VD_RS2_VS1_M_VX  (     VQMACCU_VX,      VQMACCU_VR, RVANYV,  "vqmaccu"   ),
+    ATTR32_VD_RS2_VS1_M_VX  (      VQMACC_VX,       VQMACC_VR, RVANYV,  "vqmacc"    ),
+    ATTR32_VD_RS2_VS1_M_VX  (    VQMACCSU_VX,     VQMACCSU_VR, RVANYV,  "vqmaccsu"  ),
+    ATTR32_VD_RS2_VS1_M_VX  (    VQMACCUS_VX,     VQMACCUS_VR, RVANYV,  "vqmaccus"  ),
 
     // V-extension FVF-type instructions
     ATTR32_VD_VS1_FS2_M_VF  (       VFADD_VF,        VFADD_VR, RVANYV,  "vfadd"       ),
@@ -2799,7 +2785,7 @@ const static opAttrs attrsArray32[] = {
     ATTR32_VD_FS2_VS1_M_VF  (    VFWNMSAC_VF,     VFWNMSAC_VR, RVANYV,  "vfwnmsac"    ),
 
     // V-extension MVX-type instructions
-    ATTR32_VMV_S_X   (        VMV_S_X,         VMV_S_X, RVANYV,  "vmv.s.x"    ),
+    ATTR32_VD_RS2           (        VMV_S_X,         VMV_S_X, RVANYV,  "vmv.s.x"    ),
     ATTR32_VD_VS1_RS2_M_VX  (   VSLIDE1UP_VX,    VSLIDE1UP_VX, RVANYV,  "vslide1up"  ),
     ATTR32_VD_VS1_RS2_M_VX  ( VSLIDE1DOWN_VX,  VSLIDE1DOWN_VX, RVANYV,  "vslide1down"),
     ATTR32_VEXT_V           (        VZEXT_V,         VZEXT_V, RVANYV,  "vzext"      ),
@@ -2812,10 +2798,10 @@ const static opAttrs attrsArray32[] = {
     ATTR32_VD_VS1_RS2_M_VX  (        VMUL_VX,         VMUL_VR, RVANYV,  "vmul"       ),
     ATTR32_VD_VS1_RS2_M_VX  (     VMULHSU_VX,      VMULHSU_VR, RVANYV,  "vmulhsu"    ),
     ATTR32_VD_VS1_RS2_M_VX  (       VMULH_VX,        VMULH_VR, RVANYV,  "vmulh"      ),
-    ATTR32_VD_VS2_RS1_M_VX  (       VMADD_VX,        VMADD_VR, RVANYV,  "vmadd"      ),
-    ATTR32_VD_VS2_RS1_M_VX  (      VNMSUB_VX,       VNMSUB_VR, RVANYV,  "vnmsub"     ),
-    ATTR32_VD_VS2_RS1_M_VX  (       VMACC_VX,        VMACC_VR, RVANYV,  "vmacc"      ),
-    ATTR32_VD_VS2_RS1_M_VX  (      VNMSAC_VX,       VNMSAC_VR, RVANYV,  "vnmsac"     ),
+    ATTR32_VD_RS2_VS1_M_VX  (       VMADD_VX,        VMADD_VR, RVANYV,  "vmadd"      ),
+    ATTR32_VD_RS2_VS1_M_VX  (      VNMSUB_VX,       VNMSUB_VR, RVANYV,  "vnmsub"     ),
+    ATTR32_VD_RS2_VS1_M_VX  (       VMACC_VX,        VMACC_VR, RVANYV,  "vmacc"      ),
+    ATTR32_VD_RS2_VS1_M_VX  (      VNMSAC_VX,       VNMSAC_VR, RVANYV,  "vnmsac"     ),
     ATTR32_VD_VS1_RS2_M_VX  (      VWADDU_VX,       VWADDU_VR, RVANYV,  "vwaddu"     ),
     ATTR32_VD_VS1_RS2_M_VX  (       VWADD_VX,        VWADD_VR, RVANYV,  "vwadd"      ),
     ATTR32_VD_VS1_RS2_M_VX  (      VWSUBU_VX,       VWSUBU_VR, RVANYV,  "vwsubu"     ),
@@ -2827,10 +2813,10 @@ const static opAttrs attrsArray32[] = {
     ATTR32_VD_VS1_RS2_M_VX  (      VWMULU_VX,       VWMULU_VR, RVANYV,  "vwmulu"     ),
     ATTR32_VD_VS1_RS2_M_VX  (     VWMULSU_VX,      VWMULSU_VR, RVANYV,  "vwmulsu"    ),
     ATTR32_VD_VS1_RS2_M_VX  (       VWMUL_VX,        VWMUL_VR, RVANYV,  "vwmul"      ),
-    ATTR32_VD_VS2_RS1_M_VX  (     VWMACCU_VX,      VWMACCU_VR, RVANYV,  "vwmaccu"    ),
-    ATTR32_VD_VS2_RS1_M_VX  (      VWMACC_VX,       VWMACC_VR, RVANYV,  "vwmacc"     ),
-    ATTR32_VD_VS2_RS1_M_VX  (    VWMACCSU_VX,     VWMACCSU_VR, RVANYV,  "vwmaccsu"   ),
-    ATTR32_VD_VS2_RS1_M_VX  (    VWMACCUS_VX,     VWMACCUS_VR, RVANYV,  "vwmaccus"   ),
+    ATTR32_VD_RS2_VS1_M_VX  (     VWMACCU_VX,      VWMACCU_VR, RVANYV,  "vwmaccu"    ),
+    ATTR32_VD_RS2_VS1_M_VX  (      VWMACC_VX,       VWMACC_VR, RVANYV,  "vwmacc"     ),
+    ATTR32_VD_RS2_VS1_M_VX  (    VWMACCSU_VX,     VWMACCSU_VR, RVANYV,  "vwmaccsu"   ),
+    ATTR32_VD_RS2_VS1_M_VX  (    VWMACCUS_VX,     VWMACCUS_VR, RVANYV,  "vwmaccus"   ),
 
     // dummy entry for undecoded instruction
     ATTR32_LAST             (           LAST,            LAST,          "undef")
@@ -2863,7 +2849,7 @@ static void insertEntries32(vmidDecodeTableP table, decodeEntry32CP decEntries) 
 //
 // Create the 32-bit instruction decode table
 //
-static vmidDecodeTableP createDecodeTable32(
+static vmidDecodeTableP createExtDecodeTable32(
     riscvVectVer     vect_version,
     riscvBitManipVer bitmanip_version
 ) {
@@ -2968,7 +2954,7 @@ static riscvIType32 getInstructionType32(riscvP riscv, riscvInstrInfoP info) {
 
     // create instruction decode table if required
     if(!table) {
-        table = createDecodeTable32(vect_version, bitmanip_version);
+        table = createExtDecodeTable32(vect_version, bitmanip_version);
         decodeTables[vect_version][bitmanip_version] = table;
     }
 
@@ -3250,7 +3236,7 @@ static void insertEntries16(
 //
 // Create the 16-bit instruction decode table
 //
-static vmidDecodeTableP createDecodeTable16(Bool is64BitMode) {
+static vmidDecodeTableP createExtDecodeTable16(Bool is64BitMode) {
 
     vmidDecodeTableP table = vmidNewDecodeTable(16, IT16_LAST);
 
@@ -3272,7 +3258,7 @@ static riscvIType16 getInstructionType16(riscvP riscv, riscvInstrInfoP info) {
 
     // create instruction decode table if required
     if(!decodeTables[is64BitMode]) {
-        decodeTables[is64BitMode] = createDecodeTable16(is64BitMode);
+        decodeTables[is64BitMode] = createExtDecodeTable16(is64BitMode);
     }
 
     // decode the instruction using decode table
@@ -3303,6 +3289,22 @@ static riscvRegDesc forceWidth32(riscvInstrInfoP info) {
 }
 
 //
+// Is the instruction in the custom space?
+//
+static Bool isCustom(Uns32 instr) {
+
+    switch(instr&0x7f) {
+        case 0x0b:      // CUSTOM0 : 0001011
+        case 0x2b:      // CUSTOM1 : 0101011
+        case 0x6b:      // CUSTOM2 : 1011011
+        case 0x7b:      // CUSTOM3 : 1111011
+            return True;
+        default:
+            return False;
+    }
+}
+
+//
 // Return X register width specifier encoded in the instruction
 //
 static riscvRegDesc getXWidth(riscvP riscv, riscvInstrInfoP info, wxSpec w) {
@@ -3316,7 +3318,7 @@ static riscvRegDesc getXWidth(riscvP riscv, riscvInstrInfoP info, wxSpec w) {
             result = current;
             break;
         case WX_3:
-            result = !U_3(instr) ? current : forceWidth32(info);
+            result = !U_3(instr) || isCustom(instr) ? current : forceWidth32(info);
             break;
         case WX_12:
             result = U_12(instr) ? RV_RD_64 : RV_RD_32;
@@ -4052,9 +4054,9 @@ static Uns32 getShN(riscvInstrInfoP info, Bool shN) {
 }
 
 //
-// Fix floating point instructions that cannot be determined by decode alone
+// Fix instructions that cannot be determined by decode alone
 //
-static void fixFPPseudoInstructions(riscvInstrInfoP info) {
+static void fixPseudoInstructions(riscvInstrInfoP info) {
 
     switch(info->type) {
 
@@ -4079,6 +4081,22 @@ static void fixFPPseudoInstructions(riscvInstrInfoP info) {
                 info->type   = RV_IT_FNEG_R;
                 info->opcode = "fneg";
                 info->format = FMT_R1_R2;
+            }
+            break;
+
+        case RV_IT_GREVI_I:
+            if((info->c&0x1f)==0x1f) {
+                info->type = RV_IT_REV_I;
+            } else if((info->c&0x1f)==0x18) {
+                info->type = RV_IT_REV8_I;
+            }
+            break;
+
+        case RV_IT_GORCI_I:
+            if(info->c==0x07) {
+                info->type = RV_IT_ORCB_I;
+            } else if((info->c&0x1f)==0x10) {
+                info->type = RV_IT_ORC16_I;
             }
             break;
 
@@ -4204,8 +4222,7 @@ void riscvDecode(
 ) {
     info->type        = RV_IT_LAST;
     info->thisPC      = thisPC;
-    info->instruction = riscvGetInstruction(riscv, info->thisPC);
-    info->bytes       = is4ByteInstruction(info->instruction) ? 4 : 2;
+    info->instruction = riscvFetchInstruction(riscv, info->thisPC, &info->bytes);
 
     // decode based on instruction size
     if(info->bytes==4) {
@@ -4214,14 +4231,14 @@ void riscvDecode(
         decode16(riscv, info);
     }
 
-    // fix up floating point pseudo-instructions
-    fixFPPseudoInstructions(info);
+    // fix up pseudo-instructions
+    fixPseudoInstructions(info);
 }
 
 //
-// Return instruction at address thisPC
+// Fetch instruction at address thisPC
 //
-Uns32 riscvGetInstruction(riscvP riscv, riscvAddr thisPC) {
+Uns32 riscvFetchInstruction(riscvP riscv, riscvAddr thisPC, Uns8 *bytesP) {
 
     Uns32 result;
 
@@ -4245,6 +4262,11 @@ Uns32 riscvGetInstruction(riscvP riscv, riscvAddr thisPC) {
         // get full instruction pattern
         result |= (fetch2(riscv, highPC) << 16);
     }
+    
+    // return instruction size (irrespective of whether compressed present)
+    if(bytesP) {
+        *bytesP = is4ByteInstruction(result) ? 4 : 2;
+    }
 
     return result;
 }
@@ -4256,4 +4278,142 @@ Uns32 riscvGetInstructionSize(riscvP riscv, riscvAddr thisPC) {
     return getInstructionSize(riscv, thisPC);
 }
 
+
+////////////////////////////////////////////////////////////////////////////////
+// EXTERNALLY-IMPLEMENTED INSTRUCTIONS
+////////////////////////////////////////////////////////////////////////////////
+
+//
+// Create externally-implemented instruction decode table
+//
+static vmidDecodeTableP createExtDecodeTable(
+    riscvExtInstrAttrsCP attrs,
+    Uns32                last,
+    Uns32                bits
+) {
+    // create the table
+    vmidDecodeTableP table = vmidNewDecodeTable(bits, last);
+    Uns32            i;
+
+    for(i=0; i<last; i++) {
+
+        const char *opcode = attrs[i].opcode;
+        const char *decode = attrs[i].decode;
+
+        VMI_ASSERT(decode && opcode, "invalid attribute entry (index %u)", i);
+
+        vmidNewEntryFmtBin(table, opcode, i, decode, 0);
+    }
+
+    return table;
+}
+
+//
+// Decode externally-implemented instruction
+//
+static Uns32 decodeExtInstruction(
+    vmidDecodeTablePP    tableP,
+    riscvExtInstrInfoP   info,
+    riscvExtInstrAttrsCP attrs,
+    Uns32                last,
+    Uns32                bits
+) {
+    // create instruction decode table if required
+    if(!*tableP) {
+        *tableP = createExtDecodeTable(attrs, last, bits);
+    }
+
+    // decode the instruction using decode table
+    return vmidDecode(*tableP, info->instruction);
+}
+
+//
+// Unpack instruction fields using standard pattern
+//
+static void unpackExtInstruction(
+    riscvP               riscv,
+    riscvExtInstrInfoP   instrInfo,
+    riscvExtInstrPattern pattern
+) {
+    static const riscvIType32 map[] = {
+
+        // GPR INSTRUCTIONS
+        [RVIP_RD_RS1_RS2]        = IT32_ADD_R,
+        [RVIP_RD_RS1_SI]         = IT32_ADDI_I,
+        [RVIP_RD_RS1_SHIFT]      = IT32_SLLI_I,
+        [RVIP_RD_RS1_RS2_RS3]    = IT32_CMIX_R4,
+        [RVIP_RD_RS1_RS3_SHIFT]  = IT32_FSRI_R3I,
+
+        // FPR INSTRUCTIONS
+        [RVIP_FD_FS1_FS2]        = IT32_FMAX_R,
+        [RVIP_FD_FS1_FS2_RM]     = IT32_FADD_R,
+        [RVIP_FD_FS1_FS2_FS3_RM] = IT32_FMADD_R4,
+        [RVIP_RD_FS1_FS2]        = IT32_FEQ_R,
+
+        // VECTOR INSTRUCTIONS
+        [RVIP_VD_VS1_VS2_M]      = IT32_VADD_VV,
+        [RVIP_VD_VS1_SI_M]       = IT32_VADD_VI,
+        [RVIP_VD_VS1_UI_M]       = IT32_VSLL_VI,
+        [RVIP_VD_VS1_RS2_M]      = IT32_VADD_VX,
+        [RVIP_VD_VS1_FS2_M]      = IT32_VFADD_VF,
+        [RVIP_RD_VS1_RS2]        = IT32_VEXT_X_V,
+        [RVIP_RD_VS1_M]          = IT32_VPOPC_M,
+        [RVIP_VD_RS2]            = IT32_VMV_S_X,
+        [RVIP_FD_VS1]            = IT32_VFMV_F_S,
+        [RVIP_VD_FS2]            = IT32_VFMV_S_F,
+    };
+
+    // seed fields from the client instruction information
+    riscvInstrInfo info = {
+        thisPC      : instrInfo->thisPC,
+        instruction : instrInfo->instruction,
+    };
+
+    // interpret instruction fields
+    interpretInstruction(riscv, &info, &attrsArray32[map[pattern]]);
+
+    // fill result with interpreted fields
+    instrInfo->arch = info.arch;
+    instrInfo->r[0] = info.r[0];
+    instrInfo->r[1] = info.r[1];
+    instrInfo->r[2] = info.r[2];
+    instrInfo->r[3] = info.r[3];
+    instrInfo->mask = info.mask;
+    instrInfo->rm   = info.rm;
+    instrInfo->c    = info.c;
+}
+
+//
+// Fetch an instruction at the given simulated address and if it matches a
+// decode pattern in the given instruction table unpack the instruction fields
+// into 'info'
+//
+Uns32 riscvExtFetchInstruction(
+    riscvP               riscv,
+    riscvAddr            thisPC,
+    riscvExtInstrInfoP   info,
+    vmidDecodeTablePP    tableP,
+    riscvExtInstrAttrsCP attrs,
+    Uns32                last,
+    Uns32                bits
+) {
+    Uns32 result = last;
+    Uns8  bytes;
+
+    // fetch instruction
+    info->thisPC      = thisPC;
+    info->instruction = riscvFetchInstruction(riscv, thisPC, &bytes);
+
+    // decode based on instruction size
+    if((bytes*8)==bits) {
+        result = decodeExtInstruction(tableP, info, attrs, result, bits);
+    }
+
+    // unpack the instruction if it was successfully decoded
+    if(result!=last) {
+        unpackExtInstruction(riscv, info, attrs[result].pattern);
+    }
+
+    return result;
+}
 

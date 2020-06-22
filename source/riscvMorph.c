@@ -34,6 +34,7 @@
 #include "riscvExceptions.h"
 #include "riscvFunctions.h"
 #include "riscvMessage.h"
+#include "riscvModelCallbackTypes.h"
 #include "riscvMorph.h"
 #include "riscvRegisters.h"
 #include "riscvStructure.h"
@@ -307,6 +308,33 @@ inline static Bool vectorNoFaultOnlyFirst(riscvP riscv) {
 static void emitIllegalInstruction(void) {
     vmimtArgProcessor();
     vmimtCallAttrs((vmiCallFn)riscvIllegalInstruction, VMCA_EXCEPTION);
+}
+
+//
+// Emit Illegal Instruction description message
+//
+static void illegalInstructionMessage(riscvP riscv, const char *reason) {
+    vmiMessage("W", CPU_PREFIX "_ILL",
+        SRCREF_FMT "%s",
+        SRCREF_ARGS(riscv, getPC(riscv)),
+        reason
+    );
+}
+
+//
+// Emit code to take an Illegal Instruction exception for the given reason
+//
+void riscvEmitIllegalInstructionMessage(riscvP riscv, const char *reason) {
+
+    // emit message in verbose mode
+    if(riscv->verbose) {
+        vmimtArgProcessor();
+        vmimtArgNatAddress(reason);
+        vmimtCall((vmiCallFn)illegalInstructionMessage);
+    }
+
+    // take Illegal Instruction exception
+    emitIllegalInstruction();
 }
 
 //
@@ -9957,6 +9985,48 @@ VMI_MORPH_FN(riscvMorph) {
         vmiMessage("F", CPU_PREFIX "_UIMP", // LCOV_EXCL_LINE
             SRCREF_FMT "unimplemented",
             SRCREF_ARGS(riscv, thisPC)
+        );
+    }
+}
+
+//
+// Translate externally-implemented instruction
+//
+void riscvMorphExternal(
+    riscvExtMorphStateP state,
+    const char         *disableReason,
+    Bool               *opaque
+) {
+    riscvP riscv = state->riscv;
+
+    // indicate instruction is implemented here
+    *opaque = True;
+
+    if(RISCV_DISASSEMBLE(riscv)) {
+
+        // no action if in disassembly mode
+
+    } else if(!riscvInstructionEnabled(riscv, state->info.arch)) {
+
+        // instruction not enabled
+
+    } else if(disableReason) {
+
+        // instruction not enabled
+        riscvEmitIllegalInstructionMessage(riscv, disableReason);
+
+    } else if(state->attrs->morph) {
+
+        // translate the instruction
+        vmimtInstructionClassAdd(state->attrs->iClass);
+        state->attrs->morph(state);
+
+    } else {
+
+        // here if no morph callback specified
+        vmiMessage("F", CPU_PREFIX "_UIMP", // LCOV_EXCL_LINE
+            SRCREF_FMT "unimplemented",
+            SRCREF_ARGS(riscv, getPC(riscv))
         );
     }
 }

@@ -29,8 +29,10 @@
 #include "riscvCSR.h"
 #include "riscvDecode.h"
 #include "riscvDecodeTypes.h"
+#include "riscvDisassemble.h"
 #include "riscvDisassembleFormats.h"
 #include "riscvFunctions.h"
+#include "riscvModelCallbackTypes.h"
 #include "riscvUtils.h"
 
 
@@ -691,6 +693,34 @@ VMI_DISASSEMBLE_FN(riscvDisassemble) {
     riscvDecode(riscv, thisPC, &info);
 
     // return disassembled instruction
+    return disassembleInfo(riscv, &info, attrs);
+}
+
+//
+// Disassemble unpacked instruction using the given format
+//
+const char *riscvDisassembleInstruction(
+    riscvP             riscv,
+    riscvExtInstrInfoP instrInfo,
+    const char        *opcode,
+    const char        *format,
+    vmiDisassAttrs     attrs
+) {
+    riscvInstrInfo info = {0};
+
+    // fill source from interpreted fields
+    info.opcode = opcode;
+    info.format = format;
+    info.arch   = instrInfo->arch;
+    info.r[0]   = instrInfo->r[0];
+    info.r[1]   = instrInfo->r[1];
+    info.r[2]   = instrInfo->r[2];
+    info.r[3]   = instrInfo->r[3];
+    info.mask   = instrInfo->mask;
+    info.rm     = instrInfo->rm;
+    info.c      = instrInfo->c;
+
+    // do disassembly
     return disassembleInfo(riscv, &info, attrs);
 }
 
