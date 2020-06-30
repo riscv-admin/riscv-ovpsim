@@ -4367,6 +4367,7 @@ static void unpackExtInstruction(
     riscvInstrInfo info = {
         thisPC      : instrInfo->thisPC,
         instruction : instrInfo->instruction,
+        bytes       : instrInfo->bytes,
     };
 
     // interpret instruction fields
@@ -4398,20 +4399,25 @@ Uns32 riscvExtFetchInstruction(
     Uns32                bits
 ) {
     Uns32 result = last;
-    Uns8  bytes;
 
     // fetch instruction
     info->thisPC      = thisPC;
-    info->instruction = riscvFetchInstruction(riscv, thisPC, &bytes);
+    info->instruction = riscvFetchInstruction(riscv, thisPC, &info->bytes);
 
     // decode based on instruction size
-    if((bytes*8)==bits) {
+    if((info->bytes*8)==bits) {
         result = decodeExtInstruction(tableP, info, attrs, result, bits);
     }
 
     // unpack the instruction if it was successfully decoded
     if(result!=last) {
-        unpackExtInstruction(riscv, info, attrs[result].pattern);
+
+        riscvExtInstrAttrsCP match = &attrs[result];
+
+        info->opcode = match->opcode;
+        info->format = match->format;
+
+        unpackExtInstruction(riscv, info, match->pattern);
     }
 
     return result;

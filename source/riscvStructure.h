@@ -77,17 +77,12 @@ typedef struct riscvNetValueS {
 } riscvNetValue;
 
 //
-// Number of PMP registers
-//
-#define NUM_PMPS 16
-
-//
 // Container for PMP configuration registers
 //
 typedef union riscvPMPCFGU {
-    Uns8  u8 [NUM_PMPS];    // when viewed as bytes
-    Uns32 u32[NUM_PMPS/4];  // when viewed as words
-    Uns64 u64[NUM_PMPS/8];  // when viewed as double words
+    Uns8  *u8;          // when viewed as bytes
+    Uns32 *u32;         // when viewed as words
+    Uns64 *u64;         // when viewed as double words
 } riscvPMPCFG;
 
 //
@@ -268,7 +263,7 @@ typedef struct riscvS {
     riscvDomainSet     vmDomains;           // mapped domains
     memDomainP         CLICDomain;          // CLIC domain
     riscvPMPCFG        pmpcfg;              // pmpcfg registers
-    Uns64              pmpaddr[NUM_PMPS];   // pmpaddr registers
+    Uns64             *pmpaddr;             // pmpaddr registers
     riscvTLBP          tlb;                 // TLB cache
     Uns8               extBits    :  8;     // bit size of external domains
     Bool               PTWActive  :  1;     // page table walk active

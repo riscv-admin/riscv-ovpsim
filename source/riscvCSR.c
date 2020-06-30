@@ -2135,31 +2135,66 @@ static RISCV_CSR_WRITEFN(satpW) {
 ////////////////////////////////////////////////////////////////////////////////
 
 //
-// Read pmpcfg0-pmpcfg3
+// Return the maximum number of PMP registers
+//
+inline static Uns32 getMaxPMPRegs(riscvP riscv) {
+    return (riscv->configInfo.priv_version>=RVPV_1_12) ? 64 : 16;
+}
+
+//
+// Return index number of pmpcfg register
+//
+inline static Uns32 pmpcfgIndex(riscvCSRAttrsCP attrs) {
+    return getCSRId(attrs)-CSR_ID(pmpcfg0);
+}
+
+//
+// Return index number of pmpaddr register
+//
+inline static Uns32 pmpaddrIndex(riscvCSRAttrsCP attrs) {
+    return getCSRId(attrs)-CSR_ID(pmpaddr0);
+}
+
+//
+// Is pmpcfg register present?
+//
+inline static RISCV_CSR_PRESENTFN(pmpcfgP) {
+    return pmpcfgIndex(attrs) < (getMaxPMPRegs(riscv)/4);
+}
+
+//
+// Is pmpaddr register present?
+//
+inline static RISCV_CSR_PRESENTFN(pmpaddrP) {
+    return pmpaddrIndex(attrs) < getMaxPMPRegs(riscv);
+}
+
+//
+// Read pmpcfg0-pmpcfg15
 //
 static RISCV_CSR_READFN(pmpcfgR) {
-    return riscvVMReadPMPCFG(riscv, getCSRId(attrs)-CSR_ID(pmpcfg0));
+    return riscvVMReadPMPCFG(riscv, pmpcfgIndex(attrs));
 }
 
 //
-// Write pmpcfg0-pmpcfg3
+// Write pmpcfg0-pmpcfg15
 //
 static RISCV_CSR_WRITEFN(pmpcfgW) {
-    return riscvVMWritePMPCFG(riscv, getCSRId(attrs)-CSR_ID(pmpcfg0), newValue);
+    return riscvVMWritePMPCFG(riscv, pmpcfgIndex(attrs), newValue);
 }
 
 //
-// Read pmpaddr0-pmpaddr15
+// Read pmpaddr0-pmpaddr63
 //
 static RISCV_CSR_READFN(pmpaddrR) {
-    return riscvVMReadPMPAddr(riscv, getCSRId(attrs)-CSR_ID(pmpaddr0));
+    return riscvVMReadPMPAddr(riscv, pmpaddrIndex(attrs));
 }
 
 //
-// Write pmpaddr0-pmpaddr15
+// Write pmpaddr0-pmpaddr63
 //
 static RISCV_CSR_WRITEFN(pmpaddrW) {
-    return riscvVMWritePMPAddr(riscv, getCSRId(attrs)-CSR_ID(pmpaddr0), newValue);
+    return riscvVMWritePMPAddr(riscv, pmpaddrIndex(attrs), newValue);
 }
 
 
@@ -2546,30 +2581,6 @@ static RISCV_CSR_WRITEFN(dcsrW) {
     )
 
 //
-// Implemented using callbacks only, numbers 0..15
-//
-#define CSR_ATTR_P__0_15( \
-    _ID, _NUM, _ARCH, _ACCESS, _VERSION, _ENDB,_NOTR,_TVMT,_WRD,_NOSR,  \
-    _DESC, _PRESENT, _WSTATE, _RCB, _RWCB, _WCB                         \
-) \
-    CSR_ATTR_P__NUM(_ID, _NUM,  0, _ARCH, _ACCESS, _VERSION, _ENDB,_NOTR,_TVMT,_WRD,_NOSR, _DESC, _PRESENT, _WSTATE, _RCB, _RWCB, _WCB), \
-    CSR_ATTR_P__NUM(_ID, _NUM,  1, _ARCH, _ACCESS, _VERSION, _ENDB,_NOTR,_TVMT,_WRD,_NOSR, _DESC, _PRESENT, _WSTATE, _RCB, _RWCB, _WCB), \
-    CSR_ATTR_P__NUM(_ID, _NUM,  2, _ARCH, _ACCESS, _VERSION, _ENDB,_NOTR,_TVMT,_WRD,_NOSR, _DESC, _PRESENT, _WSTATE, _RCB, _RWCB, _WCB), \
-    CSR_ATTR_P__NUM(_ID, _NUM,  3, _ARCH, _ACCESS, _VERSION, _ENDB,_NOTR,_TVMT,_WRD,_NOSR, _DESC, _PRESENT, _WSTATE, _RCB, _RWCB, _WCB), \
-    CSR_ATTR_P__NUM(_ID, _NUM,  4, _ARCH, _ACCESS, _VERSION, _ENDB,_NOTR,_TVMT,_WRD,_NOSR, _DESC, _PRESENT, _WSTATE, _RCB, _RWCB, _WCB), \
-    CSR_ATTR_P__NUM(_ID, _NUM,  5, _ARCH, _ACCESS, _VERSION, _ENDB,_NOTR,_TVMT,_WRD,_NOSR, _DESC, _PRESENT, _WSTATE, _RCB, _RWCB, _WCB), \
-    CSR_ATTR_P__NUM(_ID, _NUM,  6, _ARCH, _ACCESS, _VERSION, _ENDB,_NOTR,_TVMT,_WRD,_NOSR, _DESC, _PRESENT, _WSTATE, _RCB, _RWCB, _WCB), \
-    CSR_ATTR_P__NUM(_ID, _NUM,  7, _ARCH, _ACCESS, _VERSION, _ENDB,_NOTR,_TVMT,_WRD,_NOSR, _DESC, _PRESENT, _WSTATE, _RCB, _RWCB, _WCB), \
-    CSR_ATTR_P__NUM(_ID, _NUM,  8, _ARCH, _ACCESS, _VERSION, _ENDB,_NOTR,_TVMT,_WRD,_NOSR, _DESC, _PRESENT, _WSTATE, _RCB, _RWCB, _WCB), \
-    CSR_ATTR_P__NUM(_ID, _NUM,  9, _ARCH, _ACCESS, _VERSION, _ENDB,_NOTR,_TVMT,_WRD,_NOSR, _DESC, _PRESENT, _WSTATE, _RCB, _RWCB, _WCB), \
-    CSR_ATTR_P__NUM(_ID, _NUM, 10, _ARCH, _ACCESS, _VERSION, _ENDB,_NOTR,_TVMT,_WRD,_NOSR, _DESC, _PRESENT, _WSTATE, _RCB, _RWCB, _WCB), \
-    CSR_ATTR_P__NUM(_ID, _NUM, 11, _ARCH, _ACCESS, _VERSION, _ENDB,_NOTR,_TVMT,_WRD,_NOSR, _DESC, _PRESENT, _WSTATE, _RCB, _RWCB, _WCB), \
-    CSR_ATTR_P__NUM(_ID, _NUM, 12, _ARCH, _ACCESS, _VERSION, _ENDB,_NOTR,_TVMT,_WRD,_NOSR, _DESC, _PRESENT, _WSTATE, _RCB, _RWCB, _WCB), \
-    CSR_ATTR_P__NUM(_ID, _NUM, 13, _ARCH, _ACCESS, _VERSION, _ENDB,_NOTR,_TVMT,_WRD,_NOSR, _DESC, _PRESENT, _WSTATE, _RCB, _RWCB, _WCB), \
-    CSR_ATTR_P__NUM(_ID, _NUM, 14, _ARCH, _ACCESS, _VERSION, _ENDB,_NOTR,_TVMT,_WRD,_NOSR, _DESC, _PRESENT, _WSTATE, _RCB, _RWCB, _WCB), \
-    CSR_ATTR_P__NUM(_ID, _NUM, 15, _ARCH, _ACCESS, _VERSION, _ENDB,_NOTR,_TVMT,_WRD,_NOSR, _DESC, _PRESENT, _WSTATE, _RCB, _RWCB, _WCB)
-
-//
 // Implemented using callbacks only, numbers 0..9
 //
 #define CSR_ATTR_P__0_9( \
@@ -2586,6 +2597,24 @@ static RISCV_CSR_WRITEFN(dcsrW) {
     CSR_ATTR_P__NUM(_ID, _NUM, 7, _ARCH, _ACCESS, _VERSION, _ENDB,_NOTR,_TVMT,_WRD,_NOSR, _DESC, _PRESENT, _WSTATE, _RCB, _RWCB, _WCB), \
     CSR_ATTR_P__NUM(_ID, _NUM, 8, _ARCH, _ACCESS, _VERSION, _ENDB,_NOTR,_TVMT,_WRD,_NOSR, _DESC, _PRESENT, _WSTATE, _RCB, _RWCB, _WCB), \
     CSR_ATTR_P__NUM(_ID, _NUM, 9, _ARCH, _ACCESS, _VERSION, _ENDB,_NOTR,_TVMT,_WRD,_NOSR, _DESC, _PRESENT, _WSTATE, _RCB, _RWCB, _WCB)
+
+//
+// Implemented using callbacks only, numbers 0..63
+//
+#define CSR_ATTR_P__0_63( \
+    _ID, _NUM, _ARCH, _ACCESS, _VERSION, _ENDB,_NOTR,_TVMT,_WRD,_NOSR,  \
+    _DESC, _PRESENT, _WSTATE, _RCB, _RWCB, _WCB                         \
+) \
+    CSR_ATTR_P__0_9(_ID,    _NUM,    _ARCH, _ACCESS, _VERSION, _ENDB,_NOTR,_TVMT,_WRD,_NOSR, _DESC,    _PRESENT, _WSTATE, _RCB, _RWCB, _WCB), \
+    CSR_ATTR_P__0_9(_ID##1, _NUM+10, _ARCH, _ACCESS, _VERSION, _ENDB,_NOTR,_TVMT,_WRD,_NOSR, _DESC"1", _PRESENT, _WSTATE, _RCB, _RWCB, _WCB), \
+    CSR_ATTR_P__0_9(_ID##2, _NUM+20, _ARCH, _ACCESS, _VERSION, _ENDB,_NOTR,_TVMT,_WRD,_NOSR, _DESC"2", _PRESENT, _WSTATE, _RCB, _RWCB, _WCB), \
+    CSR_ATTR_P__0_9(_ID##3, _NUM+30, _ARCH, _ACCESS, _VERSION, _ENDB,_NOTR,_TVMT,_WRD,_NOSR, _DESC"3", _PRESENT, _WSTATE, _RCB, _RWCB, _WCB), \
+    CSR_ATTR_P__0_9(_ID##4, _NUM+40, _ARCH, _ACCESS, _VERSION, _ENDB,_NOTR,_TVMT,_WRD,_NOSR, _DESC"4", _PRESENT, _WSTATE, _RCB, _RWCB, _WCB), \
+    CSR_ATTR_P__0_9(_ID##5, _NUM+50, _ARCH, _ACCESS, _VERSION, _ENDB,_NOTR,_TVMT,_WRD,_NOSR, _DESC"5", _PRESENT, _WSTATE, _RCB, _RWCB, _WCB), \
+    CSR_ATTR_P__NUM(_ID,    _NUM,60, _ARCH, _ACCESS, _VERSION, _ENDB,_NOTR,_TVMT,_WRD,_NOSR, _DESC,    _PRESENT, _WSTATE, _RCB, _RWCB, _WCB), \
+    CSR_ATTR_P__NUM(_ID,    _NUM,61, _ARCH, _ACCESS, _VERSION, _ENDB,_NOTR,_TVMT,_WRD,_NOSR, _DESC,    _PRESENT, _WSTATE, _RCB, _RWCB, _WCB), \
+    CSR_ATTR_P__NUM(_ID,    _NUM,62, _ARCH, _ACCESS, _VERSION, _ENDB,_NOTR,_TVMT,_WRD,_NOSR, _DESC,    _PRESENT, _WSTATE, _RCB, _RWCB, _WCB), \
+    CSR_ATTR_P__NUM(_ID,    _NUM,63, _ARCH, _ACCESS, _VERSION, _ENDB,_NOTR,_TVMT,_WRD,_NOSR, _DESC,    _PRESENT, _WSTATE, _RCB, _RWCB, _WCB)
 
 //
 // Implemented using callbacks only, numbers 3..31
@@ -2693,11 +2722,23 @@ static const riscvCSRAttrs csrs[CSR_ID(LAST)] = {
     CSR_ATTR_T__     (mclicbase,    0x34B, 0,           0,          1_10,   0,0,0,0,0, "Machine CLIC Base Address",                     clicMCBP, 0,           0,            0,        mclicbaseW    ),
 
     //                name          num    arch         access      version   attrs    description                                      present   wState       rCB           rwCB      wCB
-    CSR_ATTR_P__     (pmpcfg0,      0x3A0, 0,           0,          1_10,   0,0,0,0,0, "Physical Memory Protection Configuration 0",    0,        0,           pmpcfgR,      0,        pmpcfgW       ),
-    CSR_ATTR_P__     (pmpcfg1,      0x3A1, ISA_XLEN_32, 0,          1_10,   0,0,0,0,0, "Physical Memory Protection Configuration 1",    0,        0,           pmpcfgR,      0,        pmpcfgW       ),
-    CSR_ATTR_P__     (pmpcfg2,      0x3A2, 0,           0,          1_10,   0,0,0,0,0, "Physical Memory Protection Configuration 2",    0,        0,           pmpcfgR,      0,        pmpcfgW       ),
-    CSR_ATTR_P__     (pmpcfg3,      0x3A3, ISA_XLEN_32, 0,          1_10,   0,0,0,0,0, "Physical Memory Protection Configuration 3",    0,        0,           pmpcfgR,      0,        pmpcfgW       ),
-    CSR_ATTR_P__0_15 (pmpaddr,      0x3B0, 0,           0,          1_10,   0,0,0,0,0, "Physical Memory Protection Address ",           0,        0,           pmpaddrR,     0,        pmpaddrW      ),
+    CSR_ATTR_P__     (pmpcfg0,      0x3A0, 0,           0,          1_10,   0,0,0,0,0, "Physical Memory Protection Configuration 0",    pmpcfgP,  0,           pmpcfgR,      0,        pmpcfgW       ),
+    CSR_ATTR_P__     (pmpcfg1,      0x3A1, ISA_XLEN_32, 0,          1_10,   0,0,0,0,0, "Physical Memory Protection Configuration 1",    pmpcfgP,  0,           pmpcfgR,      0,        pmpcfgW       ),
+    CSR_ATTR_P__     (pmpcfg2,      0x3A2, 0,           0,          1_10,   0,0,0,0,0, "Physical Memory Protection Configuration 2",    pmpcfgP,  0,           pmpcfgR,      0,        pmpcfgW       ),
+    CSR_ATTR_P__     (pmpcfg3,      0x3A3, ISA_XLEN_32, 0,          1_10,   0,0,0,0,0, "Physical Memory Protection Configuration 3",    pmpcfgP,  0,           pmpcfgR,      0,        pmpcfgW       ),
+    CSR_ATTR_P__     (pmpcfg4,      0x3A4, 0,           0,          1_10,   0,0,0,0,0, "Physical Memory Protection Configuration 4",    pmpcfgP,  0,           pmpcfgR,      0,        pmpcfgW       ),
+    CSR_ATTR_P__     (pmpcfg5,      0x3A5, ISA_XLEN_32, 0,          1_10,   0,0,0,0,0, "Physical Memory Protection Configuration 5",    pmpcfgP,  0,           pmpcfgR,      0,        pmpcfgW       ),
+    CSR_ATTR_P__     (pmpcfg6,      0x3A6, 0,           0,          1_10,   0,0,0,0,0, "Physical Memory Protection Configuration 6",    pmpcfgP,  0,           pmpcfgR,      0,        pmpcfgW       ),
+    CSR_ATTR_P__     (pmpcfg7,      0x3A7, ISA_XLEN_32, 0,          1_10,   0,0,0,0,0, "Physical Memory Protection Configuration 7",    pmpcfgP,  0,           pmpcfgR,      0,        pmpcfgW       ),
+    CSR_ATTR_P__     (pmpcfg8,      0x3A8, 0,           0,          1_10,   0,0,0,0,0, "Physical Memory Protection Configuration 8",    pmpcfgP,  0,           pmpcfgR,      0,        pmpcfgW       ),
+    CSR_ATTR_P__     (pmpcfg9,      0x3A9, ISA_XLEN_32, 0,          1_10,   0,0,0,0,0, "Physical Memory Protection Configuration 9",    pmpcfgP,  0,           pmpcfgR,      0,        pmpcfgW       ),
+    CSR_ATTR_P__     (pmpcfg10,     0x3AA, 0,           0,          1_10,   0,0,0,0,0, "Physical Memory Protection Configuration 10",   pmpcfgP,  0,           pmpcfgR,      0,        pmpcfgW       ),
+    CSR_ATTR_P__     (pmpcfg11,     0x3AB, ISA_XLEN_32, 0,          1_10,   0,0,0,0,0, "Physical Memory Protection Configuration 11",   pmpcfgP,  0,           pmpcfgR,      0,        pmpcfgW       ),
+    CSR_ATTR_P__     (pmpcfg12,     0x3AC, 0,           0,          1_10,   0,0,0,0,0, "Physical Memory Protection Configuration 12",   pmpcfgP,  0,           pmpcfgR,      0,        pmpcfgW       ),
+    CSR_ATTR_P__     (pmpcfg13,     0x3AD, ISA_XLEN_32, 0,          1_10,   0,0,0,0,0, "Physical Memory Protection Configuration 13",   pmpcfgP,  0,           pmpcfgR,      0,        pmpcfgW       ),
+    CSR_ATTR_P__     (pmpcfg14,     0x3AE, 0,           0,          1_10,   0,0,0,0,0, "Physical Memory Protection Configuration 14",   pmpcfgP,  0,           pmpcfgR,      0,        pmpcfgW       ),
+    CSR_ATTR_P__     (pmpcfg15,     0x3AF, ISA_XLEN_32, 0,          1_10,   0,0,0,0,0, "Physical Memory Protection Configuration 15",   pmpcfgP,  0,           pmpcfgR,      0,        pmpcfgW       ),
+    CSR_ATTR_P__0_63 (pmpaddr,      0x3B0, 0,           0,          1_10,   0,0,0,0,0, "Physical Memory Protection Address ",           pmpaddrP, 0,           pmpaddrR,     0,        pmpaddrW      ),
 
     //                name          num    arch         access      version   attrs    description                                      present   wState       rCB           rwCB      wCB
     CSR_ATTR_P__     (mcycle,       0xB00, 0,           0,          1_10,   0,1,0,0,0, "Machine Cycle Counter",                         0,        0,           mcycleR,      0,        mcycleW       ),
@@ -3658,8 +3699,17 @@ void riscvCSRInit(riscvP riscv, Uns32 index) {
 
     // override interrupt delegation masks
     if(haveBasicIC) {
-        SET_CSR_MASK_V(riscv, mideleg, sInterrupts & ~cfg->no_ideleg);
-        SET_CSR_MASK_V(riscv, sideleg, uInterrupts & ~cfg->no_ideleg);
+
+        Uns64 force_mideleg = sInterrupts & cfg->force_mideleg;
+        Uns64 force_sideleg = uInterrupts & cfg->force_sideleg;
+        Uns64 midelegMask   = ~(cfg->no_ideleg | force_mideleg);
+        Uns64 sidelegMask   = ~(cfg->no_ideleg | force_sideleg);
+
+        SET_CSR_MASK_V(riscv, mideleg, sInterrupts & midelegMask);
+        SET_CSR_MASK_V(riscv, sideleg, uInterrupts & sidelegMask);
+
+        WR_CSR(riscv, mideleg, force_mideleg);
+        WR_CSR(riscv, sideleg, force_sideleg);
     }
 
     //--------------------------------------------------------------------------
@@ -3928,17 +3978,24 @@ Bool riscvReadCSR(riscvCSRAttrsCP attrs, riscvP riscv, void *buffer) {
 
     if(ok) {
 
+        Uns64 value = 0;
+
         // switch state to architectural one before read
         toConfiguredArch(attrs, riscv);
 
         // get read callback function
         riscvCSRReadFn readCB = getCSRReadCB(attrs, riscv, bits, False);
 
-        // this function should only be used when there is a read callback
-        VMI_ASSERT(readCB, "require read callback");
-
-        // read value
-        Uns64 value = readCB(attrs, riscv);
+        // read value using callback or raw
+        if(readCB) {
+            value = readCB(attrs, riscv);
+        } else if (!rawValue) {
+            // always-zero register
+        } else if(is64Bit) {
+            value = *(Uns64*)rawValue;
+        } else {
+            value = *(Uns32*)rawValue;
+        }
 
         // assign to buffer of correct size
         if(is64Bit) {
@@ -4050,6 +4107,35 @@ Bool riscvWriteCSR(riscvCSRAttrsCP attrs, riscvP riscv, const void *buffer) {
 ////////////////////////////////////////////////////////////////////////////////
 // LINKED MODEL ACCESS FUNCTIONS
 ////////////////////////////////////////////////////////////////////////////////
+
+//
+// Read a CSR in the model given its number
+//
+Uns64 riscvReadCSRNum(riscvP riscv, Uns32 csrNum) {
+
+    riscvCSRAttrsCP attrs  = getCSRAttrs(riscv, csrNum);
+    Uns64           result = 0;
+
+    if(attrs) {
+        riscvReadCSR(attrs, riscv, &result);
+    }
+
+    return result;
+}
+
+//
+// Write a CSR in the model given its number
+//
+Uns64 riscvWriteCSRNum(riscvP riscv, riscvCSRId csrNum, Uns64 newValue) {
+
+    riscvCSRAttrsCP attrs = getCSRAttrs(riscv, csrNum);
+
+    if(attrs) {
+        riscvWriteCSR(attrs, riscv, &newValue);
+    }
+
+    return newValue;
+}
 
 //
 // Read a CSR in the base model given its id

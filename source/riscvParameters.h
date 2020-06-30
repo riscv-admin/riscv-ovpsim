@@ -79,6 +79,8 @@ typedef struct riscvParamValuesS {
     VMI_UNS64_PARAM(nmi_address);
     VMI_UNS32_PARAM(local_int_num);
     VMI_UNS64_PARAM(unimp_int_mask);
+    VMI_UNS64_PARAM(force_mideleg);
+    VMI_UNS64_PARAM(force_sideleg);
     VMI_UNS64_PARAM(no_ideleg);
     VMI_UNS64_PARAM(no_edeleg);
     VMI_BOOL_PARAM(external_int_id);

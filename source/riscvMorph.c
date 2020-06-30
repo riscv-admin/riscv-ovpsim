@@ -9091,15 +9091,20 @@ static void emitVRSLIDEDOWNInt(
 ) {
     Uns32     vlMax = getVLMAXOp(id);
     vmiLabelP skip  = vmimtNewLabel();
-
-    // assume zero result is required
-    vmimtMoveRC(id->SEW, id->r[0], 0);
+    vmiLabelP done  = vmimtNewLabel();
 
     // skip move from vector if index>=vlmax
     vmimtCompareRCJumpLabel(xBits, vmi_COND_NB, index, vlMax, skip);
 
     // do indexed move (if not skipped)
-    moveIndexedVd0Vs1(state, id, index, skip);
+    moveIndexedVd0Vs1(state, id, index, 0);
+    vmimtUncondJumpLabel(done);
+
+    // zero result if operation was skipped
+    vmimtInsertLabel(skip);
+    vmimtMoveRC(id->SEW, id->r[0], 0);
+
+    vmimtInsertLabel(done);
 }
 
 //

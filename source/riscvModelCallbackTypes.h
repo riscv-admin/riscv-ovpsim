@@ -38,19 +38,17 @@
 // Structure filled with information about a decoded instruction
 //
 typedef struct riscvExtInstrInfoS {
-
-                                    // FILLED BY CLIENT
     riscvAddr         thisPC;       // instruction address
     Uns32             instruction;  // instruction word
-    void             *userData;     // client-specific data
-
-                                    // FILLED BY INSTRUCTION UNPACK
+    Uns8              bytes;        // instruction bytes
+    const char       *opcode;       // opcode name
+    const char       *format;       // disassembly format string
     riscvArchitecture arch;         // architecture requirements
     riscvRegDesc      r[4];         // argument registers
     riscvRegDesc      mask;         // mask register (vector instructions)
     riscvRMDesc       rm;           // rounding mode
     Uns64             c;            // constant value
-
+    void             *userData;     // client-specific data
 } riscvExtInstrInfo;
 
 //
@@ -127,6 +125,7 @@ typedef struct riscvExtMorphAttrS {
     extMorphFn            morph;    // function to translate one instruction
     octiaInstructionClass iClass;   // supplemental instruction class
     Uns32                 variant;  // required variant
+    void                 *userData; // client-specific data
 } riscvExtMorphAttr;
 
 //
@@ -142,8 +141,24 @@ typedef struct riscvExtMorphStateS {
 
 
 ////////////////////////////////////////////////////////////////////////////////
-// CSRS
+// REGISTER ACCESS MACROS
 ////////////////////////////////////////////////////////////////////////////////
+
+//
+// Morph-time macros to calculate offsets to fields in an extension object
+//
+#define EXT_OFFSET(_R)  VMI_CPU_OFFSET(vmiosObjectP, _R)
+#define EXT_REG(_R)     VMI_CPU_REG(vmiosObjectP, _R)
+
+
+////////////////////////////////////////////////////////////////////////////////
+// CSR DEFINITIONS
+////////////////////////////////////////////////////////////////////////////////
+
+//
+// Construct CSR enumeration member name from register name
+//
+#define XCSR_ID(_R) XCSR_ID_##_R
 
 //
 // This type defines CSR attributes together with FIFO-specific configuration
@@ -157,27 +172,46 @@ typedef struct extCSRAttrsS {
 DEFINE_CS(extCSRAttrs);
 
 //
+// Defined but unimplemented CSR
+//
+#define XCSR_ATTR_NIP( \
+    _ID, _NUM, _ARCH, _EXT, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC \
+) [XCSR_ID(_ID)] = { \
+    .extension = _EXT,                              \
+    .baseAttrs = {                                  \
+        name          : #_ID,                       \
+        desc          : _DESC" (not implemented)",  \
+        csrNum        : _NUM,                       \
+        arch          : _ARCH,                      \
+        wEndBlock     : _ENDB,                      \
+        wEndRM        : _ENDRM,                     \
+        noTraceChange : _NOTR,                      \
+        TVMT          : _TVMT,                      \
+    }                                               \
+}
+
+//
 // Implemented using vmiReg and optional callbacks, no mask
 //
 #define XCSR_ATTR_T__( \
     _ID, _NUM, _ARCH, _EXT, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC, _RCB, _RWCB, _WCB \
 ) [XCSR_ID(_ID)] = { \
-    .extension = EXTX_##_EXT,                   \
-    .baseAttrs = {                              \
-        name          : #_ID,                   \
-        desc          : _DESC,                  \
-        csrNum        : _NUM,                   \
-        arch          : _ARCH,                  \
-        wEndBlock     : _ENDB,                  \
-        wEndRM        : _ENDRM,                 \
-        noTraceChange : _NOTR,                  \
-        TVMT          : _TVMT,                  \
-        readCB        : _RCB,                   \
-        readWriteCB   : _RWCB,                  \
-        writeCB       : _WCB,                   \
-        reg32         : XCSR_REG32_MT(_ID),     \
-        reg64         : XCSR_REG64_MT(_ID)      \
-    }                                           \
+    .extension = _EXT,                              \
+    .baseAttrs = {                                  \
+        name          : #_ID,                       \
+        desc          : _DESC,                      \
+        csrNum        : _NUM,                       \
+        arch          : _ARCH,                      \
+        wEndBlock     : _ENDB,                      \
+        wEndRM        : _ENDRM,                     \
+        noTraceChange : _NOTR,                      \
+        TVMT          : _TVMT,                      \
+        readCB        : _RCB,                       \
+        readWriteCB   : _RWCB,                      \
+        writeCB       : _WCB,                       \
+        reg32         : XCSR_REG32_MT(_ID),         \
+        reg64         : XCSR_REG64_MT(_ID)          \
+    }                                               \
 }
 
 //
@@ -186,24 +220,24 @@ DEFINE_CS(extCSRAttrs);
 #define XCSR_ATTR_TC_( \
     _ID, _NUM, _ARCH, _EXT, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC, _RCB, _RWCB, _WCB \
 ) [XCSR_ID(_ID)] = { \
-    .extension = EXTX_##_EXT,                   \
-    .baseAttrs = {                              \
-        name          : #_ID,                   \
-        desc          : _DESC,                  \
-        csrNum        : _NUM,                   \
-        arch          : _ARCH,                  \
-        wEndBlock     : _ENDB,                  \
-        wEndRM        : _ENDRM,                 \
-        noTraceChange : _NOTR,                  \
-        TVMT          : _TVMT,                  \
-        readCB        : _RCB,                   \
-        readWriteCB   : _RWCB,                  \
-        writeCB       : _WCB,                   \
-        reg32         : XCSR_REG32_MT(_ID),     \
-        writeMaskC32  : WM32_##_ID,             \
-        reg64         : XCSR_REG64_MT(_ID),     \
-        writeMaskC64  : WM64_##_ID              \
-    }                                           \
+    .extension = _EXT,                              \
+    .baseAttrs = {                                  \
+        name          : #_ID,                       \
+        desc          : _DESC,                      \
+        csrNum        : _NUM,                       \
+        arch          : _ARCH,                      \
+        wEndBlock     : _ENDB,                      \
+        wEndRM        : _ENDRM,                     \
+        noTraceChange : _NOTR,                      \
+        TVMT          : _TVMT,                      \
+        readCB        : _RCB,                       \
+        readWriteCB   : _RWCB,                      \
+        writeCB       : _WCB,                       \
+        reg32         : XCSR_REG32_MT(_ID),         \
+        writeMaskC32  : WM32_##_ID,                 \
+        reg64         : XCSR_REG64_MT(_ID),         \
+        writeMaskC64  : WM64_##_ID                  \
+    }                                               \
 }
 
 //
@@ -212,25 +246,75 @@ DEFINE_CS(extCSRAttrs);
 #define XCSR_ATTR_TV_( \
     _ID, _NUM, _ARCH, _EXT, _ENDB,_ENDRM,_NOTR,_TVMT, _DESC, _RCB, _RWCB, _WCB \
 ) [XCSR_ID(_ID)] = { \
-    .extension = EXTX_##_EXT,                   \
-    .baseAttrs = {                              \
-        name          : #_ID,                   \
-        desc          : _DESC,                  \
-        csrNum        : _NUM,                   \
-        arch          : _ARCH,                  \
-        wEndBlock     : _ENDB,                  \
-        wEndRM        : _ENDRM,                 \
-        noTraceChange : _NOTR,                  \
-        TVMT          : _TVMT,                  \
-        readCB        : _RCB,                   \
-        readWriteCB   : _RWCB,                  \
-        writeCB       : _WCB,                   \
-        reg32         : XCSR_REG32_MT(_ID),     \
-        writeMaskV32  : XCSR_MASK32_MT(_ID),    \
-        reg64         : XCSR_REG64_MT(_ID),     \
-        writeMaskV64  : XCSR_MASK64_MT(_ID)     \
-    }                                           \
+    .extension = _EXT,                              \
+    .baseAttrs = {                                  \
+        name          : #_ID,                       \
+        desc          : _DESC,                      \
+        csrNum        : _NUM,                       \
+        arch          : _ARCH,                      \
+        wEndBlock     : _ENDB,                      \
+        wEndRM        : _ENDRM,                     \
+        noTraceChange : _NOTR,                      \
+        TVMT          : _TVMT,                      \
+        readCB        : _RCB,                       \
+        readWriteCB   : _RWCB,                      \
+        writeCB       : _WCB,                       \
+        reg32         : XCSR_REG32_MT(_ID),         \
+        writeMaskV32  : XCSR_MASK32_MT(_ID),        \
+        reg64         : XCSR_REG64_MT(_ID),         \
+        writeMaskV64  : XCSR_MASK64_MT(_ID)         \
+    }                                               \
 }
 
+
+////////////////////////////////////////////////////////////////////////////////
+// CSR ACCESS MACROS
+////////////////////////////////////////////////////////////////////////////////
+
+// get CSR value using current XLEN
+#define RD_XCSR(_OBJ, _RNAME) \
+    (RISCV_XLEN_IS_32((_OBJ)->riscv) ?                  \
+        (_OBJ)->csr._RNAME.u32.bits :                   \
+        (_OBJ)->csr._RNAME.u64.bits)                    \
+
+// set CSR value using current XLEN
+#define WR_XCSR(_OBJ, _RNAME, _VALUE) \
+    if(RISCV_XLEN_IS_32((_OBJ)->riscv)) {               \
+        (_OBJ)->csr._RNAME.u32.bits = _VALUE;           \
+    } else {                                            \
+        (_OBJ)->csr._RNAME.u64.bits = _VALUE;           \
+    }
+
+// get CSR field using current XLEN
+#define RD_XCSR_FIELD(_OBJ, _RNAME, _FIELD) \
+    (RISCV_XLEN_IS_32((_OBJ)->riscv) ?                  \
+        (_OBJ)->csr._RNAME.u32.fields._FIELD :          \
+        (_OBJ)->csr._RNAME.u64.fields._FIELD)           \
+
+// set CSR field using current XLEN
+#define WR_XCSR_FIELD(_OBJ, _RNAME, _FIELD, _VALUE) \
+    if(RISCV_XLEN_IS_32((_OBJ)->riscv)) {               \
+        (_OBJ)->csr._RNAME.u32.fields._FIELD = _VALUE;  \
+    } else {                                            \
+        (_OBJ)->csr._RNAME.u64.fields._FIELD = _VALUE;  \
+    }
+
+// set CSR field when XLEN is 64
+#define WR_XCSR64_FIELD(_OBJ, _RNAME, _FIELD, _VALUE) \
+    if(RISCV_XLEN_IS_64((_OBJ)->riscv)) {               \
+        (_OBJ)->csr._RNAME.u64.fields._FIELD = _VALUE;  \
+    }
+
+
+////////////////////////////////////////////////////////////////////////////////
+// MORPH-TIME CSR ACCESS MACROS
+////////////////////////////////////////////////////////////////////////////////
+
+//
+// Morph-time macros to access a CSR register by id
+//
+#define XCSR_REG_MT(_ID)    EXT_REG(csr._ID)
+#define XCSR_REG32_MT(_ID)  EXT_REG(csr._ID.u32)
+#define XCSR_REG64_MT(_ID)  EXT_REG(csr._ID.u64)
 
 
