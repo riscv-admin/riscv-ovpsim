@@ -83,6 +83,8 @@ typedef struct riscvConfigS {
     Uns64             debug_address;    // debug vector address
     Uns64             dexc_address;     // debug exception address
     Uns64             unimp_int_mask;   // mask of unimplemented interrupts
+    Uns64             force_mideleg;    // always-delegated M-mode interrupts
+    Uns64             force_sideleg;    // always-delegated S-mode interrupts
     Uns64             no_ideleg;        // non-delegated interrupts
     Uns64             no_edeleg;        // non-delegated exceptions
     Uns64             ecode_mask;       // implemented bits in xcause.ecode

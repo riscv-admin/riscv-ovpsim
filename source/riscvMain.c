@@ -72,6 +72,8 @@ static void initLeafModelCBs(riscvP riscv) {
     riscv->cb.setTMode           = riscvSetTMode;
     riscv->cb.getTMode           = riscvGetTMode;
     riscv->cb.getDataEndian      = riscvGetDataEndian;
+    riscv->cb.readCSR            = riscvReadCSRNum;
+    riscv->cb.writeCSR           = riscvWriteCSRNum;
     riscv->cb.readBaseCSR        = riscvReadBaseCSR;
     riscv->cb.writeBaseCSR       = riscvWriteBaseCSR;
 
@@ -253,6 +255,8 @@ static void applyParamsSMP(riscvP riscv, riscvParamValuesP params) {
     cfg->ecode_mask          = params->ecode_mask;
     cfg->ecode_nmi           = params->ecode_nmi;
     cfg->external_int_id     = params->external_int_id;
+    cfg->force_mideleg       = params->force_mideleg;
+    cfg->force_sideleg       = params->force_sideleg;
     cfg->no_ideleg           = params->no_ideleg;
     cfg->no_edeleg           = params->no_edeleg;
     cfg->lr_sc_grain         = powerOfTwo(params->lr_sc_grain, "lr_sc_grain");
@@ -472,6 +476,9 @@ VMI_CONSTRUCTOR_FN(riscvConstructor) {
         // initialize mask of implemented exceptions
         riscvSetExceptionMask(riscv);
 
+        // allocate PMP structures
+        riscvVMNewPMP(riscv);
+
         // initialize CSR state
         riscvCSRInit(riscv, smpContext->index);
 
@@ -550,6 +557,9 @@ VMI_DESTRUCTOR_FN(riscvDestructor) {
 
     // free CLIC data structures
     riscvFreeCLIC(riscv);
+
+    // free PMP structures
+    riscvVMFreePMP(riscv);
 }
 
 

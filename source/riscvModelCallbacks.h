@@ -149,8 +149,6 @@ typedef RISCV_FETCH_INSTRUCTION_FN((*riscvFetchInstructionFn));
 #define RISCV_DISASS_INSTRUCTION_FN(_NAME) const char *_NAME( \
     riscvP             riscv,       \
     riscvExtInstrInfoP instrInfo,   \
-    const char        *opcode,      \
-    const char        *format,      \
     vmiDisassAttrs     attrs        \
 )
 typedef RISCV_DISASS_INSTRUCTION_FN((*riscvDisassInstructionFn));
@@ -380,6 +378,25 @@ typedef RISCV_TSTORE_FN((*riscvTStoreFn));
 typedef RISCV_PMA_CHECK_FN((*riscvPMACheckFn));
 
 //
+// Read a CSR in the base model given its number
+//
+#define RISCV_READ_CSR_NUM_FN(_NAME) Uns64 _NAME( \
+    riscvP riscv,               \
+    Uns32  csrNum               \
+)
+typedef RISCV_READ_CSR_NUM_FN((*riscvReadCSRNumFn));
+
+//
+// Write a CSR in the base model given its number
+//
+#define RISCV_WRITE_CSR_NUM_FN(_NAME) Uns64 _NAME( \
+    riscvP riscv,               \
+    Uns32  csrNum,              \
+    Uns64  newValue             \
+)
+typedef RISCV_WRITE_CSR_NUM_FN((*riscvWriteCSRNumFn));
+
+//
 // Read a CSR in the base model given its id
 //
 #define RISCV_READ_BASE_CSR_FN(_NAME) Uns64 _NAME( \
@@ -415,6 +432,8 @@ typedef struct riscvModelCBS {
     riscvSetTModeFn           setTMode;
     riscvGetTModeFn           getTMode;
     riscvGetDataEndianFn      getDataEndian;
+    riscvReadCSRNumFn         readCSR;
+    riscvWriteCSRNumFn        writeCSR;
     riscvReadBaseCSRFn        readBaseCSR;
     riscvWriteBaseCSRFn       writeBaseCSR;
 

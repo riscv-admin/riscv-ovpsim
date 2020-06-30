@@ -32,7 +32,5 @@
 const char *riscvDisassembleInstruction(
     riscvP             riscv,
     riscvExtInstrInfoP instrInfo,
-    const char        *opcode,
-    const char        *format,
     vmiDisassAttrs     attrs
 );

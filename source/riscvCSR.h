@@ -93,6 +93,21 @@
     CSR_ID(_R##15)
 
 //
+// Construct enumeration member names from the given base and indices 0..63
+//
+#define CSR_ID_0_63(_R) \
+    CSR_ID_0_9(_R),     \
+    CSR_ID_0_9(_R##1),  \
+    CSR_ID_0_9(_R##2),  \
+    CSR_ID_0_9(_R##3),  \
+    CSR_ID_0_9(_R##4),  \
+    CSR_ID_0_9(_R##5),  \
+    CSR_ID(_R##60),     \
+    CSR_ID(_R##61),     \
+    CSR_ID(_R##62),     \
+    CSR_ID(_R##63)
+
+//
 // Identifiers for each implemented CSR
 //
 typedef enum riscvCSRIdE {
@@ -174,8 +189,8 @@ typedef enum riscvCSRIdE {
     CSR_ID      (mscratchcsw),  // 0x348
     CSR_ID      (mscratchcswl), // 0x349
     CSR_ID      (mclicbase),    // 0x34B
-    CSR_ID_0_3  (pmpcfg),       // 0x3A0-0x3A3
-    CSR_ID_0_15 (pmpaddr),      // 0x3B0-0x3BF
+    CSR_ID_0_15 (pmpcfg),       // 0x3A0-0x3AF
+    CSR_ID_0_63 (pmpaddr),      // 0x3B0-0x3EF
     CSR_ID      (mcycle),       // 0xB00
     CSR_ID      (minstret),     // 0xB02
     CSR_ID_3_31 (mhpmcounter),  // 0xB03-0xB1F
@@ -255,6 +270,16 @@ Bool riscvWriteCSR(riscvCSRAttrsCP attrs, riscvP riscv, const void *buffer);
 ////////////////////////////////////////////////////////////////////////////////
 // LINKED MODEL ACCESS FUNCTIONS
 ////////////////////////////////////////////////////////////////////////////////
+
+//
+// Read a CSR in the model given its number
+//
+Uns64 riscvReadCSRNum(riscvP riscv, Uns32 csrNum);
+
+//
+// Write a CSR in the model given its number
+//
+Uns64 riscvWriteCSRNum(riscvP riscv, riscvCSRId csrNum, Uns64 newValue);
 
 //
 // Read a CSR in the base model given its id

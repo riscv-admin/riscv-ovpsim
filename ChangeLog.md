@@ -12,6 +12,14 @@ NOTE: X-commit messages below refer to git commits in the following
   V-commit: https://github.com/riscv/riscv-v-spec
 
 - Vector Extension
+  - behavior of vslidedown.vx and vslidedown.vi with a slide of 0 when source
+    and destination vector registers are the same has been corrected.
+
+Date 2020-June-22
+Release 20200619.0
+===
+
+- Vector Extension
   - sstatus.VS field alias has been implemented in its new position (from
     specification version 0.9).
 

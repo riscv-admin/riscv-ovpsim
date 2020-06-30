@@ -425,7 +425,6 @@ static RISCV_BOOL_PDEFAULT_CFG_FN(mclicbase_undefined);
 static RISCV_UNS32_PDEFAULT_CFG_FN(tvec_align);
 static RISCV_UNS32_PDEFAULT_CFG_FN(counteren_mask);
 static RISCV_UNS32_PDEFAULT_CFG_FN(PMP_grain)
-static RISCV_UNS32_PDEFAULT_CFG_FN(PMP_registers);
 static RISCV_UNS32_PDEFAULT_CFG_FN(CLICLEVELS);
 static RISCV_UNS32_PDEFAULT_CFG_FN(CLICCFGLBITS);
 
@@ -437,8 +436,20 @@ static RISCV_UNS64_PDEFAULT_CFG_FN(nmi_address)
 static RISCV_UNS64_PDEFAULT_CFG_FN(debug_address)
 static RISCV_UNS64_PDEFAULT_CFG_FN(dexc_address)
 static RISCV_UNS64_PDEFAULT_CFG_FN(unimp_int_mask)
+static RISCV_UNS64_PDEFAULT_CFG_FN(force_mideleg)
+static RISCV_UNS64_PDEFAULT_CFG_FN(force_sideleg)
 static RISCV_UNS64_PDEFAULT_CFG_FN(no_ideleg)
 static RISCV_UNS64_PDEFAULT_CFG_FN(no_edeleg)
+
+
+//
+// Set default number of PMP registers
+//
+static RISCV_PDEFAULT_FN(default_PMP_registers) {
+
+    setUns32ParamDefault(param, cfg->PMP_registers);
+    setUns32ParamMax(param, (cfg->priv_version>=RVPV_1_12) ? 64 : 16);
+}
 
 //
 // Set default value of numHarts
@@ -692,8 +703,8 @@ static riscvParameter parameters[] = {
 
     // simulation controls
     {  RVPV_VARIANT, 0,                            VMI_ENUM_PARAM_SPEC  (riscvParamValues, variant,              0,                         "Selects variant (either a generic UISA or a specific model)")},
-    {  RVPV_ALL,     default_user_version,         VMI_ENUM_PARAM_SPEC  (riscvParamValues, user_version,         userVariants,              "Specify required User Architecture version")},
-    {  RVPV_ALL,     default_priv_version,         VMI_ENUM_PARAM_SPEC  (riscvParamValues, priv_version,         privVariants,              "Specify required Privileged Architecture version")},
+    {  RVPV_PRE,     default_user_version,         VMI_ENUM_PARAM_SPEC  (riscvParamValues, user_version,         userVariants,              "Specify required User Architecture version")},
+    {  RVPV_PRE,     default_priv_version,         VMI_ENUM_PARAM_SPEC  (riscvParamValues, priv_version,         privVariants,              "Specify required Privileged Architecture version")},
     {  RVPV_V,       default_vect_version,         VMI_ENUM_PARAM_SPEC  (riscvParamValues, vector_version,       vectorVariants,            "Specify required Vector Architecture version")},
     {  RVPV_B,       default_bitmanip_version,     VMI_ENUM_PARAM_SPEC  (riscvParamValues, bitmanip_version,     bitmanipVariants,          "Specify required Bit Manipulation Architecture version")},
     {  RVPV_FPV,     default_fp16_version,         VMI_ENUM_PARAM_SPEC  (riscvParamValues, fp16_version,         fp16Variants,              "Specify required 16-bit floating point format")},
@@ -733,10 +744,12 @@ static riscvParameter parameters[] = {
     {  RVPV_ALL,     default_reset_address,        VMI_UNS64_PARAM_SPEC (riscvParamValues, reset_address,        0, 0,          -1,         "Override reset vector address")},
     {  RVPV_ALL,     default_nmi_address,          VMI_UNS64_PARAM_SPEC (riscvParamValues, nmi_address,          0, 0,          -1,         "Override NMI vector address")},
     {  RVPV_ALL,     default_PMP_grain,            VMI_UNS32_PARAM_SPEC (riscvParamValues, PMP_grain,            0, 0,          29,         "Specify PMP region granularity, G (0 => 4 bytes, 1 => 8 bytes, etc)")},
-    {  RVPV_ALL,     default_PMP_registers,        VMI_UNS32_PARAM_SPEC (riscvParamValues, PMP_registers,        0, 0,          16,         "Specify the number of implemented PMP address registers")},
+    {  RVPV_ALL,     default_PMP_registers,        VMI_UNS32_PARAM_SPEC (riscvParamValues, PMP_registers,        0, 0,          0,          "Specify the number of implemented PMP address registers")},
     {  RVPV_S,       default_Sv_modes,             VMI_UNS32_PARAM_SPEC (riscvParamValues, Sv_modes,             0, 0,          (1<<16)-1,  "Specify bit mask of implemented Sv modes (e.g. 1<<8 is Sv39)")},
     {  RVPV_ALL,     default_local_int_num,        VMI_UNS32_PARAM_SPEC (riscvParamValues, local_int_num,        0, 0,          0,          "Specify number of supplemental local interrupts")},
     {  RVPV_ALL,     default_unimp_int_mask,       VMI_UNS64_PARAM_SPEC (riscvParamValues, unimp_int_mask,       0, 0,          -1,         "Specify mask of unimplemented interrupts (e.g. 1<<9 indicates Supervisor external interrupt unimplemented)")},
+    {  RVPV_ALL,     default_force_mideleg,        VMI_UNS64_PARAM_SPEC (riscvParamValues, force_mideleg,        0, 0,          -1,         "Specify mask of interrupts always delegated to lower-priority execution level from Machine execution level")},
+    {  RVPV_S,       default_force_sideleg,        VMI_UNS64_PARAM_SPEC (riscvParamValues, force_sideleg,        0, 0,          -1,         "Specify mask of interrupts always delegated to User execution level from Supervisor execution level")},
     {  RVPV_ALL,     default_no_ideleg,            VMI_UNS64_PARAM_SPEC (riscvParamValues, no_ideleg,            0, 0,          -1,         "Specify mask of interrupts that cannot be delegated to lower-priority execution levels")},
     {  RVPV_ALL,     default_no_edeleg,            VMI_UNS64_PARAM_SPEC (riscvParamValues, no_edeleg,            0, 0,          -1,         "Specify mask of exceptions that cannot be delegated to lower-priority execution levels")},
     {  RVPV_ALL,     default_external_int_id,      VMI_BOOL_PARAM_SPEC  (riscvParamValues, external_int_id,      False,                     "Whether to add nets allowing External Interrupt ID codes to be forced")},
@@ -1166,6 +1179,10 @@ VMI_SET_PARAM_VALUES_FN(riscvGetPreParamValues) {
         // refine variant in cluster if required
         const char *variant = refineVariant(riscv, match->name);
         riscv->configInfo = *getSelectedConfig(cfgList, variant);
+
+        // override architecture versions if required
+        riscv->configInfo.user_version = params->user_version;
+        riscv->configInfo.priv_version = params->priv_version;
 
         // apply misa_Extensions override if required
         if(SETBIT(params->misa_Extensions)) {

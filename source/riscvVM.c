@@ -160,6 +160,13 @@ static Uns64 getPC(riscvP riscv) {
 }
 
 //
+// Return the number of implemented PMP registers
+//
+inline static Uns32 getNumPMPs(riscvP riscv) {
+    return riscv->configInfo.PMP_registers;
+}
+
+//
 // Return table entry implied global state
 //
 inline static Bool getG(riscvP riscv, Bool G) {
@@ -1645,7 +1652,7 @@ static Bool createPMPDomain(riscvP riscv, riscvMode mode, Bool isCode) {
     memDomainP otherDomain = riscv->pmaDomains[mode][!isCode];
     Bool       unified     = (pmaDomain==otherDomain);
     Uns32      pmpBits     = 64;
-    Uns32      numRegs     = riscv->configInfo.PMP_registers;
+    Uns32      numRegs     = getNumPMPs(riscv);
     Uns64      pmpMask     = getAddressMask(pmpBits);
     Uns64      extMask     = getAddressMask(riscv->extBits);
 
@@ -2122,7 +2129,7 @@ static Bool pmpLockedTOR(riscvP riscv, Uns8 index) {
 
     Bool locked = False;
 
-    if(index<NUM_PMPS) {
+    if(index<getNumPMPs(riscv)) {
 
         pmpcfgElem e = getPMPCFGElem(riscv, index);
 
@@ -2275,9 +2282,10 @@ static void getPMPEntryBounds(
 //
 static Bool lowerPriorityPMPEntryLocked(riscvP riscv, Uns32 index) {
 
+    Uns32 numRegs = getNumPMPs(riscv);
     Uns32 i;
 
-    for(i=index+1; i<NUM_PMPS; i++) {
+    for(i=index+1; i<numRegs; i++) {
 
         pmpcfgElem e = getPMPCFGElem(riscv, i);
 
@@ -2320,10 +2328,32 @@ static void invalidatePMPEntry(riscvP riscv, Uns32 index) {
 }
 
 //
+// Return offset into PMP bank allowing for the fact that when in 64-bit mode
+// the second set of PMP registers are controlled by pmpcfg2 (not pmpcfg1,
+// which is unimplemented)
+//
+static Uns32 getPMPCFGOffset(riscvP riscv, Uns32 index) {
+    return (riscv->currentArch & ISA_XLEN_64) ? index/2 : index;
+}
+
+//
+// Is the given PMP configuration register index valid?
+//
+static Bool validPMPCFG(riscvP riscv, Uns32 index) {
+
+    riscvArchitecture arch          = riscv->currentArch;
+    Uns32             entriesPerCFG = (arch & ISA_XLEN_64) ? 8 : 4;
+    Uns32             numPMP        = getNumPMPs(riscv);
+    Uns32             numCFG        = ((numPMP+entriesPerCFG-1)/entriesPerCFG);
+
+    return (getPMPCFGOffset(riscv, index) < numCFG);
+}
+
+//
 // Read the indexed PMP configuration register
 //
 Uns64 riscvVMReadPMPCFG(riscvP riscv, Uns32 index) {
-    return readPMPCFGInt(riscv, index);
+    return validPMPCFG(riscv, index) ? readPMPCFGInt(riscv, index) : 0;
 }
 
 //
@@ -2332,79 +2362,70 @@ Uns64 riscvVMReadPMPCFG(riscvP riscv, Uns32 index) {
 //
 Uns64 riscvVMWritePMPCFG(riscvP riscv, Uns32 index, Uns64 newValue) {
 
-    riscvArchitecture arch          = riscv->currentArch;
-    Uns32             entriesPerCFG = (arch & ISA_XLEN_64) ? 8 : 4;
-    Uns32             numPMP        = riscv->configInfo.PMP_registers;
-    Uns32             G             = riscv->configInfo.PMP_grain;
-    Uns32             numCFG        = ((numPMP+entriesPerCFG-1)/entriesPerCFG);
+    Uns64 result = 0;
 
-    // get offset into PMP bank allowing for the fact that when in 64-bit mode
-    // the second set of PMP registers are controlled by pmpcfg2 (not pmpcfg1,
-    // which is unimplemented)
-    Uns32 offset = (arch & ISA_XLEN_64) ? index/2 : index;
+    if(validPMPCFG(riscv, index)) {
 
-    if(offset<numCFG) {
+        Uns32 entriesPerCFG = (riscv->currentArch & ISA_XLEN_64) ? 8 : 4;
+        Uns32 offset        = getPMPCFGOffset(riscv, index);
+        Uns32 G             = riscv->configInfo.PMP_grain;
+        Uns32 numPMP        = getNumPMPs(riscv);
+        Uns32 numBytes      = numPMP-(offset*entriesPerCFG);
+        Uns64 mask          = (numBytes>=8) ? -1 : (1ULL<<(numBytes*8))-1;
+        Int32 i;
 
-        Uns32             numBytes = numPMP-(offset*entriesPerCFG);
-        Uns64             mask     = (numBytes>=8) ? -1 : (1ULL<<(numBytes*8))-1;
-        riscvPMPCFG       oldValue = riscv->pmpcfg;
-        Int32             i;
-
-        // mask writable bits
-        newValue &= (WM64_pmpcfg & mask);
-
-        // update register
-        if(arch & ISA_XLEN_64) {
-            riscv->pmpcfg.u64[offset] = newValue;
-        } else {
-            riscv->pmpcfg.u32[offset] = newValue;
-        }
+        // get byte-accessible source value
+        union {Uns64 u64; Uns8 u8[8];} src = {u64 : newValue&WM64_pmpcfg&mask};
 
         // invalidate any modified entries in lowest-to-highest priority order
         // (required so that lowerPriorityPMPEntryLocked always returns valid
         // results)
-        for(i=NUM_PMPS-1; i>=0; i--) {
+        for(i=entriesPerCFG-1; i>=0; i--) {
+
+            Uns32 cfgIndex = (index*4)+i;
+            Uns8 *dstP     = &riscv->pmpcfg.u8[cfgIndex];
 
             // get old and new values
-            pmpcfgElem oldCFG = {u8:oldValue.u8[i]};
-            pmpcfgElem newCFG = {u8:riscv->pmpcfg.u8[i]};
+            pmpcfgElem srcCFG = {u8:src.u8[i]};
+            pmpcfgElem dstCFG = {u8:*dstP};
 
             // when G>=1, the NA4 mode is not selectable
-            if(G && (newCFG.mode==PMPM_NA4)) {
-                newCFG.mode = oldCFG.mode;
-                riscv->pmpcfg.u8[i] = newCFG.u8;
+            if(G && (srcCFG.mode==PMPM_NA4)) {
+                srcCFG.mode = dstCFG.mode;
             }
 
-            if(oldCFG.u8!=newCFG.u8) {
+            if((*dstP!=srcCFG.u8) && !pmpLocked(riscv, cfgIndex)) {
 
-                // revert value (perhaps temporarily)
-                riscv->pmpcfg.u8[i] = oldCFG.u8;
+                // invalidate entry using its original specification
+                invalidatePMPEntry(riscv, cfgIndex);
 
-                if(!pmpLocked(riscv, i)) {
+                // set new value
+                *dstP = srcCFG.u8;
 
-                    // invalidate entry using its original specification
-                    invalidatePMPEntry(riscv, i);
-
-                    // set new value
-                    riscv->pmpcfg.u8[i] = newCFG.u8;
-
-                    // invalidate entry using its new specification
-                    invalidatePMPEntry(riscv, i);
-                }
+                // invalidate entry using its new specification
+                invalidatePMPEntry(riscv, cfgIndex);
             }
         }
+
+        // return updated value
+        result = readPMPCFGInt(riscv, index);
     }
 
-    // return updated value
-    return readPMPCFGInt(riscv, index);
+    return result;
+}
+
+//
+// Is the given PMP address register index valid?
+//
+inline static Bool validPMPAddr(riscvP riscv, Uns32 index) {
+    return index<getNumPMPs(riscv);
 }
 
 //
 // Read the indexed PMP address register
 //
 Uns64 riscvVMReadPMPAddr(riscvP riscv, Uns32 index) {
-
-    return getEffectivePMPAddr(riscv, index);
+    return validPMPAddr(riscv, index) ? getEffectivePMPAddr(riscv, index) : 0;
 }
 
 //
@@ -2413,8 +2434,8 @@ Uns64 riscvVMReadPMPAddr(riscvP riscv, Uns32 index) {
 //
 Uns64 riscvVMWritePMPAddr(riscvP riscv, Uns32 index, Uns64 newValue) {
 
-    Uns32 numRegs = riscv->configInfo.PMP_registers;
-    Uns32 G       = riscv->configInfo.PMP_grain;
+    Uns64 result = 0;
+    Uns32 G      = riscv->configInfo.PMP_grain;
 
     // mask writable bits to implemented external bits
     newValue &= (getAddressMask(riscv->extBits) >> 2);
@@ -2424,7 +2445,7 @@ Uns64 riscvVMWritePMPAddr(riscvP riscv, Uns32 index, Uns64 newValue) {
         newValue &= (-1ULL << (G-1));
     }
 
-    if((index<numRegs) && (riscv->pmpaddr[index]!=newValue)) {
+    if(validPMPAddr(riscv, index) && (riscv->pmpaddr[index]!=newValue)) {
 
         if(pmpLocked(riscv, index)) {
 
@@ -2445,9 +2466,11 @@ Uns64 riscvVMWritePMPAddr(riscvP riscv, Uns32 index, Uns64 newValue) {
             // invalidate entry using its new specification
             invalidatePMPEntry(riscv, index);
         }
+
+        result = getEffectivePMPAddr(riscv, index);
     }
 
-    return getEffectivePMPAddr(riscv, index);
+    return result;
 }
 
 //
@@ -2455,7 +2478,7 @@ Uns64 riscvVMWritePMPAddr(riscvP riscv, Uns32 index, Uns64 newValue) {
 //
 void riscvVMResetPMP(riscvP riscv) {
 
-    Uns32 numRegs = riscv->configInfo.PMP_registers;
+    Uns32 numRegs = getNumPMPs(riscv);
     Uns32 i;
 
     for(i=0; i<numRegs; i++) {
@@ -2536,7 +2559,7 @@ static void mapPMP(
     Uns64     lowPA,
     Uns64     highPA
 ) {
-    Uns32 numRegs = riscv->configInfo.PMP_registers;
+    Uns32 numRegs = getNumPMPs(riscv);
 
     if(numRegs) {
 
@@ -2546,7 +2569,7 @@ static void mapPMP(
         Int32   i;
 
         // handle all regions in lowest-to-highest priority order
-        for(i=riscv->configInfo.PMP_registers-1; i>=0; i--) {
+        for(i=numRegs-1; i>=0; i--) {
             refinePMPRegionRange(riscv, mode, &lowMap, &highMap, lowPA, i, &priv);
         }
 
@@ -2557,6 +2580,32 @@ static void mapPMP(
         } else {
             setPMPPriv(riscv, mode, lowMap, highMap, priv, True);
         }
+    }
+}
+
+//
+// Allocate PMP structures
+//
+void riscvVMNewPMP(riscvP riscv) {
+
+    Uns32 numRegs = getNumPMPs(riscv);
+
+    if(numRegs) {
+        riscv->pmpcfg.u64 = STYPE_CALLOC_N(Uns64, (numRegs+7)/8);
+        riscv->pmpaddr    = STYPE_CALLOC_N(Uns64, numRegs);
+    }
+}
+
+//
+// Free PMP structures
+//
+void riscvVMFreePMP(riscvP riscv) {
+
+    if(riscv->pmpcfg.u64) {
+        STYPE_FREE(riscv->pmpcfg.u64);
+    }
+    if(riscv->pmpaddr) {
+        STYPE_FREE(riscv->pmpaddr);
     }
 }
 
