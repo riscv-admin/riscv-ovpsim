@@ -11,6 +11,20 @@ NOTE: X-commit messages below refer to git commits in the following
   I-commit: https://github.com/riscv/riscv-isa-manual
   V-commit: https://github.com/riscv/riscv-v-spec
 
+- Reads of instret and cycle CSRs now exclude the current instruction from the
+  reported count.
+- The vector version master branch currently has these differences compared to
+  the previous 0.9 version:
+  - SLEN=VLEN register layout is mandatory;
+  - ELEN>VLEN is now supported for LMUL>1;
+  - Whole register moves and load/stores now have element size hints;
+  - Instructions vfrsqrte7.v and vfrece7.v added, with candidate implementations
+    (precise behavior is not yet defined).
+
+Date 2020-June-30
+Release 20200629.0
+===
+
 - Vector Extension
   - behavior of vslidedown.vx and vslidedown.vi with a slide of 0 when source
     and destination vector registers are the same has been corrected.

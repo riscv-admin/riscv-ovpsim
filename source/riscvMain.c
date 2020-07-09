@@ -80,7 +80,7 @@ static void initLeafModelCBs(riscvP riscv) {
     // from riscvExceptions.h
     riscv->cb.testInterrupt      = riscvTestInterrupt;
     riscv->cb.illegalInstruction = riscvIllegalInstruction;
-    riscv->cb.takeException      = riscvTakeException;
+    riscv->cb.takeException      = riscvTakeAsynchonousException;
 
     // from riscvDecode.h
     riscv->cb.fetchInstruction   = riscvExtFetchInstruction;
@@ -281,8 +281,7 @@ static void applyParamsSMP(riscvP riscv, riscvParamValuesP params) {
     cfg->xret_preserves_lr   = params->xret_preserves_lr;
     cfg->require_vstart0     = params->require_vstart0;
     cfg->ELEN                = powerOfTwo(params->ELEN, "ELEN");
-    cfg->SLEN                = powerOfTwo(params->SLEN, "SLEN");
-    cfg->VLEN                = powerOfTwo(params->VLEN, "VLEN");
+    cfg->VLEN = cfg->SLEN    = powerOfTwo(params->VLEN, "VLEN");
     cfg->SEW_min             = powerOfTwo(params->SEW_min, "SEW_min");
     cfg->Zvlsseg             = params->Zvlsseg;
     cfg->Zvamo               = params->Zvamo;
@@ -301,12 +300,25 @@ static void applyParamsSMP(riscvP riscv, riscvParamValuesP params) {
     cfg->intthresh_undefined = params->intthresh_undefined;
     cfg->mclicbase_undefined = params->mclicbase_undefined;
 
+    // handle SLEN (always the same as VLEN from version 1.0)
+    if(!riscvVFSupport(riscv, RVVF_SLEN_IS_VLEN)) {
+        cfg->SLEN = powerOfTwo(params->SLEN, "SLEN");
+    } else if((params->VLEN!=params->SLEN) && params->SETBIT(SLEN)) {
+        vmiMessage("W", CPU_PREFIX"_ISLEN",
+            "'SLEN' parameter now ignored - using VLEN (%u)",
+            cfg->SLEN
+        );
+    }
+
     // initialise vector-version-dependent mstatus.VS
     if(riscvVFSupport(riscv, RVVF_VS_STATUS_9)) {
         cfg->csr.mstatus.u64.fields.VS_9 = params->mstatus_VS;
     } else {
         cfg->csr.mstatus.u64.fields.VS_8 = params->mstatus_VS;
     }
+
+    // initialise vector-version-dependent vtype format
+    riscv->vtypeFormat = RV_VTF_0_9;
 
     // handle bit manipulation subset parameters
     cfg->bitmanip_absent = 0;
@@ -328,8 +340,8 @@ static void applyParamsSMP(riscvP riscv, riscvParamValuesP params) {
     // Zvqmac extension is only available after version RVVV_0_8_20191004
     cfg->Zvqmac = params->Zvqmac && (params->vector_version>RVVV_0_8_20191004);
 
-    // force VLEN >= ELEN
-    if(cfg->VLEN<cfg->ELEN) {
+    // force VLEN >= ELEN unless explicitly supported
+    if((cfg->VLEN<cfg->ELEN) && !riscvVFSupport(riscv, RVVF_ELEN_GT_VLEN)) {
         vmiMessage("W", CPU_PREFIX"_IVLEN",
             "'VLEN' (%u) less than 'ELEN' (%u) - forcing VLEN=%u",
             cfg->VLEN, cfg->ELEN, cfg->ELEN
@@ -401,6 +413,9 @@ static void applyParamsSMP(riscvP riscv, riscvParamValuesP params) {
 
     // set tag mask
     riscv->exclusiveTagMask = -lr_sc_grain;
+
+    // allocate CSR remap list
+    riscvNewCSRRemaps(riscv, params->CSR_remap);
 }
 
 //

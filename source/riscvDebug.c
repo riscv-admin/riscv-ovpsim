@@ -307,6 +307,7 @@ static vmiRegInfoCP getRegisters(riscvP riscv, Bool normal) {
         Uns32             fprNum = (!normal || (arch&ISA_DF)) ? 32       : 0;
         Uns32             vrNum  = ( normal && (arch&ISA_V))  ? VREG_NUM : 0;
         Uns32             regNum = 0;
+        Uns32             csrNum;
         riscvCSRDetails   csrDetails;
         isrDetailsCP      isrDetails;
         vmiRegInfoP       dst;
@@ -341,7 +342,8 @@ static vmiRegInfoCP getRegisters(riscvP riscv, Bool normal) {
 
         // count visible CSRs
         csrDetails.attrs = 0;
-        while(riscvGetCSRDetails(riscv, &csrDetails, normal)) {
+        csrNum           = 0;
+        while(riscvGetCSRDetails(riscv, &csrDetails, &csrNum, normal)) {
             regNum++;
         }
 
@@ -403,7 +405,8 @@ static vmiRegInfoCP getRegisters(riscvP riscv, Bool normal) {
 
         // fill visible CSRs
         csrDetails.attrs = 0;
-        while(riscvGetCSRDetails(riscv, &csrDetails, normal)) {
+        csrNum           = 0;
+        while(riscvGetCSRDetails(riscv, &csrDetails, &csrNum, normal)) {
             riscvCSRAttrsCP attrs = csrDetails.attrs;
             dst->name          = attrs->name;
             dst->description   = attrs->desc;

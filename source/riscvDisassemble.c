@@ -285,12 +285,13 @@ static void putOptRM(
 //
 static void putVType(char **result, riscvP riscv, riscvVType vtype) {
 
-    const char *mulString = vtype.vlmulf ? "mf" : "m";
-    Uns32       vlmul     = vtype.vlmulf ? 4-vtype.vlmul : vtype.vlmul;
+    Int32       svlmul    = getVTypeSVLMUL(vtype);
+    const char *mulString = (svlmul<0) ? "mf" : "m";
+    Uns32       vlmul     = (svlmul<0) ? -svlmul : svlmul;
 
     // put common fields
     putChar(result, 'e');
-    putD(result, 8<<vtype.vsew);
+    putD(result, getVTypeSEW(vtype));
     putChar(result, ',');
     putString(result, mulString);
     putD(result, 1<<vlmul);
@@ -298,9 +299,9 @@ static void putVType(char **result, riscvP riscv, riscvVType vtype) {
     // add agnostic indications if implemented
     if(riscvVFSupport(riscv, RVVF_AGNOSTIC)) {
         putChar(result, ',');
-        putString(result, vtype.vta ? "ta" : "tu");
+        putString(result, getVTypeVTA(vtype) ? "ta" : "tu");
         putChar(result, ',');
-        putString(result, vtype.vma ? "ma" : "mu");
+        putString(result, getVTypeVMA(vtype) ? "ma" : "mu");
     }
 }
 
@@ -413,6 +414,12 @@ static void putOpcode(char **result, riscvP riscv, riscvInstrInfoP info) {
         // whole register load/store
         putD(result, info->nf+1);
         putChar(result, 'r');
+
+        // emit version 1.0 EEW hint if required
+        if(riscvVFSupport(riscv, RVVF_VLR_HINT)) {
+            putChar(result, 'e');
+            putD(result, info->eew);
+        }
 
     } else {
 

@@ -241,6 +241,11 @@ void riscvCSRFree(riscvP riscv);
 //
 void riscvCSRReset(riscvP riscv);
 
+//
+// Allocate CSR remap list
+//
+void riscvNewCSRRemaps(riscvP riscv, const char *remaps);
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // DISASSEMBLER INTERFACE ACCESS FUNCTIONS
@@ -350,7 +355,12 @@ typedef struct riscvCSRDetailsS {
 // Iterator filling 'details' with the next CSR register details -
 // 'details.name' should be initialized to NULL prior to the first call
 //
-Bool riscvGetCSRDetails(riscvP riscv, riscvCSRDetailsP details, Bool normal);
+Bool riscvGetCSRDetails(
+    riscvP           riscv,
+    riscvCSRDetailsP details,
+    Uns32           *csrNumP,
+    Bool             normal
+);
 
 //
 // Register new externally-implemented CSR
@@ -1392,23 +1402,13 @@ typedef CSR_REG_TYPE(genericXLEN) CSR_REG_TYPE(vl);
 
 // 32-bit view
 typedef struct {
-    Uns32 vlmul  :  2;
-    Uns32 vsew   :  3;
-    Uns32 vlmulf :  1;
-    Uns32 vta    :  1;
-    Uns32 vma    :  1;
-    Uns32 _u1    : 23;
+    Uns32 _u1    : 31;
     Uns32 vill   :  1;
 } CSR_REG_TYPE_32(vtype);
 
 // 64-bit view
 typedef struct {
-    Uns64 vlmul  :  2;
-    Uns64 vsew   :  3;
-    Uns32 vlmulf :  1;
-    Uns32 vta    :  1;
-    Uns32 vma    :  1;
-    Uns64 _u1    : 55;
+    Uns64 _u1    : 63;
     Uns64 vill   :  1;
 } CSR_REG_TYPE_64(vtype);
 

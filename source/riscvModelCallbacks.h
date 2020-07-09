@@ -292,6 +292,26 @@ typedef RISCV_NEW_CSR_FN((*riscvNewCSRFn));
 typedef RISCV_RD_WR_SNAP_FN((*riscvRdWrSnapFn));
 
 //
+// Should a memory exception of the given type be suppressed or raised as
+// normal?
+//
+#define RISCV_SUPPRESS_MEM_EXCEPT_FN(_NAME) Bool _NAME( \
+    riscvP         riscv,       \
+    riscvException exception,   \
+    void          *clientData   \
+)
+typedef RISCV_SUPPRESS_MEM_EXCEPT_FN((*riscvSuppressMemExceptFn));
+
+//
+// Implementation-specific NMI
+//
+#define RISCV_CUSTOM_NMI_FN(_NAME) Bool _NAME( \
+    riscvP riscv,               \
+    void  *clientData           \
+)
+typedef RISCV_CUSTOM_NMI_FN((*riscvCustomNMIFn));
+
+//
 // Notifier called on trap entry or exception return
 //
 #define RISCV_TRAP_NOTIFIER_FN(_NAME) void _NAME( \
@@ -318,6 +338,16 @@ typedef RISCV_RESET_NOTIFIER_FN((*riscvResetNotifierFn));
     void  *clientData           \
 )
 typedef RISCV_FIRST_EXCEPTION_FN((*riscvFirstExceptionFn));
+
+//
+// Return priority for the indexed custom interrupt
+//
+#define RISCV_GET_INTERRUPT_PRI_FN(_NAME) riscvExceptionPriority _NAME( \
+    riscvP riscv,               \
+    Uns32  intNum,              \
+    void  *clientData           \
+)
+typedef RISCV_GET_INTERRUPT_PRI_FN((*riscvGetInterruptPriFn));
 
 //
 // Called when core has either halted or restarted
@@ -483,10 +513,13 @@ typedef struct riscvExtCBS {
     riscvRdWrSnapFn           wrSnapCB;
 
     // exception actions
+    riscvSuppressMemExceptFn  suppressMemExcept;
+    riscvCustomNMIFn          customNMI;
     riscvTrapNotifierFn       trapNotifier;
     riscvTrapNotifierFn       ERETNotifier;
     riscvResetNotifierFn      resetNotifier;
     riscvFirstExceptionFn     firstException;
+    riscvGetInterruptPriFn    getInterruptPri;
 
     // halt/restart actions
     riscvHRNotifierFn         haltRestartNotifier;

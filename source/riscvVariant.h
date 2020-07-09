@@ -173,8 +173,8 @@ typedef enum riscvPrivVerE {
 //
 // Date and tag of master version
 //
-#define RVVV_MASTER_DATE    "3 June 2020"
-#define RVVV_MASTER_TAG     "443ce5b"
+#define RVVV_MASTER_DATE    "3 July 2020"
+#define RVVV_MASTER_TAG     "2144559"
 
 //
 // Supported Vector Architecture versions
@@ -301,6 +301,9 @@ typedef enum riscvVFeatureE {
     RVVF_AGNOSTIC,          // are agnostic bits implemented?
     RVVF_MLEN1,             // is MLEN always 1?
     RVVF_EEW_OVERLAP,       // use relaxed EEW overlap rules?
+    RVVF_SLEN_IS_VLEN,      // is SLEN==VLEN?
+    RVVF_ELEN_GT_VLEN,      // is ELEN>VLEN legal?
+    RVVF_VLR_HINT,          // do VLR instructions encode hints?
     RVVF_LAST,              // for sizing
 } riscvVFeature;
 

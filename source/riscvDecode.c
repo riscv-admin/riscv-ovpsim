@@ -817,6 +817,8 @@ typedef enum riscvIType32E {
     IT32_VFNCVT_FF_V,
     IT32_VFNCVTROD_FF_V,
     IT32_VFSQRT_V,
+    IT32_VFRSQRTE7_V,
+    IT32_VFRECE7_V,
     IT32_VFCLASS_V,
     IT32_VFMUL_VV,
     IT32_VFMADD_VV,
@@ -2075,25 +2077,15 @@ const static decodeEntry32 decodeInitial09[] = {
     DECODE32_ENTRY(        VSXEI_I, "|...|.11|.|.....|.....|101|.....|0100111|"),
     DECODE32_ENTRY(       VSUXEI_I, "|...|.01|.|.....|.....|101|.....|0100111|"),
 
-    // V-extension load/store instructions (32/512-bit elements)
+    // V-extension load/store instructions (32/64/512/1024-bit elements)
     //                               | nf|mop|m|  xs2|  rs1|wth|  vs3| opcode|
-    DECODE32_ENTRY(          VLE_I, "|...|.00|.|.0000|.....|110|.....|0000111|"),
-    DECODE32_ENTRY(         VLSE_I, "|...|.10|.|.....|.....|110|.....|0000111|"),
-    DECODE32_ENTRY(        VLXEI_I, "|...|.11|.|.....|.....|110|.....|0000111|"),
-    DECODE32_ENTRY(          VSE_I, "|...|.00|.|00000|.....|110|.....|0100111|"),
-    DECODE32_ENTRY(         VSSE_I, "|...|.10|.|.....|.....|110|.....|0100111|"),
-    DECODE32_ENTRY(        VSXEI_I, "|...|.11|.|.....|.....|110|.....|0100111|"),
-    DECODE32_ENTRY(       VSUXEI_I, "|...|.01|.|.....|.....|110|.....|0100111|"),
-
-    // V-extension load/store instructions (64/1024-bit elements)
-    //                               | nf|mop|m|  xs2|  rs1|wth|  vs3| opcode|
-    DECODE32_ENTRY(          VLE_I, "|...|.00|.|.0000|.....|111|.....|0000111|"),
-    DECODE32_ENTRY(         VLSE_I, "|...|.10|.|.....|.....|111|.....|0000111|"),
-    DECODE32_ENTRY(        VLXEI_I, "|...|.11|.|.....|.....|111|.....|0000111|"),
-    DECODE32_ENTRY(          VSE_I, "|...|.00|.|00000|.....|111|.....|0100111|"),
-    DECODE32_ENTRY(         VSSE_I, "|...|.10|.|.....|.....|111|.....|0100111|"),
-    DECODE32_ENTRY(        VSXEI_I, "|...|.11|.|.....|.....|111|.....|0100111|"),
-    DECODE32_ENTRY(       VSUXEI_I, "|...|.01|.|.....|.....|111|.....|0100111|"),
+    DECODE32_ENTRY(          VLE_I, "|...|.00|.|.0000|.....|11.|.....|0000111|"),
+    DECODE32_ENTRY(         VLSE_I, "|...|.10|.|.....|.....|11.|.....|0000111|"),
+    DECODE32_ENTRY(        VLXEI_I, "|...|.11|.|.....|.....|11.|.....|0000111|"),
+    DECODE32_ENTRY(          VSE_I, "|...|.00|.|00000|.....|11.|.....|0100111|"),
+    DECODE32_ENTRY(         VSSE_I, "|...|.10|.|.....|.....|11.|.....|0100111|"),
+    DECODE32_ENTRY(        VSXEI_I, "|...|.11|.|.....|.....|11.|.....|0100111|"),
+    DECODE32_ENTRY(       VSUXEI_I, "|...|.01|.|.....|.....|11.|.....|0100111|"),
 
     // V-extension AMO operations (8-bit elements, Zvamo)
     //                               |amoop|dm|  xs2|  rs1|wth|  vs3| opcode|
@@ -2119,29 +2111,17 @@ const static decodeEntry32 decodeInitial09[] = {
     DECODE32_ENTRY(   VAMOSWAPEI_R, "|00001|..|.....|.....|101|.....|0101111|"),
     DECODE32_ENTRY(    VAMOXOREI_R, "|00100|..|.....|.....|101|.....|0101111|"),
 
-    // V-extension AMO operations (32-bit elements, Zvamo)
+    // V-extension AMO operations (32/64-bit elements, Zvamo)
     //                               |amoop|dm|  xs2|  rs1|wth|  vs3| opcode|
-    DECODE32_ENTRY(    VAMOADDEI_R, "|00000|..|.....|.....|110|.....|0101111|"),
-    DECODE32_ENTRY(    VAMOANDEI_R, "|01100|..|.....|.....|110|.....|0101111|"),
-    DECODE32_ENTRY(    VAMOMAXEI_R, "|10100|..|.....|.....|110|.....|0101111|"),
-    DECODE32_ENTRY(   VAMOMAXUEI_R, "|11100|..|.....|.....|110|.....|0101111|"),
-    DECODE32_ENTRY(    VAMOMINEI_R, "|10000|..|.....|.....|110|.....|0101111|"),
-    DECODE32_ENTRY(   VAMOMINUEI_R, "|11000|..|.....|.....|110|.....|0101111|"),
-    DECODE32_ENTRY(     VAMOOREI_R, "|01000|..|.....|.....|110|.....|0101111|"),
-    DECODE32_ENTRY(   VAMOSWAPEI_R, "|00001|..|.....|.....|110|.....|0101111|"),
-    DECODE32_ENTRY(    VAMOXOREI_R, "|00100|..|.....|.....|110|.....|0101111|"),
-
-    // V-extension AMO operations (64-bit elements, Zvamo)
-    //                               |amoop|dm|  xs2|  rs1|wth|  vs3| opcode|
-    DECODE32_ENTRY(    VAMOADDEI_R, "|00000|..|.....|.....|111|.....|0101111|"),
-    DECODE32_ENTRY(    VAMOANDEI_R, "|01100|..|.....|.....|111|.....|0101111|"),
-    DECODE32_ENTRY(    VAMOMAXEI_R, "|10100|..|.....|.....|111|.....|0101111|"),
-    DECODE32_ENTRY(   VAMOMAXUEI_R, "|11100|..|.....|.....|111|.....|0101111|"),
-    DECODE32_ENTRY(    VAMOMINEI_R, "|10000|..|.....|.....|111|.....|0101111|"),
-    DECODE32_ENTRY(   VAMOMINUEI_R, "|11000|..|.....|.....|111|.....|0101111|"),
-    DECODE32_ENTRY(     VAMOOREI_R, "|01000|..|.....|.....|111|.....|0101111|"),
-    DECODE32_ENTRY(   VAMOSWAPEI_R, "|00001|..|.....|.....|111|.....|0101111|"),
-    DECODE32_ENTRY(    VAMOXOREI_R, "|00100|..|.....|.....|111|.....|0101111|"),
+    DECODE32_ENTRY(    VAMOADDEI_R, "|00000|..|.....|.....|11.|.....|0101111|"),
+    DECODE32_ENTRY(    VAMOANDEI_R, "|01100|..|.....|.....|11.|.....|0101111|"),
+    DECODE32_ENTRY(    VAMOMAXEI_R, "|10100|..|.....|.....|11.|.....|0101111|"),
+    DECODE32_ENTRY(   VAMOMAXUEI_R, "|11100|..|.....|.....|11.|.....|0101111|"),
+    DECODE32_ENTRY(    VAMOMINEI_R, "|10000|..|.....|.....|11.|.....|0101111|"),
+    DECODE32_ENTRY(   VAMOMINUEI_R, "|11000|..|.....|.....|11.|.....|0101111|"),
+    DECODE32_ENTRY(     VAMOOREI_R, "|01000|..|.....|.....|11.|.....|0101111|"),
+    DECODE32_ENTRY(   VAMOSWAPEI_R, "|00001|..|.....|.....|11.|.....|0101111|"),
+    DECODE32_ENTRY(    VAMOXOREI_R, "|00100|..|.....|.....|11.|.....|0101111|"),
 
     // V-extension FVV-type instructions
     //                               |funct6|m|  vs2|  vs1|FVV|  vs3| opcode|
@@ -2180,6 +2160,32 @@ const static decodeEntry32 decodeInitial09[] = {
     DECODE32_ENTRY(        VZEXT_V, "|010010|.|.....|001.0|010|.....|1010111|"),
     DECODE32_ENTRY(        VSEXT_V, "|010010|.|.....|00011|010|.....|1010111|"),
     DECODE32_ENTRY(        VSEXT_V, "|010010|.|.....|001.1|010|.....|1010111|"),
+
+    // table termination entry
+    {0}
+};
+
+//
+// This specifies decodes *after* release 0.9
+//
+const static decodeEntry32 decodeInitial10[] = {
+
+    // V-extension load/store instructions (whole registers, 8/128-bit hint)
+    //                               | nf|mop|m|  xs2|  rs1|wth|  vs3| opcode|
+    DECODE32_ENTRY(          VLE_I, "|...|.00|1|01000|.....|000|.....|0000111|"),
+
+    // V-extension load/store instructions (whole registers, 16/256-bit hint)
+    //                               | nf|mop|m|  xs2|  rs1|wth|  vs3| opcode|
+    DECODE32_ENTRY(          VLE_I, "|...|.00|1|01000|.....|101|.....|0000111|"),
+
+    // V-extension load/store instructions (whole registers, 32/64/512/1024-bit hint)
+    //                               | nf|mop|m|  xs2|  rs1|wth|  vs3| opcode|
+    DECODE32_ENTRY(          VLE_I, "|...|.00|1|01000|.....|11.|.....|0000111|"),
+
+    // V-extension FVV-type instructions
+    //                               |funct6|m|  vs2|  vs1|FVV|  vs3| opcode|
+    DECODE32_ENTRY(    VFRSQRTE7_V, "|010011|.|.....|00100|001|.....|1010111|"),
+    DECODE32_ENTRY(      VFRECE7_V, "|010011|.|.....|00101|001|.....|1010111|"),
 
     // table termination entry
     {0}
@@ -2576,6 +2582,8 @@ const static opAttrs attrsArray32[] = {
     ATTR32_VD_VS1_M_VN      (    VFNCVT_FF_V,     VFNCVT_FF_V, RVANYV,  "vfncvt.f.f"     ),
     ATTR32_VD_VS1_M_W_ROD   ( VFNCVTROD_FF_V,     VFNCVT_FF_V, RVANYV,  "vfncvt.rod.f.f" ),
     ATTR32_VD_VS1_M_V       (       VFSQRT_V,        VFSQRT_V, RVANYV,  "vfsqrt"         ),
+    ATTR32_VD_VS1_M_V       (    VFRSQRTE7_V,     VFRSQRTE7_V, RVANYV,  "vfrsqrte7"      ),
+    ATTR32_VD_VS1_M_V       (      VFRECE7_V,       VFRECE7_V, RVANYV,  "vfrece7"        ),
     ATTR32_VD_VS1_M_V       (      VFCLASS_V,       VFCLASS_V, RVANYV,  "vfclass"        ),
     ATTR32_VD_VS1_VS2_M_VV  (       VFMUL_VV,        VFMUL_VR, RVANYV,  "vfmul"          ),
     ATTR32_VD_VS2_VS1_M_VV  (      VFMADD_VV,       VFMADD_VR, RVANYV,  "vfmadd"         ),
@@ -2933,6 +2941,11 @@ static vmidDecodeTableP createExtDecodeTable32(
         insertEntries32(table, &decodePre09[0]);
     } else {
         insertEntries32(table, &decodeInitial09[0]);
+    }
+
+    // insert vector-extension-dependent table entries after 0.9
+    if(vect_version>RVVV_0_9) {
+        insertEntries32(table, &decodeInitial10[0]);
     }
 
     return table;
@@ -3940,7 +3953,7 @@ static riscvVType getVType(
             break;
 
         case VTYPE_30_20:
-            result.u32 = U_30_20(instr);
+            result = composeVType(riscv, U_30_20(instr));
             break;
 
         default:
@@ -3952,7 +3965,7 @@ static riscvVType getVType(
 }
 
 //
-// Return while-register specification encoded in the instruction
+// Return whole-register specification encoded in the instruction
 //
 static riscvWholeDesc getWholeReg(riscvInstrInfoP info, wholeSpec wr) {
 

@@ -4653,7 +4653,7 @@ static void prepareMasks(
             fillPredMask(id, rotate);
         }
 
-        // create active mask (LSB within byte set)
+        // create active mask (LSB within field set)
         if(needActiveMask) {
             fillActiveMask(id, rotate);
         }
@@ -5185,7 +5185,7 @@ static riscvVLMULx8Mt getVLMULMt(riscvMorphStateP state) {
 
         emitCheckPolymorphic();
 
-        VLMULx8 = svlmulToVLMULx8(getSVLMUL(riscv));
+        VLMULx8 = svlmulToVLMULx8(getCurrentSVLMUL(riscv));
         blockState->VLMULx8Mt = VLMULx8;
     }
 
@@ -5205,7 +5205,8 @@ static riscvSEWMt getSEWMt(riscvMorphStateP state) {
 
         emitCheckPolymorphic();
 
-        blockState->SEWMt = SEW = vsewToSEW(RD_CSR_FIELD(riscv, vtype, vsew));
+        SEW = getCurrentSEW(riscv);
+        blockState->SEWMt = SEW;
     }
 
     return SEW;
@@ -5826,7 +5827,11 @@ static void getVectorOpRegisters(riscvMorphStateP state, iterDescP id) {
             riscvSEWMt     eew    = state->info.eew;
 
             // take into account EEW encoded in the instruction
-            if(eew && ((i==2) || (state->info.memBits!=-1))) {
+            if(!eew) {
+                // no encoded EEW
+            } else if(state->info.isWhole) {
+                // encoded EEW is a hint but otherwise ignored
+            } else if((i==2) || (state->info.memBits!=-1)) {
                 vr->forceEEW = True;
                 mulNx8 = (mulNx8*eew)/vr->EEW;
             }
@@ -6803,7 +6808,7 @@ void riscvWVStart(riscvMorphStateP state, Bool useRS1) {
 Uns32 riscvGetMaxVL(riscvP riscv, riscvVType vtype) {
 
     Uns32          VLEN    = riscv->configInfo.VLEN;
-    riscvSEWMt     SEW     = vsewToSEW(vtype.vsew);
+    riscvSEWMt     SEW     = getVTypeSEW(vtype);
     riscvVLMULx8Mt VLMULx8 = vtypeToVLMULx8(vtype);
 
     return (VLMULx8*VLEN)/(SEW*8);
@@ -6817,20 +6822,22 @@ riscvSEWMt riscvValidVType(riscvP riscv, riscvVType vtype) {
 
     riscvSEWMt     SEW_min = riscv->configInfo.SEW_min;
     riscvSEWMt     ELEN    = riscv->configInfo.ELEN;
-    riscvSEWMt     SEW     = vsewToSEW(vtype.vsew);
+    riscvSEWMt     VLEN    = riscv->configInfo.VLEN;
+    riscvSEWMt     FRLEN   = (ELEN<VLEN) ? ELEN : VLEN ;
+    riscvSEWMt     SEW     = getVTypeSEW(vtype);
     riscvVLMULx8Mt VLMULx8 = vtypeToVLMULx8(vtype);
 
     if(
         // validate fields that must be zero
-        vtype._u1 ||
+        getVTypeZero(vtype) ||
         // validate vlmulf setting
-        (vtype.vlmulf && !vectorFractLMUL(riscv)) ||
+        ((getVTypeSVLMUL(vtype)<0) && !vectorFractLMUL(riscv)) ||
         // validate agnostic settings
-        ((vtype.vta||vtype.vma) && !vectorAgnostic(riscv)) ||
+        ((getVTypeVTA(vtype)||getVTypeVMA(vtype)) && !vectorAgnostic(riscv)) ||
         // validate SEW is supported
         (SEW<SEW_min) || (SEW>ELEN) ||
-        // validate LMUL>=(SEW/ELEN)
-        !(VLMULx8>=((SEW*8)/ELEN))
+        // validate LMUL>=(SEW/FRLEN)
+        !(VLMULx8>=((SEW*8)/FRLEN))
     ) {
         SEW = SEWMT_UNKNOWN;
     }
@@ -6843,12 +6850,12 @@ riscvSEWMt riscvValidVType(riscvP riscv, riscvVType vtype) {
 //
 static Uns32 setVLSEWLMUL(riscvP riscv, Uns64 vl, Uns32 vtypeBits) {
 
-    riscvVType vtype = {vtypeBits};
+    riscvVType vtype = composeVType(riscv, vtypeBits);
     Bool       vill  = !riscvValidVType(riscv, vtype);
 
     // handle illegal vtype setting
     if(vill) {
-        vtype.u32 = 0;
+        vtype.u.u32 = 0;
     }
 
     // update vtype CSR
@@ -6868,7 +6875,7 @@ static Uns32 setVLSEWLMUL(riscvP riscv, Uns64 vl, Uns32 vtypeBits) {
 //
 static Uns32 setMaxVLSEWLMUL(riscvP riscv, Uns32 vtypeBits) {
 
-    riscvVType vtype = {u32:vtypeBits};
+    riscvVType vtype = composeVType(riscv, vtypeBits);
 
     // compute effective VLMAX
     Uns32 VLMAX = riscvGetMaxVL(riscv, vtype);
@@ -6958,7 +6965,7 @@ static void emitVSetVLRRCCB(riscvMorphStateP state) {
     // call update function (SEW is known to be valid)
     vmimtArgProcessor();
     vmiCallFn cb = handleVSetVLArg1(state);
-    vmimtArgUns32(vtype.u32);
+    vmimtArgUns32(vtype.u.u32);
     vmimtCallResultAttrs(cb, dBits, rd.r, VMCA_NO_INVALIDATE);
     writeUnpackedSize(rd, dBits);
 
@@ -6982,7 +6989,7 @@ static void emitVSetVLRRCBadSEWLMUL(riscvMorphStateP state) {
     // use embedded call
     vmimtArgProcessor();
     vmimtArgUns64(0);           // vl (ignored)
-    vmimtArgUns32(vtype.u32);   // vtype
+    vmimtArgUns32(vtype.u.u32); // vtype
     vmimtCallResultAttrs(cb, dBits, rd.r, VMCA_NO_INVALIDATE);
     writeUnpackedSize(rd, dBits);
 
@@ -7138,7 +7145,7 @@ static Uns32 getVMemBits(riscvMorphStateP state, iterDescP id) {
 
     Uns32 memBits = state->info.memBits;
 
-    if(isMemBitsSEW(memBits)) {
+    if(state->info.isWhole || isMemBitsSEW(memBits)) {
         memBits = id->SEW;
     }
 
@@ -9745,6 +9752,8 @@ const static riscvMorphAttr dispatchTable[] = {
     [RV_IT_VFWMSAC_VR]       = {fpConfig:RVFP_NORMAL, morph:emitVectorOp, opTCB:emitVRMAccFltCB,    fpTernop:vmi_FMSUB,  vShape:RVVW_V2F_V1F_V1F},
     [RV_IT_VFWNMSAC_VR]      = {fpConfig:RVFP_NORMAL, morph:emitVectorOp, opTCB:emitVRMAccFltCB,    fpTernop:vmi_FNMSUB, vShape:RVVW_V2F_V1F_V1F},
     [RV_IT_VFSQRT_V]         = {fpConfig:RVFP_NORMAL, morph:emitVectorOp, opTCB:emitVRUnaryFltCB,   fpUnop:  vmi_FSQRT,  vShape:RVVW_V1F_V1F_V1F},
+    [RV_IT_VFRSQRTE7_V]      = {fpConfig:RVFP_NORMAL, morph:emitVectorOp, opTCB:emitVRUnaryFltCB,   fpUnop:  vmi_FRSQRT, vShape:RVVW_V1F_V1F_V1F},
+    [RV_IT_VFRECE7_V]        = {fpConfig:RVFP_NORMAL, morph:emitVectorOp, opTCB:emitVRUnaryFltCB,   fpUnop:  vmi_FRECIP, vShape:RVVW_V1F_V1F_V1F},
     [RV_IT_VFMIN_VR]         = {fpConfig:RVFP_FMIN,   morph:emitVectorOp, opTCB:emitVRBinaryFltCB,  fpBinop: vmi_FMIN,   vShape:RVVW_V1F_V1F_V1F},
     [RV_IT_VFMAX_VR]         = {fpConfig:RVFP_FMAX,   morph:emitVectorOp, opTCB:emitVRBinaryFltCB,  fpBinop: vmi_FMAX,   vShape:RVVW_V1F_V1F_V1F},
     [RV_IT_VFSGNJ_VR]        = {fpConfig:RVFP_NORMAL, morph:emitVectorOp, opTCB:emitVRFSgnFltCB,    clearFS1:1,negFS2:0, vShape:RVVW_V1F_V1F_V1F},
