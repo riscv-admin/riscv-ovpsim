@@ -1365,8 +1365,27 @@ void riscvDoc(riscvP rootProcessor) {
             );
             vmidocAddText(
                 Version,
+                "- SLEN=VLEN register layout is mandatory;"
+            );
+            vmidocAddText(
+                Version,
+                "- ELEN>VLEN is now supported for LMUL>1;"
+            );
+            vmidocAddText(
+                Version,
+                "- whole register moves and load/stores now have element size "
+                "hints;"
+            );
+            vmidocAddText(
+                Version,
                 "- overlap constraints for different source/destination EEW "
-                "changed."
+                "changed;"
+            );
+            vmidocAddText(
+                Version,
+                "- instructions vfrsqrte7.v and vfrece7.v added, with "
+                "candidate implementations (precise behavior is not yet "
+                "defined)."
             );
         }
     }

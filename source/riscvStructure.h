@@ -67,13 +67,13 @@
 //
 typedef struct riscvNetValueS {
     Bool reset;         // level of reset signal
-    Bool nmi;           // level of NMI signal
     Bool haltreq;       // haltreq (Debug mode)
     Bool resethaltreq;  // resethaltreq (Debug mode)
     Bool resethaltreqS; // resethaltreq (Debug mode, sampled at reset)
     Bool deferint;      // defer taking interrupts (artifact)
     Bool enableCLIC;    // is CLIC enabled?
     Bool _u1;           // (for alignment)
+    Bool _u2;           // (for alignment)
 } riscvNetValue;
 
 //
@@ -173,7 +173,7 @@ typedef struct riscvS {
     riscvArchitecture  currentArch;     // current enabled features
     riscvDMode         mode;            // current processor mode
     riscvDisableReason disable;         // reason why processor is disabled
-    Uns32              numHarts;        // numer of hart contexts in container
+    Uns32              numHarts;        // number of hart contexts in container
     Bool               verbose       :1;// whether verbose output enabled
     Bool               artifactAccess:1;// whether current access is an artifact
     Bool               externalActive:1;// whether external CSR access active
@@ -181,6 +181,7 @@ typedef struct riscvS {
     Bool               useTMode      :1;// has transaction mode been enabled?
     Bool               rmCheckValid  :1;// whether RM valid check required
     Bool               checkEndian   :1;// whether endian check required
+    riscvVTypeFmt      vtypeFormat   :1;// vtype format (vector extension)
     Uns16              pmKey;           // polymorphic key
     Uns8               fpFlagsMT;       // flags set by JIT instructions
     Uns8               fpFlagsCSR;      // flags set by CSR write
@@ -204,7 +205,7 @@ typedef struct riscvS {
 
     // Interrupt and exception control
     vmiExceptionInfoCP exceptions;      // all exceptions (including extensions)
-    Uns32              exceptionNum;    // number of exceptions
+    Uns32              nonLocalNum;     // number of exceptions except local int
     Uns32              swip;            // software interrupt pending bits
     Uns64              exceptionMask;   // mask of all implemented exceptions
     Uns64              interruptMask;   // mask of all implemented interrupts
@@ -244,9 +245,9 @@ typedef struct riscvS {
     Uns32              LRAddressHandle; // LR address port handle (locking)
     Uns32              SCAddressHandle; // SC address port handle (locking)
     Uns32              AMOActiveHandle; // active AMO operation
-    Uns32              irq_ack_Handle;  // interrupt acknowledge (external CLIC)
-    Uns32              irq_id_Handle;   // interrupt id (external CLIC)
-    Uns32              sec_lvl_Handle;  // security level (external CLIC)
+    Uns32              irq_ack_Handle;  // interrupt acknowledge
+    Uns32              irq_id_Handle;   // interrupt id
+    Uns32              sec_lvl_Handle;  // security level
 
     // Timers
     vmiModelTimerP     stepTimer;       // Debug mode single-step timer
@@ -255,19 +256,20 @@ typedef struct riscvS {
     vmiRangeTableP     csrTable;        // per-CSR lookup table
     vmiRangeTableP     csrUIMessage;    // per-CSR unimplemented messages
     riscvBusPortP      csrPort;         // externally-implemented CSR port
+    riscvCSRRemapP     csrRemap;        // CSR remap list
 
     // Memory management support
-    riscvDomainSet     pmaDomains;          // pma domains
-    riscvDomainSet     pmpDomains;          // pmp domains
-    riscvDomainSet     physDomains;         // physical domains
-    riscvDomainSet     vmDomains;           // mapped domains
-    memDomainP         CLICDomain;          // CLIC domain
-    riscvPMPCFG        pmpcfg;              // pmpcfg registers
-    Uns64             *pmpaddr;             // pmpaddr registers
-    riscvTLBP          tlb;                 // TLB cache
-    Uns8               extBits    :  8;     // bit size of external domains
-    Bool               PTWActive  :  1;     // page table walk active
-    Bool               PTWBadAddr :  1;     // page table walk address was bad
+    riscvDomainSet     pmaDomains;      // pma domains
+    riscvDomainSet     pmpDomains;      // pmp domains
+    riscvDomainSet     physDomains;     // physical domains
+    riscvDomainSet     vmDomains;       // mapped domains
+    memDomainP         CLICDomain;      // CLIC domain
+    riscvPMPCFG        pmpcfg;          // pmpcfg registers
+    Uns64             *pmpaddr;         // pmpaddr registers
+    riscvTLBP          tlb;             // TLB cache
+    Uns8               extBits    :  8; // bit size of external domains
+    Bool               PTWActive  :  1; // page table walk active
+    Bool               PTWBadAddr :  1; // page table walk address was bad
 
     // Messages
     riscvBasicIntState intState;        // basic interrupt state
@@ -373,14 +375,32 @@ inline static Bool useCLICU(riscvP riscv) {
 }
 
 //
+// Compose vtype
+//
+inline static riscvVType composeVType(riscvP riscv, Uns32 vtypeBits) {
+    riscvVType vtype = {format : riscv->vtypeFormat, u : {u32 : vtypeBits}};
+    return vtype;
+}
+
+//
+// Return current vtype
+//
+inline static riscvVType getCurrentVType(riscvP riscv) {
+    return composeVType(riscv, RD_CSR(riscv, vtype));
+}
+
+//
+// Return current SEW
+//
+inline static Uns32 getCurrentSEW(riscvP riscv) {
+    return getVTypeSEW(getCurrentVType(riscv));
+}
+
+//
 // Return current vector signed vlmul
 //
-inline static Int32 getSVLMUL(riscvP riscv) {
-
-    Uns32 vlmul  = RD_CSR_FIELD(riscv, vtype, vlmul);
-    Bool  vlmulf = RD_CSR_FIELD(riscv, vtype, vlmulf);
-
-    return getSignedVLMUL(vlmul, vlmulf);
+inline static Int32 getCurrentSVLMUL(riscvP riscv) {
+    return getVTypeSVLMUL(getCurrentVType(riscv));
 }
 
 

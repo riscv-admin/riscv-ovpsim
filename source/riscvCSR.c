@@ -17,6 +17,13 @@
  *
  */
 
+// standard header files
+#include <string.h>
+
+// Imperas header files
+#include "hostapi/impAlloc.h"
+#include "hostapi/typeMacros.h"
+
 // VMI header files
 #include "vmi/vmiMessage.h"
 #include "vmi/vmiMt.h"
@@ -1661,11 +1668,6 @@ static RISCV_CSR_WRITEFN(utvecW) {
 ////////////////////////////////////////////////////////////////////////////////
 
 //
-// Return register index for CSR
-//
-static Uns32 getCSRNum(riscvCSRAttrsCP attrs);
-
-//
 // Return mask of Performance Monitor registers accessible in the current mode
 //
 static Uns32 getHPMMask(riscvP riscv) {
@@ -1690,7 +1692,7 @@ static Uns32 getHPMMask(riscvP riscv) {
 //
 static Bool hpmAccessValid(riscvCSRAttrsCP attrs, riscvP riscv) {
 
-    Uns32 index = getCSRNum(attrs);
+    Uns32 index = attrs->csrNum;
     Uns32 mask  = (1<<(index&31));
 
     if(riscv->artifactAccess) {
@@ -1763,15 +1765,31 @@ inline static Uns64 getXLENValue(riscvP riscv, Uns64 result) {
 //
 // Return current cycle count
 //
-inline static Uns64 getCycles(riscvP riscv) {
-    return vmirtGetICount((vmiProcessorP)riscv);
+static Uns64 getCycles(riscvP riscv) {
+
+    Uns64 result = vmirtGetICount((vmiProcessorP)riscv);
+
+    // exclude the current instruction if this is a true access
+    if(!riscv->artifactAccess) {
+        result--;
+    }
+
+    return result;
 }
 
 //
 // Return current instruction count
 //
-inline static Uns64 getInstructions(riscvP riscv) {
-    return vmirtGetExecutedICount((vmiProcessorP)riscv);
+static Uns64 getInstructions(riscvP riscv) {
+
+    Uns64 result = vmirtGetExecutedICount((vmiProcessorP)riscv);
+
+    // exclude the current instruction if this is a true access
+    if(!riscv->artifactAccess) {
+        result--;
+    }
+
+    return result;
 }
 
 //
@@ -2220,10 +2238,7 @@ inline static RISCV_CSR_PRESENTFN(vcsrP) {
 // Return maximum vector length for the current vector type settings
 //
 static Uns32 getMaxVL(riscvP riscv) {
-
-    riscvVType vtype = {u32:RD_CSR(riscv, vtype)};
-
-    return riscvGetMaxVL(riscv, vtype);
+    return riscvGetMaxVL(riscv, getCurrentVType(riscv));
 }
 
 //
@@ -2334,7 +2349,7 @@ void riscvRefreshVectorPMKey(riscvP riscv) {
 //
 void riscvSetVType(riscvP riscv, Bool vill, riscvVType vtype) {
 
-    WR_CSR(riscv, vtype, vtype.u32);
+    WR_CSR(riscv, vtype, vtype.u.u32);
     WR_CSR_FIELD(riscv, vtype, vill, vill);
 }
 
@@ -2764,6 +2779,131 @@ static const riscvCSRAttrs csrs[CSR_ID(LAST)] = {
 
 
 ////////////////////////////////////////////////////////////////////////////////
+// CSR ALIAS SUPPORT
+////////////////////////////////////////////////////////////////////////////////
+
+//
+// Specify alias address for CSR
+//
+typedef struct riscvCSRRemapS {
+    riscvCSRRemapP next;        // next in list
+    const char    *name;        // CSR name
+    Uns32          csrNum : 12; // index number
+} riscvCSRRemap;
+
+//
+// Return register number for CSR, perhaps modified by remap
+//
+static Uns32 getCSRNum(riscvP riscv, riscvCSRAttrsCP attrs) {
+
+    Uns32          result = attrs->csrNum;
+    riscvCSRRemapP remap;
+
+    for(remap=riscv->csrRemap; remap; remap=remap->next) {
+        if(!strcmp(attrs->name, remap->name)) {
+            result = remap->csrNum;
+        }
+    }
+
+    return result;
+}
+
+//
+// Allocate CSR remap list
+//
+void riscvNewCSRRemaps(riscvP riscv, const char *remaps) {
+
+    if(remaps && remaps[0]) {
+
+        Uns32 numRemaps = 0;
+        Uns32 i, j;
+        char  ch;
+        char  tmp[strlen(remaps)+1];
+
+        // copy given aliases to temporary buffer, stripping whitespace
+        // characters and replacing commas with zeros (to tokenize the string)
+        for(i=0, j=0; (ch=remaps[i]); i++) {
+
+            switch(ch) {
+
+                case ' ':
+                case '\t':
+                    // strip whitespace
+                    break;
+
+                case ',':
+                    // replace ',' with zero, suppressing null entries
+                    if(j && tmp[j-1]) {
+                        tmp[j++] = 0;
+                        numRemaps++;
+                    }
+                    break;
+
+                default:
+                    // copy character to result string
+                    tmp[j++] = ch;
+                    break;
+            }
+        }
+
+        // terminate last token
+        if(j && tmp[j-1]) {
+            tmp[j++] = 0;
+            numRemaps++;
+        }
+
+        char           *buffer = tmp;
+        riscvCSRRemapPP tail   = &riscv->csrRemap;
+
+        // handle each remap
+        for(i=0; i<numRemaps; i++) {
+
+            Uns32 remapLen = strlen(buffer)+1;
+            char  csrName[remapLen];
+
+            // copy name to temporary buffer
+            for(j=0; (ch=buffer[j]) && (ch!='='); j++) {
+                csrName[j] = ch;
+            }
+
+            // terminate string
+            csrName[j] = 0;
+
+            if(ch) {
+
+                // terminate string
+                Uns32 csrNum = strtol(buffer+j+1, 0, 0);
+
+                riscvCSRRemapP remap = STYPE_CALLOC(riscvCSRRemap);
+
+                remap->name   = strdup(csrName);
+                remap->csrNum = csrNum;
+
+                *tail = remap;
+                tail = &remap->next;
+            }
+
+            buffer += remapLen;
+        }
+    }
+}
+
+//
+// Free CSR alias list
+//
+static void freeCSRRemap(riscvP riscv) {
+
+    riscvCSRRemapP alias;
+
+    while((alias=riscv->csrRemap)) {
+        riscv->csrRemap = alias->next;
+        STYPE_FREE(alias->name);
+        STYPE_FREE(alias);
+    }
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
 // REGISTER ACCESS UTILITIES
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -2785,14 +2925,6 @@ typedef union CSRFieldsU {
 static riscvCSRId getCSRId(riscvCSRAttrsCP attrs) {
 
     return attrs - csrs;
-}
-
-//
-// Return register number for CSR
-//
-static Uns32 getCSRNum(riscvCSRAttrsCP attrs) {
-
-    return attrs->csrNum;
 }
 
 //
@@ -3009,7 +3141,7 @@ inline static riscvCSRAttrsCP getEntryCSRAttrs(vmiRangeEntryP entry) {
 //
 static void newCSR(riscvCSRAttrsCP attrs, riscvP riscv) {
 
-    Uns32           csrNum = attrs->csrNum;
+    Uns32           csrNum = getCSRNum(riscv, attrs);
     vmiRangeTablePP tableP = &riscv->csrTable;
     vmiRangeEntryP  entry  = vmirtGetFirstRangeEntry(tableP, csrNum, csrNum);
 
@@ -3073,11 +3205,17 @@ static riscvCSRAttrsCP getCSRAttrs(riscvP riscv, Uns32 csrNum) {
 //
 // Return the next CSR in index order given the previous one
 //
-static riscvCSRAttrsCP getNextCSR(riscvCSRAttrsCP prev, riscvP riscv) {
-
-    Uns32           csrNum = prev ? prev->csrNum+1 : 0;
+static riscvCSRAttrsCP getNextCSR(
+    riscvCSRAttrsCP prev,
+    riscvP          riscv,
+    Uns32          *csrNumP
+) {
+    Uns32           csrNum = *csrNumP;
     vmiRangeTablePP tableP = &riscv->csrTable;
     vmiRangeEntryP  entry  = vmirtGetFirstRangeEntry(tableP, csrNum, -1);
+
+    // seed next CSR index to try
+    *csrNumP = (entry ? vmirtGetRangeEntryLow(entry) : csrNum) + 1;
 
     return getEntryCSRAttrs(entry);
 }
@@ -3644,9 +3782,7 @@ void riscvCSRInit(riscvP riscv, Uns32 index) {
         ~(
             getInterruptMask(riscv_E_MSWInterrupt)       |
             getInterruptMask(riscv_E_MTimerInterrupt)    |
-            getInterruptMask(riscv_E_MExternalInterrupt) |
-            // supplemental local interrupts are Machine mode only
-            riscvGetLocalIntMask(riscv)
+            getInterruptMask(riscv_E_MExternalInterrupt)
         )
     );
 
@@ -3943,6 +4079,9 @@ void riscvCSRFree(riscvP riscv) {
 
     // free CSR message range table
     vmirtFreeRangeTable(&riscv->csrUIMessage);
+
+    // free CSR aliases
+    freeCSRRemap(riscv);
 }
 
 
@@ -4391,13 +4530,17 @@ void riscvEmitCSRWrite(
 // Iterator filling 'details' with the next CSR register details -
 // 'details.name' should be initialized to NULL prior to the first call
 //
-Bool riscvGetCSRDetails(riscvP riscv, riscvCSRDetailsP details, Bool normal) {
+Bool riscvGetCSRDetails(
+    riscvP           riscv,
+    riscvCSRDetailsP details,
+    Uns32           *csrNumP,
+    Bool             normal
+) {
+    riscvArchitecture arch   = riscv->configInfo.arch;
+    riscvCSRAttrsCP   attrs  = details->attrs;
+    Uns32             bits   = riscvGetXlenArch(riscv);
 
-    riscvArchitecture arch  = riscv->configInfo.arch;
-    riscvCSRAttrsCP   attrs = details->attrs;
-    Uns32             bits  = riscvGetXlenArch(riscv);
-
-    while((attrs=getNextCSR(attrs, riscv))) {
+    while((attrs=getNextCSR(attrs, riscv, csrNumP))) {
 
         if(checkCSRPresent(attrs, riscv, arch, normal)) {
 

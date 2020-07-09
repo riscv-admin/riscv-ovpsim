@@ -400,6 +400,8 @@ typedef enum riscvITypeE {
     RV_IT_VFNCVT_FX_V,
     RV_IT_VFNCVT_FF_V,
     RV_IT_VFSQRT_V,
+    RV_IT_VFRSQRTE7_V,
+    RV_IT_VFRECE7_V,
     RV_IT_VFCLASS_V,
     RV_IT_VFWREDSUM_VS,
     RV_IT_VFWREDOSUM_VS,

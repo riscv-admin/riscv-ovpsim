@@ -37,6 +37,15 @@ void riscvTakeException(
 );
 
 //
+// Take asynchronous processor exception
+//
+void riscvTakeAsynchonousException(
+    riscvP         riscv,
+    riscvException exception,
+    Uns64          tval
+);
+
+//
 // Take processor exception because of memory access error which could be
 // suppressed for a fault-only-first instruction
 //
@@ -120,11 +129,6 @@ Bool riscvHasException(riscvP riscv, riscvException code);
 // Return total number of interrupts (including 0 to 15)
 //
 Uns32 riscvGetIntNum(riscvP riscv);
-
-//
-// Return mask of implemented local interrupts
-//
-Uns64 riscvGetLocalIntMask(riscvP riscv);
 
 //
 // Initialize mask of implemented exceptions
