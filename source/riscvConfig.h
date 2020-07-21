@@ -52,8 +52,6 @@ typedef RV_DOC_FN((*riscvDocFn));
 //
 typedef struct riscvExtConfigS {
     Uns32        id;                    // unique extension ID
-    const char **specificDocs;          // extension-specific documentation
-    riscvDocFn   restrictionsCB;        // extension-specific restrictions
     const void  *userData;              // extension-specific constant data
 } riscvExtConfig;
 
@@ -90,6 +88,7 @@ typedef struct riscvConfigS {
     Uns64             ecode_mask;       // implemented bits in xcause.ecode
     Uns64             ecode_nmi;        // exception code for NMI
     Uns32             counteren_mask;   // counter-enable implemented mask
+    Uns32             noinhibit_mask;	// counter no-inhibit mask
     Uns32             local_int_num;    // number of local interrupts
     Uns32             lr_sc_grain;      // LR/SC region grain size
     Uns32             ASID_bits;        // number of implemented ASID bits
@@ -121,6 +120,8 @@ typedef struct riscvConfigS {
     Bool              xret_preserves_lr;// whether xRET preserves current LR
     Bool              require_vstart0;  // require vstart 0 if uninterruptible?
     Bool              enable_CSR_bus;   // enable CSR implementation bus
+    Bool              mcounteren_present;// force mcounteren to be present
+    Bool              PMP_undefined;    // force all PMP registers undefined
     Bool              external_int_id;  // enable external interrupt ID ports
     Bool              tval_zero;        // whether [smu]tval are always zero
     Bool              tval_ii_code;     // instruction bits in [smu]tval for
@@ -128,15 +129,15 @@ typedef struct riscvConfigS {
 
     // CLIC configuration
     Uns32             CLICLEVELS;       // number of CLIC interrupt levels
-    Bool              CLICANDBASIC;		// whether implements basic mode also
+    Bool              externalCLIC;     // is CLIC externally implemented?
+    Bool              CLICANDBASIC;     // whether implements basic mode also
     Uns8              CLICVERSION;      // CLIC version
     Uns8              CLICINTCTLBITS;   // bits implemented in clicintctl[i]
     Uns8              CLICCFGMBITS;     // bits implemented for cliccfg.nmbits
     Uns8              CLICCFGLBITS;     // bits implemented for cliccfg.nlbits
-    Bool              CLICSELHVEC;		// selective hardware vectoring?
-    Bool              CLICXNXTI;		// *nxti CSRs implemented?
-    Bool              CLICXCSW;			// *scratchcs* CSRs implemented?
-    Bool              externalCLIC;     // is CLIC externally implemented?
+    Bool              CLICSELHVEC;      // selective hardware vectoring?
+    Bool              CLICXNXTI;        // *nxti CSRs implemented?
+    Bool              CLICXCSW;         // *scratchcs* CSRs implemented?
     Bool              tvt_undefined;    // whether *tvt CSRs are undefined
     Bool              intthresh_undefined;// whether *intthresh CSRs undefined
     Bool              mclicbase_undefined;// whether mclicbase CSR is undefined
@@ -177,13 +178,3 @@ typedef struct riscvConfigS {
 //
 riscvConfigCP riscvGetConfigList(riscvP riscv);
 
-//
-// Get the indexed extension configuration for the processor
-//
-inline static riscvExtConfigCP riscvGetIndexedExtConfig(
-    riscvConfigCP config,
-    Uns32         index
-) {
-    riscvExtConfigCPP extensionConfigs = config->extensionConfigs;
-    return extensionConfigs ? extensionConfigs[index] : 0;
-}

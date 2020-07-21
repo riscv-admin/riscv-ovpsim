@@ -642,7 +642,7 @@ void riscvTakeException(
         if(isInt) {
             writeNet(riscv, riscv->irq_id_Handle, ecodeMod);
             writeNet(riscv, riscv->irq_ack_Handle, 1);
-            writeNet(riscv, riscv->irq_ack_Handle, 0);
+            riscv->netValue.irq_ack = True;
         }
     }
 }
@@ -1753,6 +1753,12 @@ VMI_IFETCH_FN(riscvIFetchExcept) {
     Uns64  thisPC  = address;
     Bool   fetchOK = False;
 
+    // clear interrupt acknowledge signal if it is asserted
+    if(riscv->netValue.irq_ack) {
+        writeNet(riscv, riscv->irq_ack_Handle, 0);
+        riscv->netValue.irq_ack = False;
+    }
+
     if(riscv->netValue.resethaltreqS) {
 
         // enter Debug mode out of reset
@@ -2612,7 +2618,7 @@ static riscvNetPortPP addCLICNetPorts(riscvP riscv, riscvNetPortPP tail) {
         "irq_i",
         vmi_NP_INPUT,
         irqPortCB,
-        "indicate new interrupt pending (posedge triggered)",
+        "indicate new interrupt pending",
         0,
         0
     );

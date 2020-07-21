@@ -5831,7 +5831,7 @@ static void getVectorOpRegisters(riscvMorphStateP state, iterDescP id) {
                 // no encoded EEW
             } else if(state->info.isWhole) {
                 // encoded EEW is a hint but otherwise ignored
-            } else if((i==2) || (state->info.memBits!=-1)) {
+            } else if((i==2) || (state->info.memBits>0)) {
                 vr->forceEEW = True;
                 mulNx8 = (mulNx8*eew)/vr->EEW;
             }
@@ -8893,7 +8893,7 @@ static Uns32 getRVBits(riscvMorphStateP state, iterDescP id, Uns32 index) {
 
     riscvRegDesc rsA = getRVReg(state, index);
 
-    return isVReg(rsA) ? id->SEW : getRBits(rsA);
+    return isVReg(rsA) ? getEEW(id, index) : getRBits(rsA);
 }
 
 //
