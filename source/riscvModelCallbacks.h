@@ -55,7 +55,7 @@ typedef RISCV_REGISTER_EXT_CB_FN((*riscvRegisterExtCBFn));
 //
 // Return the indexed extension's extCB clientData
 //
-#define RISCV_GET_EXT_CLIENT_DATA_FN(_NAME) void * _NAME( \
+#define RISCV_GET_EXT_CLIENT_DATA_FN(_NAME) void *_NAME( \
     riscvP riscv,      \
     Uns32  id          \
 )
@@ -83,9 +83,13 @@ typedef RISCV_GET_XLEN_FN((*riscvGetXlenFn));
 typedef RISCV_GET_REG_NAME_FN((*riscvGetRegNameFn));
 
 //
+// Enable or disable transaction mode
+//
+#define RISCV_SET_TMODE_FN(_NAME) void _NAME(riscvP riscv, Bool enable)
+typedef RISCV_SET_TMODE_FN((*riscvSetTModeFn));
+
+//
 // Return true if in transaction mode
-// Use at morph time only - assumes instruction checking this could
-// abort a transaction so emits end block if in TM
 //
 #define RISCV_GET_TMODE_FN(_NAME) Bool _NAME(riscvP riscv)
 typedef RISCV_GET_TMODE_FN((*riscvGetTModeFn));
@@ -100,10 +104,42 @@ typedef RISCV_GET_TMODE_FN((*riscvGetTModeFn));
 typedef RISCV_GET_DATA_ENDIAN_FN((*riscvGetDataEndianFn));
 
 //
-// Enable or disable transaction mode
+// Read a CSR in the base model given its number
 //
-#define RISCV_SET_TMODE_FN(_NAME) void _NAME(riscvP riscv, Bool enable)
-typedef RISCV_SET_TMODE_FN((*riscvSetTModeFn));
+#define RISCV_READ_CSR_NUM_FN(_NAME) Uns64 _NAME( \
+    riscvP riscv,               \
+    Uns32  csrNum               \
+)
+typedef RISCV_READ_CSR_NUM_FN((*riscvReadCSRNumFn));
+
+//
+// Write a CSR in the base model given its number
+//
+#define RISCV_WRITE_CSR_NUM_FN(_NAME) Uns64 _NAME( \
+    riscvP riscv,               \
+    Uns32  csrNum,              \
+    Uns64  newValue             \
+)
+typedef RISCV_WRITE_CSR_NUM_FN((*riscvWriteCSRNumFn));
+
+//
+// Read a CSR in the base model given its id
+//
+#define RISCV_READ_BASE_CSR_FN(_NAME) Uns64 _NAME( \
+    riscvP     riscv,           \
+    riscvCSRId id               \
+)
+typedef RISCV_READ_BASE_CSR_FN((*riscvReadBaseCSRFn));
+
+//
+// Write a CSR in the base model given its id
+//
+#define RISCV_WRITE_BASE_CSR_FN(_NAME) Uns64 _NAME( \
+    riscvP     riscv,           \
+    riscvCSRId id,              \
+    Uns64      newValue         \
+)
+typedef RISCV_WRITE_BASE_CSR_FN((*riscvWriteBaseCSRFn));
 
 //
 // Check for pending interrupts
@@ -408,42 +444,14 @@ typedef RISCV_TSTORE_FN((*riscvTStoreFn));
 typedef RISCV_PMA_CHECK_FN((*riscvPMACheckFn));
 
 //
-// Read a CSR in the base model given its number
+// Document extension-specific restrictions
 //
-#define RISCV_READ_CSR_NUM_FN(_NAME) Uns64 _NAME( \
-    riscvP riscv,               \
-    Uns32  csrNum               \
+#define RISCV_RESTRICTIONS_FN(_NAME) void _NAME( \
+    riscvP      riscv,          \
+    vmiDocNodeP node,           \
+    void       *clientData      \
 )
-typedef RISCV_READ_CSR_NUM_FN((*riscvReadCSRNumFn));
-
-//
-// Write a CSR in the base model given its number
-//
-#define RISCV_WRITE_CSR_NUM_FN(_NAME) Uns64 _NAME( \
-    riscvP riscv,               \
-    Uns32  csrNum,              \
-    Uns64  newValue             \
-)
-typedef RISCV_WRITE_CSR_NUM_FN((*riscvWriteCSRNumFn));
-
-//
-// Read a CSR in the base model given its id
-//
-#define RISCV_READ_BASE_CSR_FN(_NAME) Uns64 _NAME( \
-    riscvP     riscv,           \
-    riscvCSRId id               \
-)
-typedef RISCV_READ_BASE_CSR_FN((*riscvReadBaseCSRFn));
-
-//
-// Write a CSR in the base model given its id
-//
-#define RISCV_WRITE_BASE_CSR_FN(_NAME) Uns64 _NAME( \
-    riscvP     riscv,           \
-    riscvCSRId id,              \
-    Uns64      newValue         \
-)
-typedef RISCV_WRITE_BASE_CSR_FN((*riscvWriteBaseCSRFn));
+typedef RISCV_RESTRICTIONS_FN((*riscvRestrictionsFn));
 
 //
 // Container structure for all callbacks implemented by the base model
@@ -535,6 +543,9 @@ typedef struct riscvExtCBS {
 
     // PMA check actions
     riscvPMACheckFn           PMACheck;
+
+    // documentation
+    riscvRestrictionsFn       restrictionsCB;
 
 } riscvExtCB;
 

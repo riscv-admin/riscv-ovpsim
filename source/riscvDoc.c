@@ -147,8 +147,7 @@ void riscvDoc(riscvP rootProcessor) {
     riscvConfigCP    cfg      = &riscv->configInfo;
     Bool             isSMP    = child && !riscvIsCluster(riscv);
     Uns32            numHarts = cfg->numHarts;
-    Uns32            extIndex;
-    riscvExtConfigCP extCfg;
+    riscvExtCBP      extCB;
     char             string[1024];
 
     // move to first child if an SMP object
@@ -1385,7 +1384,11 @@ void riscvDoc(riscvP rootProcessor) {
                 Version,
                 "- instructions vfrsqrte7.v and vfrece7.v added, with "
                 "candidate implementations (precise behavior is not yet "
-                "defined)."
+                "defined);"
+            );
+            vmidocAddText(
+                Version,
+                "- instruction vrgatherei16.vv added."
             );
         }
     }
@@ -2129,12 +2132,10 @@ void riscvDoc(riscvP rootProcessor) {
         addOptDoc(riscv, Limitations, cfg->restrictionsCB);
 
         // add extension-specific restrictions if required
-        for(
-            extIndex = 0;
-            (extCfg = riscvGetIndexedExtConfig(cfg, extIndex));
-            extIndex++
-        ) {
-            addOptDoc(riscv, Limitations, extCfg->restrictionsCB);
+        for(extCB=riscv->extCBs; extCB; extCB=extCB->next) {
+            if(extCB->restrictionsCB) {
+                extCB->restrictionsCB(riscv, Limitations, extCB->clientData);
+            }
         }
     }
 
@@ -2246,15 +2247,6 @@ void riscvDoc(riscvP rootProcessor) {
 
         // add custom references if required
         addOptDocList(References, cfg->specificDocs);
-
-        // add extension-specific references if required
-        for(
-            extIndex = 0;
-            (extCfg = riscvGetIndexedExtConfig(cfg, extIndex));
-            extIndex++
-        ) {
-            addOptDocList(References, extCfg->specificDocs);
-        }
     }
 
     vmidocProcessor((vmiProcessorP)rootProcessor, Root);

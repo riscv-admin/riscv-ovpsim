@@ -11,15 +11,28 @@ NOTE: X-commit messages below refer to git commits in the following
   I-commit: https://github.com/riscv/riscv-isa-manual
   V-commit: https://github.com/riscv/riscv-v-spec
 
+- First release of Imperas Instruction Functional Coverage engine to provide
+  coverage of RISC-V Compliance Test Suites.
+- mintstatus, sintstatus and uintstatus CSRs have been reassigned to addresses
+  0x346, 0x146 and 0x046, respectively.
+- The vector version master branch currently has these differences compared to
+  the previous 0.9 version:
+  - V-commit a679250: instruction vrgatherei16.vv added.
+
+Date 2020-July-09
+Release 20200708.0
+===
+
 - Reads of instret and cycle CSRs now exclude the current instruction from the
   reported count.
 - The vector version master branch currently has these differences compared to
   the previous 0.9 version:
-  - SLEN=VLEN register layout is mandatory;
-  - ELEN>VLEN is now supported for LMUL>1;
-  - Whole register moves and load/stores now have element size hints;
-  - Instructions vfrsqrte7.v and vfrece7.v added, with candidate implementations
-    (precise behavior is not yet defined).
+  - V-commit 7facdcc: SLEN=VLEN register layout is mandatory;
+  - V-commit b454810: ELEN>VLEN is now supported for LMUL>1;
+  - V-commit 20f673c: Whole register moves and load/stores now have element size
+    hints;
+  - V-commit d35b23f: Instructions vfrsqrte7.v and vfrece7.v added, with 
+    candidate implementations (precise behavior is not yet defined).
 
 Date 2020-June-30
 Release 20200629.0
