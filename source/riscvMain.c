@@ -319,7 +319,11 @@ static void applyParamsSMP(riscvP riscv, riscvParamValuesP params) {
     }
 
     // initialise vector-version-dependent vtype format
-    riscv->vtypeFormat = RV_VTF_0_9;
+    if(riscvVFSupport(riscv, RVVF_VTYPE_10)) {
+        riscv->vtypeFormat = RV_VTF_1_0;
+    } else {
+        riscv->vtypeFormat = RV_VTF_0_9;
+    }
 
     // handle bit manipulation subset parameters
     cfg->bitmanip_absent = 0;

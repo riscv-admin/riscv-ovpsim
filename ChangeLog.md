@@ -11,6 +11,13 @@ NOTE: X-commit messages below refer to git commits in the following
   I-commit: https://github.com/riscv/riscv-isa-manual
   V-commit: https://github.com/riscv/riscv-v-spec
 
+- Vector Extension
+  - V-commit b8cd98b: CSR vtype format changed to make vlmul bits contiguous.
+
+Date 2020-July-21
+Release 20200720.0
+===
+
 - First release of Imperas Instruction Functional Coverage engine to provide
   coverage of RISC-V Compliance Test Suites.
 - mintstatus, sintstatus and uintstatus CSRs have been reassigned to addresses
