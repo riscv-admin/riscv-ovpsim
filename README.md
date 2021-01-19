@@ -3,38 +3,25 @@ riscvOVPsim
 A Complete, Fully Functional, Configurable RISC-V Simulator
 ===
 
-Author: Imperas Software, Ltd., using OVP Open Standard APIs  
-Date   : 22 Jul 2020 
-Version: 20200722.0  
-License: Model source included under Apache 2.0 open source license  
-License: Simulator riscvOVPsim licensed under Open Virtual Platforms (OVP) Fixed Platform Kits license  
-RISC-V Specifications currently supported:
-- RISC-V Instruction Set Manual, Volume I: User-Level ISA (User Architecture Version 20190305-Base-Ratification)
-- RISC-V Instruction Set Manual, Volume II: Privileged Architecture (Privileged Architecture Version 20190405-Priv-MSU-Ratification)
-- RISC-V Instruction Set Manual, RISC-V "V" Vector Extension (with version configurable in the model using the 'vector_version' parameter. 'master' version conforms to specification changes up to 3 July 2020 and is regularly updated to track the evolving specification.)
-- RISCV Extension B (Bit Manipulation)
-  - Run command: riscvOVPsim.exe --override riscvOVPsim/cpu/add_Extensions=B --showoverrides
-  - When B extension is active, parameter 'bitmanip_version' can be used to specify the required version.
+riscvOVPsim has moved to its own GitHub repository.
+
+It can now be found here: [github.com/riscv-ovpsim](https://github.com/riscv-ovpsim/imperas-riscv-tests).
+
+For the enhanced version, please download from [ovpworld.org/riscv-ovpsim-plus](https://www.ovpworld.org/riscvOVPsimPlus/).
   
-About riscvOVPsim
----
-The **riscvOVPsim** simulator implements the full and complete functionality of the RISC-V Foundation's public User and Privilege specifications.  
+The simulators implement the full and complete functionality of the RISC-V Foundation's public User and Privilege specifications.  
 
-The simulator is command line configurable to enable/disable all current optional and processor specific options. 
+The simulators are command line configurable to enable/disable all current optional and processor specific options. 
 
-The simulator is developed, licensed and maintained by [Imperas Software](http://www.imperas.com/riscv) and it is fully compliant to the OVP open standard APIs. 
+The simulators are developed, licensed and maintained by [Imperas Software](http://www.imperas.com/riscv) and are fully compliant to the OVP open standard APIs. 
 
-As a member of the RISC-V Foundation community of software and hardware innovators collaboratively driving RISC-V adoption, Imperas has developed the riscvOVPsim simulator to assist RISC-V adopters to become compliant to the RISC-V specifications. The latest RISC-V compliance test suite and framework can be downloaded from https://www.github.com/riscv/riscv-compliance . 
+As a member of the RISC-V Foundation community of software and hardware innovators collaboratively driving RISC-V adoption, Imperas has developed the riscvOVPsim simulators to assist RISC-V adopters to become compliant to the RISC-V specifications. The latest RISC-V compliance test suite and framework can be downloaded from https://www.github.com/riscv/riscv-compliance . 
 
-riscvOVPsim includes an industrial quality model and simulator of RISC-V processors for use for compliance and test development. It has been developed for personal, academic, or commercial use, and the model is provided as open source under the Apache 2.0 license. The simulator is provided under the  Open Virtual Platforms (OVP) Fixed Platform Kits license that enables download and usage. riscvOVPsim and Imperas RISC-V support is actively maintained and enhanced. To ensure you make use of the current version of riscvOVPsim this initial release will expire. Please download the latest version.
+The riscvOVPsim simulators include an industrial quality model and simulator of RISC-V processors for use for compliance and test development. It has been developed for personal, academic, or commercial use, and the model is provided as open source under the Apache 2.0 license. The simulator is provided under the  Open Virtual Platforms (OVP) Fixed Platform Kits license that enables download and usage. riscvOVPsim and Imperas RISC-V support is actively maintained and enhanced. To ensure you make use of the current version of riscvOVPsim this initial release will expire. Please download the latest version.
 
 Runtime configurable settings for all RISC-V specification options makes it very easy to compare run time results with any RTL implementations.
 
 Full commercial features including variant selection, comprehensive trace, GDB/Eclipse graphical source code debug, semihosting, and RISC-V foundation signature dump facility for compliance testing.
-
-More information: [riscvOVPsim user guide](doc/riscvOVPsim_User_Guide.pdf)  
-Model Source: [source](source)  
-Examples: [examples](examples)  
 
 ![](riscvOVPsim.jpg)  
 riscvOVPsim is a fixed function simulation of one configurable processor model in a fixed platform. Full extendable platform simulations of reference designs booting FreeRTOS, Linux, SMP Linux etc. are available as open source and are available from [www.IMPERAS.com](http://www.imperas.com), [www.OVPworld.org](http://www.OVPworld.org).  
@@ -47,8 +34,6 @@ The same fixed platform can be used to debug the application using GDB and Eclip
 For GDB debug add the command line argument _-gdbconsole_, this will start the GDB debugger and connect to the virtual platform.
 
 For Eclipse debug, using CDT, a configuration to attach to an external remote application for debug should be made. The port to attach to is opened on the running virtual platform by adding the command line argument _-port <port number>_ when starting the virtual platform. 
-
-Please see the [riscvOVPsim user guide](doc/riscvOVPsim_User_Guide.pdf) for full details.
 
 Using riscvOVPsim
 ---
@@ -127,12 +112,9 @@ extension to report on, or even select just individual instructions to report on
 
 There is currently 'basic' and 'extended' coverage measuring.
 
-Please read the [riscvOVPsim user guide](doc/riscvOVPsim_User_Guide.pdf) for full operational instructions.
-
 If a signature comparison based verification methodology is adopted (as in the RISC-V Compliance suites) for comparison 
 between device under test and reference, then functional coverage is only part of the story, 
 as it is essential to measure the successful propagation of the results of the input instructions/values into the signature. 
-Read more about this in the section below on Mutation Testing in the [riscvOVPsim user guide](doc/riscvOVPsim_User_Guide.pdf).
 
 The coverage technology provided as part of riscvOVPsim is fixed functionality. The Imperas coverage technology is available as an extension library as source as a standard part of the Imperas commercial
  product offerings and this allows users to extend and modify functionality and coverage capability. Contact Imperas for more information.
